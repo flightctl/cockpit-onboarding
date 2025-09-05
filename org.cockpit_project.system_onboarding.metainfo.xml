@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="addon">
+  <id>org.cockpit_project.system_onboarding</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <name>System Onboarding</name>
+  <summary>System onboarding wizard</summary>
+  <description>
+    <p>
+      Wizard for the initial setup of a system to be able to onboard it into a management system.
+    </p>
+  </description>
+  <extends>org.cockpit_project.cockpit</extends>
+  <launchable type="cockpit-manifest">system-onboarding</launchable>
+  <url type="homepage">https://github.com/cockpit-project/system-onboarding</url>
+  <url type="bugtracker">https://github.com/cockpit-project/system-onboarding/issues</url>
+  <update_contact>cockpit-devel_AT_lists.fedorahosted.org</update_contact>
+  <developer id="org.cockpit-project">
+    <name>Cockpit Project</name>
+  </developer>
+</component>

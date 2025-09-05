@@ -3,9 +3,10 @@
         "cockpit": "137"
     },
 
-    "tools": {
+    "menu": {
         "index": {
-            "label": "Starter Kit"
+            "label": "Onboarding",
+            "order": 11
         }
     }
 }

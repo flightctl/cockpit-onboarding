@@ -1,9 +1,9 @@
-pkgname=cockpit-starter-kit
+pkgname=cockpit-system-onboarding
 pkgver=VERSION
 pkgrel=1
-pkgdesc='Cockpit Starter Kit Example Module'
+pkgdesc='Cockpit System Onboarding Module'
 arch=('x86_64')
-url='https://github.com/cockpit-project/starter-kit'
+url='https://github.com/cockpit-project/system-onboarding'
 license=(LGPL)
 source=("SOURCE")
 sha256sums=('SKIP')
