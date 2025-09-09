@@ -2,6 +2,7 @@
   "compilerOptions": {
     "allowJs": true,
     "checkJs": true,
+    "allowImportingTsExtensions": true,
     "exactOptionalPropertyTypes": true,
     "jsx": "react",
     "lib": [
