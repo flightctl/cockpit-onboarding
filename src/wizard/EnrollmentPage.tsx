@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
@@ -6,14 +6,34 @@ import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/in
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
 import { Stack, StackItem } from '@patternfly/react-core';
 import { Flex, FlexItem } from '@patternfly/react-core';
+import { useModelContext } from '../model-context';
 
 export const EnrollmentPage: React.FunctionComponent = () => {
-    const [enrollmentUrl, setEnrollmentUrl] = useState<string>('');
-    const [skipTlsVerification, setSkipTlsVerification] = useState<boolean>(false);
-    const [authMethod, setAuthMethod] = useState<'username-password' | 'token'>('username-password');
-    const [username, setUsername] = useState<string>('');
-    const [password, setPassword] = useState<string>('');
-    const [token, setToken] = useState<string>('');
+    const { model, updateModel } = useModelContext();
+    
+    const setEnrollmentUrl = (url: string) => {
+        updateModel('enrollment', { url });
+    };
+    
+    const setSkipTlsVerification = (skipTlsVerification: boolean) => {
+        updateModel('enrollment', { skipTlsVerification });
+    };
+    
+    const setAuthMethod = (authMethod: 'username-password' | 'token') => {
+        updateModel('enrollment', { authMethod });
+    };
+    
+    const setUsername = (username: string) => {
+        updateModel('enrollment', { username });
+    };
+    
+    const setPassword = (password: string) => {
+        updateModel('enrollment', { password });
+    };
+    
+    const setToken = (token: string) => {
+        updateModel('enrollment', { token });
+    };
 
     const isValidUrl = (url: string): boolean => {
         try {
@@ -33,7 +53,7 @@ export const EnrollmentPage: React.FunctionComponent = () => {
         }
     };
 
-    const urlValidated = enrollmentUrl ? (isValidUrl(enrollmentUrl) ? 'success' : 'error') : 'default';
+    const urlValidated = model.enrollment.url ? (isValidUrl(model.enrollment.url) ? 'success' : 'error') : 'default';
 
     return (
         <Stack hasGutter>
@@ -44,25 +64,24 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                 <FormGroup 
                     label="Enrollment Service URL" 
                     isRequired
-                    helperText={!enrollmentUrl ? "Enter a valid HTTP or HTTPS URL" : undefined}
                     helperTextInvalid="Please enter a valid HTTP or HTTPS URL"
                     validated={urlValidated}
                 >
                     <TextInput
                         id="enrollment-url"
-                        value={enrollmentUrl}
+                        value={model.enrollment.url}
                         onChange={(_, value) => setEnrollmentUrl(value)}
                         placeholder="https://enrollment.example.com"
                         validated={urlValidated}
                     />
                 </FormGroup>
             </StackItem>
-            {isValidUrl(enrollmentUrl) && isHttpsUrl(enrollmentUrl) && (
+            {isValidUrl(model.enrollment.url) && isHttpsUrl(model.enrollment.url) && (
                 <StackItem>
                     <Checkbox
                         id="skip-tls-verification"
                         label="Skip TLS verification (insecure)"
-                        isChecked={skipTlsVerification}
+                        isChecked={model.enrollment.skipTlsVerification}
                         onChange={(_, checked) => setSkipTlsVerification(checked)}
                     />
                 </StackItem>
@@ -75,7 +94,7 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                                 id="auth-username-password"
                                 name="auth-method"
                                 label="Username and password"
-                                isChecked={authMethod === 'username-password'}
+                                isChecked={model.enrollment.authMethod === 'username-password'}
                                 onChange={() => setAuthMethod('username-password')}
                             />
                         </FlexItem>
@@ -84,21 +103,21 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                                 id="auth-token"
                                 name="auth-method"
                                 label="Token"
-                                isChecked={authMethod === 'token'}
+                                isChecked={model.enrollment.authMethod === 'token'}
                                 onChange={() => setAuthMethod('token')}
                             />
                         </FlexItem>
                     </Flex>
                 </FormGroup>
             </StackItem>
-            {authMethod === 'username-password' ? (
+            {model.enrollment.authMethod === 'username-password' ? (
                 <StackItem>
                     <Stack hasGutter>
                         <StackItem>
                             <FormGroup label="Username" isRequired>
                                 <TextInput
                                     id="username"
-                                    value={username}
+                                    value={model.enrollment.username}
                                     onChange={(_, value) => setUsername(value)}
                                     placeholder="Enter username"
                                 />
@@ -109,7 +128,7 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                                 <TextInput
                                     id="password"
                                     type="password"
-                                    value={password}
+                                    value={model.enrollment.password}
                                     onChange={(_, value) => setPassword(value)}
                                     placeholder="Enter password"
                                 />
@@ -122,7 +141,7 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                     <FormGroup label="Token" isRequired>
                         <TextInput
                             id="token"
-                            value={token}
+                            value={model.enrollment.token}
                             onChange={(_, value) => setToken(value)}
                             placeholder="Enter authentication token"
                         />

@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { Stack, StackItem } from '@patternfly/react-core';
+import { useModelContext } from '../model-context';
 
 export const HostnamePage: React.FunctionComponent = () => {
-    const [hostname, setHostname] = useState<string>('');
+    const { model: model, updateModel: updateModel } = useModelContext();
+    
+    const setHostname = (value: string) => {
+        updateModel('hostname', { value });
+    };
 
     return (
         <Stack hasGutter>
@@ -14,7 +19,7 @@ export const HostnamePage: React.FunctionComponent = () => {
                 <FormGroup label="Hostname" isRequired>
                     <TextInput
                         id="hostname-input"
-                        value={hostname}
+                        value={model.hostname.value}
                         onChange={(_, value) => setHostname(value)}
                         placeholder="my-system.example.com"
                     />

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { NumberInput } from "@patternfly/react-core/dist/esm/components/NumberInput/index.js";
 import { Stack, StackItem } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
+import { useModelContext } from '../model-context';
 
 import {
     device_state_text,
@@ -57,6 +58,8 @@ interface NetworkInterfaceSelectorProps {
 }
 
 export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceSelectorProps> = ({ interfaces }) => {
+  const { model: model, updateModel: updateModel } = useModelContext();
+  
   const columnNames = {
     name: 'Name',
     type: 'Type',
@@ -68,14 +71,21 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
 
   const isIfaceSelectable = (iface: import('../interfaces.js').Interface) => is_managed(iface.Device); // Use proper NetworkManager logic
 
-  // Find the first active interface to select by default
-  const defaultSelectedInterface = interfaces.find(iface => 
-    iface.Device && iface.Device.State === 100 && isIfaceSelectable(iface)
-  );
+  // Initialize selection if not set
+  React.useEffect(() => {
+    if (!model.networkInterface.selectedInterface) {
+      const defaultSelectedInterface = interfaces.find(iface => 
+        iface.Device && iface.Device.State === 100 && isIfaceSelectable(iface)
+      );
+      if (defaultSelectedInterface) {
+        updateModel('networkInterface', { selectedInterface: defaultSelectedInterface.Name });
+      }
+    }
+  }, [interfaces, model.networkInterface.selectedInterface, updateModel]);
   
-  const [selectedIfaceName, setSelectedIfaceName] = useState<string | null>(
-    defaultSelectedInterface ? defaultSelectedInterface.Name : null
-  );
+  const setSelectedIfaceName = (name: string) => {
+    updateModel('networkInterface', { selectedInterface: name });
+  };
 
   return (
     <Table aria-label="Network interface selector">
@@ -97,7 +107,7 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
               select={{
                 rowIndex,
                 onSelect: () => setSelectedIfaceName(iface.Name),
-                isSelected: selectedIfaceName === iface.Name,
+                isSelected: model.networkInterface.selectedInterface === iface.Name,
                 isDisabled: !isIfaceSelectable(iface),
                 variant: 'radio',
               }}
@@ -120,8 +130,15 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
 };
 
 export const NetworkVlanSelector: React.FunctionComponent = () => {
-  const [useVlan, setUseVlan] = useState<boolean>(false);
-  const [vlanId, setVlanId] = useState<number>(1);
+  const { model: model, updateModel: updateModel } = useModelContext();
+  
+  const setUseVlan = (useVlan: boolean) => {
+    updateModel('networkInterface', { useVlan });
+  };
+  
+  const setVlanId = (vlanId: number) => {
+    updateModel('networkInterface', { vlanId });
+  };
 
   const onVlanIdChange = (event: React.FormEvent<HTMLInputElement>) => {
     const value = parseInt((event.target as HTMLInputElement).value, 10);
@@ -131,14 +148,14 @@ export const NetworkVlanSelector: React.FunctionComponent = () => {
   };
 
   const onVlanIdMinus = () => {
-    if (vlanId > 1) {
-      setVlanId(vlanId - 1);
+    if (model.networkInterface.vlanId && model.networkInterface.vlanId > 1) {
+      setVlanId(model.networkInterface.vlanId - 1);
     }
   };
 
   const onVlanIdPlus = () => {
-    if (vlanId < 4094) {
-      setVlanId(vlanId + 1);
+    if (model.networkInterface.vlanId && model.networkInterface.vlanId < 4094) {
+      setVlanId(model.networkInterface.vlanId + 1);
     }
   };
 
@@ -147,13 +164,13 @@ export const NetworkVlanSelector: React.FunctionComponent = () => {
       <Checkbox
         id="vlan-checkbox"
         label="VLAN ID"
-        isChecked={useVlan}
+        isChecked={model.networkInterface.useVlan}
         onChange={(_, checked) => setUseVlan(checked)}
       />
-      {useVlan && (
+      {model.networkInterface.useVlan && (
         <div style={{ marginTop: '1rem', marginLeft: '1.5rem' }}>
           <NumberInput
-            value={vlanId}
+            value={model.networkInterface.vlanId || 1}
             min={1}
             max={4094}
             onChange={onVlanIdChange}

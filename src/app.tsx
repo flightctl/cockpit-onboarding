@@ -19,13 +19,13 @@
 
 import cockpit from 'cockpit';
 
-import React, { useRef /*, useState */ } from 'react';
+import React from 'react';
 import * as service from 'service.js';
 import { useEvent, useObject } from "hooks";
-import { /*init as initDialogs,*/ NetworkManagerModel, Interface } from './interfaces.js';
+import { NetworkManagerModel, Interface } from './interfaces.js';
 
 import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
-import { ModelContext } from './model-context.jsx';
+import { ModelProvider } from './model-context';
 
 import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist/esm/components/Page/index.js";
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
@@ -49,15 +49,15 @@ export const Application = () => {
                                 []);
     useEvent(nmService, "changed");
 
-    const model = useObject(() => new NetworkManagerModel(), null, []);
-    useEvent(model, "changed");
+    const networkManager = useObject(() => new NetworkManagerModel(), null, []);
+    useEvent(networkManager, "changed");
 
     // const nmRunning_ref = useRef(undefined);
-    // useEvent(model.client, "owner", (event, owner) => { nmRunning_ref.current = owner !== null });
+    // useEvent(networkManager.client, "owner", (event, owner) => { nmRunning_ref.current = owner !== null });
 
     // // useEvent(superuser, "changed");
 
-    if (model.ready === undefined)
+    if (networkManager.ready === undefined)
         return <EmptyStatePanel loading />;
 
     // /* Show EmptyStatePanel when nm is not running */
@@ -102,15 +102,15 @@ export const Application = () => {
     //     }
     // }
 
-    const interfaces = model.list_interfaces();
+    const interfaces = networkManager.list_interfaces();
 
     /* At this point NM is running and the model is ready */
     return (
-        <ModelContext.Provider value={model}>
+        <ModelProvider networkManager={networkManager}>
             <WithDialogs key="1">
-                <SystemOnboardingWizard operationInProgress={model.operationInProgress} interfaces={interfaces} />
+                <SystemOnboardingWizard operationInProgress={networkManager.operationInProgress} interfaces={interfaces} />
             </WithDialogs>
-        </ModelContext.Provider>
+        </ModelProvider>
     );
 };
 

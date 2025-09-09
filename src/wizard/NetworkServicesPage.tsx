@@ -7,22 +7,27 @@ import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index
 import { Stack, StackItem } from '@patternfly/react-core';
 import { Flex, FlexItem } from '@patternfly/react-core';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
+import { useModelContext } from '../model-context';
 
 export const NetworkServicesPage: React.FunctionComponent = () => {
-    const [autoNtp, setAutoNtp] = useState<boolean>(true);
+    const { model, updateNestedModel } = useModelContext();
     const [ntpServerInput, setNtpServerInput] = useState<string>('');
-    const [ntpServers, setNtpServers] = useState<string[]>([]);
+
+    const setAutoNtp = (autoConfig: boolean) => {
+        updateNestedModel('networkServices', 'ntp', { autoConfig });
+    };
 
     const addNtpServer = () => {
-        if (ntpServerInput.trim() && !ntpServers.includes(ntpServerInput.trim())) {
-            const newServers = [...ntpServers, ntpServerInput.trim()];
-            setNtpServers(newServers.sort());
+        if (ntpServerInput.trim() && !model.networkServices.ntp.servers.includes(ntpServerInput.trim())) {
+            const newServers = [...model.networkServices.ntp.servers, ntpServerInput.trim()];
+            updateNestedModel('networkServices', 'ntp', { servers: newServers.sort() });
             setNtpServerInput('');
         }
     };
 
     const removeNtpServer = (serverToRemove: string) => {
-        setNtpServers(ntpServers.filter(server => server !== serverToRemove));
+        const newServers = model.networkServices.ntp.servers.filter(server => server !== serverToRemove);
+        updateNestedModel('networkServices', 'ntp', { servers: newServers });
     };
 
     return (
@@ -32,11 +37,11 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                 <Checkbox
                     id="auto-ntp"
                     label="Automatically configure time servers"
-                    isChecked={autoNtp}
+                    isChecked={model.networkServices.ntp.autoConfig}
                     onChange={(_, checked) => setAutoNtp(checked)}
                 />
             </StackItem>
-            {!autoNtp && (
+            {!model.networkServices.ntp.autoConfig && (
                 <StackItem style={{ marginLeft: '1.5rem' }}>
                     <Stack hasGutter>
                         <StackItem>
@@ -77,8 +82,8 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                     </Tr>
                                 </Thead>
                                 <Tbody>
-                                    {ntpServers.length > 0 ? (
-                                        ntpServers.map((server, index) => (
+                                    {model.networkServices.ntp.servers.length > 0 ? (
+                                        model.networkServices.ntp.servers.map((server, index) => (
                                             <Tr key={index}>
                                                 <Td>{server}</Td>
                                                 <Td>
