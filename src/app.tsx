@@ -20,13 +20,16 @@
 import cockpit from 'cockpit';
 
 import React from 'react';
-import * as service from 'service.js';
+import { useRef } from 'react';
 import { useEvent, useObject } from "hooks";
+
+import * as service from 'service.js';
 import { NetworkManagerModel, Interface } from './interfaces.js';
 
 import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
 import { ModelProvider } from './model-context';
 
+import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist/esm/components/Page/index.js";
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
 import { Flex } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
@@ -52,55 +55,52 @@ export const Application = () => {
     const networkManager = useObject(() => new NetworkManagerModel(), null, []);
     useEvent(networkManager, "changed");
 
-    // const nmRunning_ref = useRef(undefined);
-    // useEvent(networkManager.client, "owner", (event, owner) => { nmRunning_ref.current = owner !== null });
-
-    // // useEvent(superuser, "changed");
+    const nmRunning_ref = useRef(undefined);
+    useEvent(networkManager.client, "owner", (event, owner) => { nmRunning_ref.current = owner !== null });
 
     if (networkManager.ready === undefined)
         return <EmptyStatePanel loading />;
 
-    // /* Show EmptyStatePanel when nm is not running */
-    // if (!nmRunning_ref.current) {
-    //     if (nmService.enabled) {
-    //         return (
-    //             <div id="networking-nm-crashed">
-    //                 <EmptyStatePanel icon={ ExclamationCircleIcon }
-    //                                  title={ _("NetworkManager is not running") }
-    //                                  action={nmService.exists ? _("Start service") : null}
-    //                                  onAction={ nmService.start }
-    //                                  secondary={
-    //                                      <Button component="a"
-    //                                              variant="secondary"
-    //                                              onClick={() => cockpit.jump("/system/services#/NetworkManager.service", cockpit.transport.host)}>
-    //                                          {_("Troubleshoot…")}
-    //                                      </Button>
-    //                                  } />
-    //             </div>
-    //         );
-    //     } else if (!nmService.exists) {
-    //         return (
-    //             <div id="networking-nm-not-found">
-    //                 <EmptyStatePanel icon={ ExclamationCircleIcon }
-    //                                  title={ _("NetworkManager is not installed") } />
+    if (!nmRunning_ref.current) {
+        if (nmService.enabled) {
+            return (
+                <div id="networking-nm-crashed">
+                    <EmptyStatePanel icon={ ExclamationCircleIcon }
+                                     title={ _("NetworkManager is not running") }
+                                     action={nmService.exists ? _("Start service") : null}
+                                     onAction={ nmService.start }
+                                     secondary={
+                                         <Button component="a"
+                                                 variant="secondary"
+                                                 onClick={() => cockpit.jump("/system/services#/NetworkManager.service", cockpit.transport.host)}>
+                                             {_("Troubleshoot…")}
+                                         </Button>
+                                     } />
+                </div>
+            );
+        } else if (!nmService.exists) {
+            return (
+                <div id="networking-nm-not-found">
+                    <EmptyStatePanel icon={ ExclamationCircleIcon }
+                                     title={ _("NetworkManager is not installed") } />
 
-    //             </div>
-    //         );
-    //     } else {
-    //         return (
-    //             <div id="networking-nm-disabled">
-    //                 <EmptyStatePanel icon={ ExclamationCircleIcon }
-    //                                  title={ _("Network devices and graphs require NetworkManager") }
-    //                                  action={nmService.exists ? _("Enable service") : null}
-    //                                  onAction={() => {
-    //                                      nmService.enable();
-    //                                      nmService.start();
-    //                                  }} />
+                </div>
+            );
+        } else {
+            return (
+                <div id="networking-nm-disabled">
+                    <EmptyStatePanel icon={ ExclamationCircleIcon }
+                                     title={ _("Network devices and graphs require NetworkManager") }
+                                     action={nmService.exists ? _("Enable service") : null}
+                                     onAction={() => {
+                                         nmService.enable();
+                                         nmService.start();
+                                     }} />
 
-    //             </div>
-    //         );
-    //     }
-    // }
+                </div>
+            );
+        }
+    }
 
     const interfaces = networkManager.list_interfaces();
 
