@@ -17,14 +17,7 @@ export const ReviewPage: React.FunctionComponent = () => {
             </StackItem>
 
             <StackItem>
-                <DescriptionList isHorizontal horizontalTermWidthModifier={{
-      default: '8ch',
-      sm: '15ch',
-      md: '20ch',
-      lg: '28ch',
-      xl: '30ch',
-      '2xl': '35ch'
-    }}>
+                <DescriptionList isHorizontal>
                     {/* System */}
                     <DescriptionListGroup>
                         <DescriptionListTerm><p>System</p></DescriptionListTerm>
