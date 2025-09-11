@@ -6,7 +6,7 @@ import { Stack, StackItem } from '@patternfly/react-core';
 import { useModelContext } from '../model-context';
 
 export const HostnamePage: React.FunctionComponent = () => {
-    const { model: model, updateModel: updateModel } = useModelContext();
+    const { model, isInitialized, updateModel } = useModelContext();
     
     const setHostname = (value: string) => {
         updateModel('hostname', { value });
@@ -22,6 +22,7 @@ export const HostnamePage: React.FunctionComponent = () => {
                         value={model.hostname.value}
                         onChange={(_, value) => setHostname(value)}
                         placeholder="my-system.example.com"
+                        isDisabled={!isInitialized}
                     />
                 </FormGroup>
             </StackItem>

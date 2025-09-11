@@ -68,10 +68,12 @@ declare module './interfaces.js' {
 
     interface Ipv4Config {
         Addresses: string[][];
+        Nameservers?: string[];
     }
 
     interface Ipv6Config {
         Addresses: string[][];
+        Nameservers?: string[];
     }
 
     export interface NetworkManagerModel extends cockpit.EventSource<NetworkManagerEvents> {

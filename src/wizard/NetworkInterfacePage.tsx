@@ -58,7 +58,7 @@ interface NetworkInterfaceSelectorProps {
 }
 
 export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceSelectorProps> = ({ interfaces }) => {
-  const { model: model, updateModel: updateModel } = useModelContext();
+  const { model: model, updateModel: updateModel, switchToInterfaceConfig } = useModelContext();
   
   const columnNames = {
     name: 'Name',
@@ -85,6 +85,8 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
   
   const setSelectedIfaceName = (name: string) => {
     updateModel('networkInterface', { selectedInterface: name });
+    // Switch to the configuration of the newly selected interface
+    switchToInterfaceConfig(name);
   };
 
   return (
