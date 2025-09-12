@@ -19,8 +19,7 @@
 
 import cockpit from 'cockpit';
 
-import React from 'react';
-import { useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useEvent, useObject } from "hooks";
 
 import * as service from 'service.js';
@@ -41,6 +40,7 @@ import { NetworkAddressPage } from './wizard/NetworkAddressPage.tsx';
 import { NetworkServicesPage } from './wizard/NetworkServicesPage.tsx';
 import { EnrollmentPage } from './wizard/EnrollmentPage.tsx';
 import { ReviewPage } from './wizard/ReviewPage.tsx';
+import { EnrollmentProgressPage } from './wizard/EnrollmentProgressPage.tsx';
 
 import { WithDialogs } from "dialogs.jsx";
 
@@ -65,24 +65,29 @@ export const Application = () => {
         if (nmService.enabled) {
             return (
                 <div id="networking-nm-crashed">
-                    <EmptyStatePanel icon={ ExclamationCircleIcon }
+                    <EmptyStatePanel
+icon={ ExclamationCircleIcon }
                                      title={ _("NetworkManager is not running") }
                                      action={nmService.exists ? _("Start service") : null}
                                      onAction={ nmService.start }
                                      secondary={
-                                         <Button component="a"
+                                         <Button
+component="a"
                                                  variant="secondary"
-                                                 onClick={() => cockpit.jump("/system/services#/NetworkManager.service", cockpit.transport.host)}>
+                                                 onClick={() => cockpit.jump("/system/services#/NetworkManager.service", cockpit.transport.host)}
+                                         >
                                              {_("Troubleshoot…")}
                                          </Button>
-                                     } />
+                                     }
+                    />
                 </div>
             );
         } else if (!nmService.exists) {
             return (
                 <div id="networking-nm-not-found">
                     <EmptyStatePanel icon={ ExclamationCircleIcon }
-                                     title={ _("NetworkManager is not installed") } />
+                                     title={ _("NetworkManager is not installed") }
+                    />
 
                 </div>
             );
@@ -95,7 +100,8 @@ export const Application = () => {
                                      onAction={() => {
                                          nmService.enable();
                                          nmService.start();
-                                     }} />
+                                     }}
+                    />
 
                 </div>
             );
@@ -119,33 +125,66 @@ interface SystemOnboardingWizardProps {
     interfaces: Interface[];
 }
 
+const checkEnrollmentScripts = async (): Promise<boolean> => {
+    try {
+        // Use shell to expand $HOME environment variable
+        const proc = cockpit.spawn(['sh', '-c', 'find "$HOME/.config/cockpit/system-onboarding.d/" -name "*.sh" -type f -executable 2>/dev/null || true']);
+        const output = await proc;
+        const scripts = output.trim().split('\n')
+.filter(line => line.length > 0);
+        return scripts.length > 0;
+    } catch {
+        console.log('No enrollment scripts found or directory does not exist');
+        return false;
+    }
+};
+
 export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({ operationInProgress, interfaces }) => {
+    const [hasEnrollmentScripts, setHasEnrollmentScripts] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        checkEnrollmentScripts().then(setHasEnrollmentScripts);
+    }, []);
+
+    // Show loading while checking for scripts
+    if (hasEnrollmentScripts === null) {
+        return <EmptyStatePanel loading />;
+    }
+
+    const reviewButtonText = hasEnrollmentScripts ? _('Enroll') : _('Apply');
+    const finalStepName = hasEnrollmentScripts ? _('Apply and enroll') : _('Apply configuration');
+
     return (
         <Page className='no-masthead-sidebar'>
             <PageSection hasBodyWrapper={false} padding={{ default: "padding" }}>
                 <Flex alignItems={{ default: 'alignItemsCenter' }}>
-                    <h2>System onboarding wizard</h2>
+                    <h2>{_('System onboarding wizard')}</h2>
                 </Flex>
-            </PageSection>        
+            </PageSection>
             <PageSection hasBodyWrapper={false} type={PageSectionTypes.wizard} aria-label="Wizard container">
                 <Wizard>
-                    <WizardStep name="Hostname" id="wizard-step-1">
+                    <WizardStep name={_('Hostname')} id="wizard-step-1">
                         <HostnamePage />
                     </WizardStep>
-                    <WizardStep name="Network interface" id="wizard-step-2">
+                    <WizardStep name={_('Network interface')} id="wizard-step-2">
                         <NetworkInterfacePage operationInProgress={operationInProgress} interfaces={interfaces} />
                     </WizardStep>
-                    <WizardStep name="Network address" id="wizard-step-3">
+                    <WizardStep name={_('Network address')} id="wizard-step-3">
                         <NetworkAddressPage />
                     </WizardStep>
-                    <WizardStep name="Network services" id="wizard-step-4">
+                    <WizardStep name={_('Network services')} id="wizard-step-4">
                         <NetworkServicesPage />
                     </WizardStep>
-                    <WizardStep name="Enrollment server" id="wizard-step-5">
-                        <EnrollmentPage />
+                    {hasEnrollmentScripts && (
+                        <WizardStep name={_('Enrollment server')} id="wizard-step-5">
+                            <EnrollmentPage />
+                        </WizardStep>
+                    )}
+                    <WizardStep name={_('Review')} id={hasEnrollmentScripts ? "wizard-step-6" : "wizard-step-5"} footer={{ nextButtonText: reviewButtonText }}>
+                        <ReviewPage hasEnrollmentScripts={hasEnrollmentScripts} />
                     </WizardStep>
-                    <WizardStep name="Review and enroll" id="wizard-step-6" footer={{ nextButtonText: 'Enroll' }}>
-                        <ReviewPage />
+                    <WizardStep name={finalStepName} id={hasEnrollmentScripts ? "wizard-step-7" : "wizard-step-6"} footer={{ nextButtonText: _('Finish'), isBackDisabled: true }}>
+                        <EnrollmentProgressPage />
                     </WizardStep>
                 </Wizard>
             </PageSection>

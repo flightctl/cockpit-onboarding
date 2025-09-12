@@ -51,6 +51,14 @@ export interface Model {
     password: string;
     token: string;
   };
+  enrollmentProgress: {
+    currentStep: number; // 0-3
+    stepStates: ('pending' | 'running' | 'success' | 'error')[];
+    logs: string[]; // execution logs
+    isRunning: boolean; // overall execution state
+    canCancel: boolean; // whether cancellation is possible
+    overallProgress: number; // 0-100 percentage
+  };
 }
 
 // Default network address configuration
@@ -100,6 +108,14 @@ const initialModel: Model = {
         username: '',
         password: '',
         token: '',
+    },
+    enrollmentProgress: {
+        currentStep: 0,
+        stepStates: ['pending', 'pending', 'pending', 'pending'],
+        logs: [],
+        isRunning: false,
+        canCancel: false,
+        overallProgress: 0,
     },
 };
 
@@ -172,14 +188,14 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     // IPv4 configuration
     const ipv4Method = iface.MainConnection?.Settings?.ipv4?.method || 'dhcp';
     const ipv4ConnectionDns = iface.MainConnection?.Settings?.ipv4?.dns || [];
-    
+
     if (activeConnection.Ip4Config && activeConnection.Ip4Config.Addresses.length > 0) {
         const address = activeConnection.Ip4Config.Addresses[0];
         // Get DNS servers from active config (includes DHCP-provided DNS) and connection settings
         const activeDns = (activeConnection.Ip4Config as any).Nameservers || [];
         const hasStaticDns = ipv4ConnectionDns.length > 0;
         const dnsServers = hasStaticDns ? ipv4ConnectionDns : activeDns;
-        
+
         config.ipv4 = {
             ...config.ipv4,
             method: ipv4Method === 'manual' ? 'static' : 'dhcp',
@@ -204,7 +220,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     // IPv6 configuration
     const ipv6Method = iface.MainConnection?.Settings?.ipv6?.method || 'dhcp';
     const ipv6ConnectionDns = iface.MainConnection?.Settings?.ipv6?.dns || [];
-    
+
     if (activeConnection.Ip6Config && activeConnection.Ip6Config.Addresses.length > 0) {
         const address = activeConnection.Ip6Config.Addresses[0];
         // Get DNS servers from active config (includes DHCP-provided DNS) and connection settings

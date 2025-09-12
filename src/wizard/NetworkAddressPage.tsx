@@ -4,8 +4,7 @@ import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { TextInputGroup, TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
-import { Stack, StackItem, Flex, FlexItem } from '@patternfly/react-core';
-import { ValidatedOptions } from '@patternfly/react-core';
+import { Stack, StackItem, Flex, FlexItem, ValidatedOptions } from '@patternfly/react-core';
 import { useModelContext } from '../model-context';
 
 // Validation functions

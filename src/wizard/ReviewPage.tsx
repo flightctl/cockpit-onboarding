@@ -1,19 +1,26 @@
 import React from 'react';
+import cockpit from 'cockpit';
 
-import { Stack, StackItem } from '@patternfly/react-core';
-import { Card, CardBody, CardTitle } from '@patternfly/react-core';
-import { DescriptionList, DescriptionListGroup, DescriptionListTerm, DescriptionListDescription } from '@patternfly/react-core';
-import { List, ListItem } from '@patternfly/react-core';
-import { Title } from '@patternfly/react-core';
+import { Stack, StackItem, DescriptionList, DescriptionListGroup, DescriptionListTerm, DescriptionListDescription } from '@patternfly/react-core';
 import { useModelContext } from '../model-context';
 
-export const ReviewPage: React.FunctionComponent = () => {
+const _ = cockpit.gettext;
+
+interface ReviewPageProps {
+    hasEnrollmentScripts: boolean;
+}
+
+export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnrollmentScripts }) => {
     const { model } = useModelContext();
 
     return (
         <Stack hasGutter>
             <StackItem>
-                <p>Please review your configuration below. Click "Enroll" to apply these settings and complete the system onboarding.</p>
+                <p>
+                    {hasEnrollmentScripts
+                        ? _('Please review your configuration below. Click "Enroll" to apply these settings and complete the system onboarding.')
+                        : _('Please review your configuration below. Click "Apply" to apply these settings to the system.')}
+                </p>
             </StackItem>
 
             <StackItem>
@@ -21,7 +28,7 @@ export const ReviewPage: React.FunctionComponent = () => {
                     {/* System */}
                     <DescriptionListGroup>
                         <DescriptionListTerm><p>System</p></DescriptionListTerm>
-                        <DescriptionListDescription><p></p></DescriptionListDescription>
+                        <DescriptionListDescription><p /></DescriptionListDescription>
                     </DescriptionListGroup>
                     <DescriptionListGroup>
                         <DescriptionListTerm>Hostname</DescriptionListTerm>
@@ -33,7 +40,7 @@ export const ReviewPage: React.FunctionComponent = () => {
                     {/* Network Interface */}
                     <DescriptionListGroup>
                         <DescriptionListTerm><p>Network Interface</p></DescriptionListTerm>
-                        <DescriptionListDescription><p></p></DescriptionListDescription>
+                        <DescriptionListDescription><p /></DescriptionListDescription>
                     </DescriptionListGroup>
                     <DescriptionListGroup>
                         <DescriptionListTerm>Interface</DescriptionListTerm>
@@ -85,17 +92,17 @@ export const ReviewPage: React.FunctionComponent = () => {
                             {model.networkAddress.ipv4.autoDns ? (
                                 'auto'
                             ) : (
-                                <>
-                                    {model.networkAddress.ipv4.primaryDns && (
-                                        <div>{model.networkAddress.ipv4.primaryDns}</div>
+    <>
+        {model.networkAddress.ipv4.primaryDns && (
+        <div>{model.networkAddress.ipv4.primaryDns}</div>
                                     )}
-                                    {model.networkAddress.ipv4.secondaryDns && (
-                                        <div>{model.networkAddress.ipv4.secondaryDns}</div>
+        {model.networkAddress.ipv4.secondaryDns && (
+        <div>{model.networkAddress.ipv4.secondaryDns}</div>
                                     )}
-                                    {!model.networkAddress.ipv4.primaryDns && !model.networkAddress.ipv4.secondaryDns && (
-                                        <div>(empty)</div>
+        {!model.networkAddress.ipv4.primaryDns && !model.networkAddress.ipv4.secondaryDns && (
+        <div>(empty)</div>
                                     )}
-                                </>
+    </>
                             )}
                         </DescriptionListDescription>
                     </DescriptionListGroup>
@@ -132,17 +139,17 @@ export const ReviewPage: React.FunctionComponent = () => {
                                 {model.networkAddress.ipv6.autoDns ? (
                                     'auto'
                                 ) : (
-                                    <>
-                                        {model.networkAddress.ipv6.primaryDns && (
-                                            <div>{model.networkAddress.ipv6.primaryDns}</div>
+    <>
+        {model.networkAddress.ipv6.primaryDns && (
+        <div>{model.networkAddress.ipv6.primaryDns}</div>
                                         )}
-                                        {model.networkAddress.ipv6.secondaryDns && (
-                                            <div>{model.networkAddress.ipv6.secondaryDns}</div>
+        {model.networkAddress.ipv6.secondaryDns && (
+        <div>{model.networkAddress.ipv6.secondaryDns}</div>
                                         )}
-                                        {!model.networkAddress.ipv6.primaryDns && !model.networkAddress.ipv6.secondaryDns && (
-                                            <div>(empty)</div>
+        {!model.networkAddress.ipv6.primaryDns && !model.networkAddress.ipv6.secondaryDns && (
+        <div>(empty)</div>
                                         )}
-                                    </>
+    </>
                                 )}
                             </DescriptionListDescription>
                         </DescriptionListGroup>
@@ -151,7 +158,7 @@ export const ReviewPage: React.FunctionComponent = () => {
                     {/* Network Services */}
                     <DescriptionListGroup>
                         <DescriptionListTerm><p>Network Services</p></DescriptionListTerm>
-                        <DescriptionListDescription><p></p></DescriptionListDescription>
+                        <DescriptionListDescription><p /></DescriptionListDescription>
                     </DescriptionListGroup>
                     <DescriptionListGroup>
                         <DescriptionListTerm>NTP servers</DescriptionListTerm>
@@ -170,49 +177,51 @@ export const ReviewPage: React.FunctionComponent = () => {
                         </DescriptionListDescription>
                     </DescriptionListGroup>
 
-                    {/* Network Services */}
-                    <DescriptionListGroup>
-                        <DescriptionListTerm><p>Enrollment</p></DescriptionListTerm>
-                        <DescriptionListDescription><p></p></DescriptionListDescription>
-                    </DescriptionListGroup>
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>Server</DescriptionListTerm>
-                        <DescriptionListDescription>
-                            {model.enrollment.url || '(empty)'}
-                        </DescriptionListDescription>
-                    </DescriptionListGroup>
-                    {model.enrollment.url && model.enrollment.url.startsWith('https://') && (
-                        <DescriptionListGroup>
-                            <DescriptionListTerm>TLS Verification</DescriptionListTerm>
-                            <DescriptionListDescription>
-                                {model.enrollment.skipTlsVerification ? 'disabled (insecure)' : 'enabled'}
-                            </DescriptionListDescription>
-                        </DescriptionListGroup>
-                    )}
-                    {model.enrollment.authMethod === 'username-password' && (
+                    {hasEnrollmentScripts && (
                         <>
+                            {/* Enrollment Section */}
                             <DescriptionListGroup>
-                                <DescriptionListTerm>Username</DescriptionListTerm>
-                                <DescriptionListDescription>
-                                    {model.enrollment.username || '(empty)'}
-                                </DescriptionListDescription>
+                                <DescriptionListTerm><p>{_('Enrollment')}</p></DescriptionListTerm>
+                                <DescriptionListDescription><p /></DescriptionListDescription>
                             </DescriptionListGroup>
                             <DescriptionListGroup>
-                                <DescriptionListTerm>Password</DescriptionListTerm>
+                                <DescriptionListTerm>{_('Server')}</DescriptionListTerm>
                                 <DescriptionListDescription>
-                                    {model.enrollment.password ? '*'.repeat(model.enrollment.password.length) : '(empty)'}
+                                    {model.enrollment.url || _('(empty)')}
                                 </DescriptionListDescription>
                             </DescriptionListGroup>
-                        </>
-                    )}
-                    {model.enrollment.authMethod === 'token' && (
-                        <>
-                            <DescriptionListGroup>
-                                <DescriptionListTerm>Token</DescriptionListTerm>
-                                <DescriptionListDescription>
-                                    {model.enrollment.token || '(empty)'}
-                                </DescriptionListDescription>
-                            </DescriptionListGroup>
+                            {model.enrollment.url && model.enrollment.url.startsWith('https://') && (
+                                <DescriptionListGroup>
+                                    <DescriptionListTerm>{_('TLS Verification')}</DescriptionListTerm>
+                                    <DescriptionListDescription>
+                                        {model.enrollment.skipTlsVerification ? _('disabled (insecure)') : _('enabled')}
+                                    </DescriptionListDescription>
+                                </DescriptionListGroup>
+                            )}
+                            {model.enrollment.authMethod === 'username-password' && (
+                                <>
+                                    <DescriptionListGroup>
+                                        <DescriptionListTerm>{_('Username')}</DescriptionListTerm>
+                                        <DescriptionListDescription>
+                                            {model.enrollment.username || _('(empty)')}
+                                        </DescriptionListDescription>
+                                    </DescriptionListGroup>
+                                    <DescriptionListGroup>
+                                        <DescriptionListTerm>{_('Password')}</DescriptionListTerm>
+                                        <DescriptionListDescription>
+                                            {model.enrollment.password ? '*'.repeat(model.enrollment.password.length) : _('(empty)')}
+                                        </DescriptionListDescription>
+                                    </DescriptionListGroup>
+                                </>
+                            )}
+                            {model.enrollment.authMethod === 'token' && (
+                                <DescriptionListGroup>
+                                    <DescriptionListTerm>{_('Token')}</DescriptionListTerm>
+                                    <DescriptionListDescription>
+                                        {model.enrollment.token || _('(empty)')}
+                                    </DescriptionListDescription>
+                                </DescriptionListGroup>
+                            )}
                         </>
                     )}
                 </DescriptionList>
