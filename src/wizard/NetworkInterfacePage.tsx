@@ -17,7 +17,6 @@ interface NetworkInterfacePageProps {
 }
 
 export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageProps> = ({ interfaces }) => {
-
     function hasGroup(iface: import('../interfaces.js').Interface) {
         return ((iface.Device &&
                  iface.Device.ActiveConnection &&
@@ -40,16 +39,16 @@ export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageP
     });
 
     return (
-      <Stack hasGutter>
-        <StackItem>
-            <p>Choose a network interface to use for onboarding:</p>
-            <NetworkInterfaceSelector interfaces={filteredInterfaces} />
-        </StackItem>
-        <StackItem>
-            <p>Optionally, specify the VLAN ID to use on this interface:</p>
-            <NetworkVlanSelector />
-        </StackItem>
-      </Stack>
+        <Stack hasGutter>
+            <StackItem>
+                <p>Choose a network interface to use for onboarding:</p>
+                <NetworkInterfaceSelector interfaces={filteredInterfaces} />
+            </StackItem>
+            <StackItem>
+                <p>Optionally, specify the VLAN ID to use on this interface:</p>
+                <NetworkVlanSelector />
+            </StackItem>
+        </Stack>
     );
 };
 
@@ -58,8 +57,8 @@ interface NetworkInterfaceSelectorProps {
 }
 
 export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceSelectorProps> = ({ interfaces }) => {
-  const { model: model, updateModel: updateModel, switchToInterfaceConfig } = useModelContext();
-  
+  const { model, updateModel, switchToInterfaceConfig } = useModelContext();
+
   const columnNames = {
     name: 'Name',
     type: 'Type',
@@ -74,7 +73,7 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
   // Initialize selection if not set
   React.useEffect(() => {
     if (!model.networkInterface.selectedInterface) {
-      const defaultSelectedInterface = interfaces.find(iface => 
+      const defaultSelectedInterface = interfaces.find(iface =>
         iface.Device && iface.Device.State === 100 && isIfaceSelectable(iface)
       );
       if (defaultSelectedInterface) {
@@ -82,7 +81,7 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
       }
     }
   }, [interfaces, model.networkInterface.selectedInterface, updateModel]);
-  
+
   const setSelectedIfaceName = (name: string) => {
     updateModel('networkInterface', { selectedInterface: name });
     // Switch to the configuration of the newly selected interface
@@ -90,22 +89,22 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
   };
 
   return (
-    <Table aria-label="Network interface selector">
-      <Thead>
-        <Tr>
-          <Th screenReaderText="Row select" />
-          <Th>{columnNames.name}</Th>
-          <Th>{columnNames.type}</Th>
-          <Th>{columnNames.mac}</Th>
-          <Th>{columnNames.model}</Th>
-          <Th>{columnNames.speed}</Th>
-          <Th>{columnNames.state}</Th>
-        </Tr>
-      </Thead>
-      <Tbody>
-        {interfaces.map((iface, rowIndex) => (
-          <Tr key={iface.Name}>
-            <Td
+      <Table aria-label="Network interface selector">
+          <Thead>
+              <Tr>
+                  <Th screenReaderText="Row select" />
+                  <Th>{columnNames.name}</Th>
+                  <Th>{columnNames.type}</Th>
+                  <Th>{columnNames.mac}</Th>
+                  <Th>{columnNames.model}</Th>
+                  <Th>{columnNames.speed}</Th>
+                  <Th>{columnNames.state}</Th>
+              </Tr>
+          </Thead>
+          <Tbody>
+              {interfaces.map((iface, rowIndex) => (
+                  <Tr key={iface.Name}>
+                      <Td
               select={{
                 rowIndex,
                 onSelect: () => setSelectedIfaceName(iface.Name),
@@ -113,31 +112,31 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
                 isDisabled: !isIfaceSelectable(iface),
                 variant: 'radio',
               }}
-            />
-            <Td dataLabel={columnNames.name}>{iface.Name}</Td>
-            <Td dataLabel={columnNames.type}>{iface.Device?.DeviceType || 'N/A'}</Td>
-            <Td dataLabel={columnNames.mac}>{iface.Device?.HwAddress || 'N/A'}</Td>
-            <Td dataLabel={columnNames.model}>
-              {iface.Device?.IdVendor && iface.Device?.IdModel 
-                ? `${iface.Device.IdVendor} ${iface.Device.IdModel}` 
+                      />
+                      <Td dataLabel={columnNames.name}>{iface.Name}</Td>
+                      <Td dataLabel={columnNames.type}>{iface.Device?.DeviceType || 'N/A'}</Td>
+                      <Td dataLabel={columnNames.mac}>{iface.Device?.HwAddress || 'N/A'}</Td>
+                      <Td dataLabel={columnNames.model}>
+                          {iface.Device?.IdVendor && iface.Device?.IdModel
+                ? `${iface.Device.IdVendor} ${iface.Device.IdModel}`
                 : iface.Device?.IdModel || iface.Device?.IdVendor || 'N/A'}
-            </Td>
-            <Td dataLabel={columnNames.speed}>{iface.Device?.Speed ? `${iface.Device.Speed} Mbps` : 'N/A'}</Td>
-            <Td dataLabel={columnNames.state}>{device_state_text(iface.Device)}</Td>
-          </Tr>
+                      </Td>
+                      <Td dataLabel={columnNames.speed}>{iface.Device?.Speed ? `${iface.Device.Speed} Mbps` : 'N/A'}</Td>
+                      <Td dataLabel={columnNames.state}>{device_state_text(iface.Device)}</Td>
+                  </Tr>
         ))}
-      </Tbody>
-    </Table>
+          </Tbody>
+      </Table>
   );
 };
 
 export const NetworkVlanSelector: React.FunctionComponent = () => {
-  const { model: model, updateModel: updateModel } = useModelContext();
-  
+  const { model, updateModel } = useModelContext();
+
   const setUseVlan = (useVlan: boolean) => {
     updateModel('networkInterface', { useVlan });
   };
-  
+
   const setVlanId = (vlanId: number) => {
     updateModel('networkInterface', { vlanId });
   };
@@ -162,16 +161,16 @@ export const NetworkVlanSelector: React.FunctionComponent = () => {
   };
 
   return (
-    <div>
-      <Checkbox
+      <div>
+          <Checkbox
         id="vlan-checkbox"
         label="VLAN ID"
         isChecked={model.networkInterface.useVlan}
         onChange={(_, checked) => setUseVlan(checked)}
-      />
-      {model.networkInterface.useVlan && (
-        <div style={{ marginTop: '1rem', marginLeft: '1.5rem' }}>
-          <NumberInput
+          />
+          {model.networkInterface.useVlan && (
+          <div style={{ marginTop: '1rem', marginLeft: '1.5rem' }}>
+              <NumberInput
             value={model.networkInterface.vlanId || 1}
             min={1}
             max={4094}
@@ -181,9 +180,9 @@ export const NetworkVlanSelector: React.FunctionComponent = () => {
             inputName="vlan-id"
             inputAriaLabel="VLAN ID"
             widthChars={5}
-          />
-        </div>
+              />
+          </div>
       )}
-    </div>
+      </div>
   );
 };

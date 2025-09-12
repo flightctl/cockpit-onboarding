@@ -4,15 +4,13 @@ import { TextInputGroup, TextInputGroupMain } from "@patternfly/react-core/dist/
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
-import { Stack, StackItem } from '@patternfly/react-core';
-import { Flex, FlexItem } from '@patternfly/react-core';
-import { ValidatedOptions } from '@patternfly/react-core';
+import { Stack, StackItem, Flex, FlexItem, ValidatedOptions } from '@patternfly/react-core';
 import { useModelContext } from '../model-context';
 
 // Validation functions
 const validateUrl = (url: string): string | null => {
     if (!url.trim()) return 'URL is required';
-    
+
     try {
         const urlObj = new URL(url);
         if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
@@ -58,7 +56,7 @@ const validateToken = (token: string): string | null => {
 
 export const EnrollmentPage: React.FunctionComponent = () => {
     const { model, updateModel } = useModelContext();
-    
+
     // Validation states
     const [validationErrors, setValidationErrors] = React.useState({
         url: null as string | null,
@@ -66,33 +64,33 @@ export const EnrollmentPage: React.FunctionComponent = () => {
         password: null as string | null,
         token: null as string | null,
     });
-    
+
     const setEnrollmentUrl = (url: string) => {
         const error = validateUrl(url);
         setValidationErrors(prev => ({ ...prev, url: error }));
         updateModel('enrollment', { url });
     };
-    
+
     const setSkipTlsVerification = (skipTlsVerification: boolean) => {
         updateModel('enrollment', { skipTlsVerification });
     };
-    
+
     const setAuthMethod = (authMethod: 'username-password' | 'token') => {
         updateModel('enrollment', { authMethod });
     };
-    
+
     const setUsername = (username: string) => {
         const error = validateUsername(username);
         setValidationErrors(prev => ({ ...prev, username: error }));
         updateModel('enrollment', { username });
     };
-    
+
     const setPassword = (password: string) => {
         const error = validatePassword(password);
         setValidationErrors(prev => ({ ...prev, password: error }));
         updateModel('enrollment', { password });
     };
-    
+
     const setToken = (token: string) => {
         const error = validateToken(token);
         setValidationErrors(prev => ({ ...prev, token: error }));
@@ -118,8 +116,8 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                 <p>Configure enrollment service connection:</p>
             </StackItem>
             <StackItem>
-                <FormGroup 
-                    label="Enrollment Service URL" 
+                <FormGroup
+                    label="Enrollment Service URL"
                     isRequired
                 >
                     <TextInputGroup validated={validationErrors.url ? ValidatedOptions.error : (model.enrollment.url && !validationErrors.url ? ValidatedOptions.success : ValidatedOptions.warning)}>
@@ -171,64 +169,66 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                     </Flex>
                 </FormGroup>
             </StackItem>
-            {model.enrollment.authMethod === 'username-password' ? (
-                <StackItem>
-                    <Stack hasGutter>
-                        <StackItem>
-                            <FormGroup label="Username" isRequired>
-                                <TextInputGroup validated={validationErrors.username ? ValidatedOptions.error : (model.enrollment.username && !validationErrors.username ? ValidatedOptions.success : ValidatedOptions.warning)}>
-                                    <TextInputGroupMain
+            {model.enrollment.authMethod === 'username-password'
+? (
+    <StackItem>
+        <Stack hasGutter>
+            <StackItem>
+                <FormGroup label="Username" isRequired>
+                    <TextInputGroup validated={validationErrors.username ? ValidatedOptions.error : (model.enrollment.username && !validationErrors.username ? ValidatedOptions.success : ValidatedOptions.warning)}>
+                        <TextInputGroupMain
                                         id="username"
                                         value={model.enrollment.username}
                                         onChange={(_, value) => setUsername(value)}
                                         placeholder="Enter username"
-                                    />
-                                </TextInputGroup>
-                                {validationErrors.username && (
-                                    <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
-                                        {validationErrors.username}
-                                    </div>
+                        />
+                    </TextInputGroup>
+                    {validationErrors.username && (
+                    <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
+                        {validationErrors.username}
+                    </div>
                                 )}
-                            </FormGroup>
-                        </StackItem>
-                        <StackItem>
-                            <FormGroup label="Password" isRequired>
-                                <TextInputGroup validated={validationErrors.password ? ValidatedOptions.error : (model.enrollment.password && !validationErrors.password ? ValidatedOptions.success : ValidatedOptions.warning)}>
-                                    <TextInputGroupMain
+                </FormGroup>
+            </StackItem>
+            <StackItem>
+                <FormGroup label="Password" isRequired>
+                    <TextInputGroup validated={validationErrors.password ? ValidatedOptions.error : (model.enrollment.password && !validationErrors.password ? ValidatedOptions.success : ValidatedOptions.warning)}>
+                        <TextInputGroupMain
                                         id="password"
                                         type="password"
                                         value={model.enrollment.password}
                                         onChange={(_, value) => setPassword(value)}
                                         placeholder="Enter password"
-                                    />
-                                </TextInputGroup>
-                                {validationErrors.password && (
-                                    <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
-                                        {validationErrors.password}
-                                    </div>
+                        />
+                    </TextInputGroup>
+                    {validationErrors.password && (
+                    <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
+                        {validationErrors.password}
+                    </div>
                                 )}
-                            </FormGroup>
-                        </StackItem>
-                    </Stack>
-                </StackItem>
-            ) : (
-                <StackItem>
-                    <FormGroup label="Token" isRequired>
-                        <TextInputGroup validated={validationErrors.token ? ValidatedOptions.error : (model.enrollment.token && !validationErrors.token ? ValidatedOptions.success : ValidatedOptions.warning)}>
-                            <TextInputGroupMain
+                </FormGroup>
+            </StackItem>
+        </Stack>
+    </StackItem>
+            )
+: (
+    <StackItem>
+        <FormGroup label="Token" isRequired>
+            <TextInputGroup validated={validationErrors.token ? ValidatedOptions.error : (model.enrollment.token && !validationErrors.token ? ValidatedOptions.success : ValidatedOptions.warning)}>
+                <TextInputGroupMain
                                 id="token"
                                 value={model.enrollment.token}
                                 onChange={(_, value) => setToken(value)}
                                 placeholder="Enter authentication token"
-                            />
-                        </TextInputGroup>
-                        {validationErrors.token && (
-                            <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
-                                {validationErrors.token}
-                            </div>
+                />
+            </TextInputGroup>
+            {validationErrors.token && (
+            <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
+                {validationErrors.token}
+            </div>
                         )}
-                    </FormGroup>
-                </StackItem>
+        </FormGroup>
+    </StackItem>
             )}
         </Stack>
     );

@@ -82,7 +82,7 @@ declare module './interfaces.js' {
         curtain?: string;
         operationInProgress?: boolean;
         ready?: boolean;
-        
+
         set_curtain(state: string): void;
         set_operation_in_progress(value: boolean): void;
         list_interfaces(): Interface[];
