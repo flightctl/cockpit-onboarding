@@ -56,6 +56,12 @@
       "parser": "@typescript-eslint/parser",
       "parserOptions": {
         "project": ["./tsconfig.json"]
+      },
+      "rules": {
+        // Disable the JSX linter to avoid infinite recursion bug
+        "indent": "off"
+        // Here, we'd normally use the TSX/TS indent rule, but it no longer exists for eslint 8 series
+        // "@typescript-eslint/indent": ["error", 2]
       }
     }]
 }

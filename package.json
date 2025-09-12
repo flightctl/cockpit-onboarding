@@ -18,14 +18,16 @@
     "stylelint:fix": "stylelint --fix src/*{.css,scss}"
   },
   "devDependencies": {
+    "@eslint/js": "^9.35.0",
     "@types/react": "18.3.13",
     "@types/react-dom": "18.3.1",
-    "@typescript-eslint/eslint-plugin": "8.41.0",
+    "@typescript-eslint/eslint-plugin": "^8.43.0",
+    "@typescript-eslint/parser": "^8.43.0",
     "argparse": "2.0.1",
     "esbuild": "0.25.9",
     "esbuild-sass-plugin": "3.3.1",
     "esbuild-wasm": "0.25.9",
-    "eslint": "8.57.1",
+    "eslint": "^8.57.1",
     "eslint-config-standard": "17.1.0",
     "eslint-config-standard-jsx": "11.0.0",
     "eslint-config-standard-react": "13.0.0",
@@ -43,17 +45,18 @@
     "stylelint-config-standard": "39.0.0",
     "stylelint-config-standard-scss": "15.0.1",
     "stylelint-formatter-pretty": "4.0.1",
-    "typescript": "5.9.2"
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.43.0"
   },
   "dependencies": {
-    "@patternfly/patternfly": "6.1.0",
-    "@patternfly/react-core": "6.1.0",
-    "@patternfly/react-icons": "6.1.0",
+    "@patternfly/patternfly": "6.3.1",
+    "@patternfly/react-core": "6.3.1",
+    "@patternfly/react-icons": "6.3.1",
     "@patternfly/react-styles": "6.3.1",
     "@patternfly/react-table": "^6.3.1",
     "dequal": "^2.0.3",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "uuid": "^11.1.0"
+    "uuid": "12.0.0"
   }
 }
