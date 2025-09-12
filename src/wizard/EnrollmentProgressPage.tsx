@@ -5,6 +5,7 @@ import { Progress } from "@patternfly/react-core/dist/esm/components/Progress/in
 import { Stack, StackItem, List, ListItem, Title, Card, CardBody, Alert } from '@patternfly/react-core';
 import { CheckCircleIcon, ExclamationCircleIcon, InProgressIcon } from '@patternfly/react-icons';
 import { useModelContext } from '../model-context';
+import { systemConfigurationService } from '../system-config';
 
 type StepStatus = 'pending' | 'running' | 'success' | 'failed' | 'warning';
 
@@ -19,7 +20,7 @@ interface Step {
 const _ = cockpit.gettext;
 
 export const EnrollmentProgressPage: React.FunctionComponent = () => {
-    const { model, updateModel } = useModelContext();
+    const { model, updateModel, networkManager } = useModelContext();
     const [hasStarted, setHasStarted] = useState(false);
     const [enrollmentScripts, setEnrollmentScripts] = useState<string[]>([]);
     const [steps, setSteps] = useState<Step[]>([]);
@@ -152,9 +153,29 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
 
     // Built-in step implementations
     const applyConfiguration = async (): Promise<{ success: boolean; output: string }> => {
-        // Simulate applying configuration
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return { success: true, output: 'Configuration changes applied successfully' };
+        try {
+            console.log('Applying system configuration...');
+            
+            // Use SystemConfigurationService to apply all configuration
+            const result = await systemConfigurationService.applySystemConfiguration(networkManager, model);
+            
+            const summary = result.success ? 
+                'Configuration applied successfully' : 
+                'Configuration applied with some errors';
+            
+            return {
+                success: result.success,
+                output: `${summary}\n\nDetails:\n${result.results.join('\n')}`
+            };
+            
+        } catch (error) {
+            const errorMsg = `Configuration failed: ${String(error)}`;
+            console.error('applyConfiguration error:', error);
+            return {
+                success: false,
+                output: errorMsg
+            };
+        }
     };
 
     const testConnectivity = async (): Promise<{ success: boolean; output: string }> => {

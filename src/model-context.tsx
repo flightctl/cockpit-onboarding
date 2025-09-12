@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { systemInfoService } from './system-info';
+import { systemConfigurationService } from './system-config.js';
 import { Interface } from './interfaces.js';
 import { ip4_prefix_from_text } from './utils.js';
 
@@ -339,7 +339,7 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
 
         try {
             const interfaces: Interface[] = networkManager.list_interfaces();
-            const systemInfo = await systemInfoService.getSystemInfo(interfaces);
+            const systemInfo = await systemConfigurationService.getSystemInfo(interfaces);
 
             // Extract network configurations for all interfaces
             const originalConfigs: { [interfaceName: string]: NetworkAddressConfig } = {};
@@ -390,7 +390,7 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
     useEffect(() => {
     // Cleanup system info service on unmount
         return () => {
-            systemInfoService.close();
+            systemConfigurationService.close();
         };
     }, []);
 
