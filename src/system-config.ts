@@ -5,8 +5,9 @@ import { Model } from './model-context';
 
 export interface SystemInfo {
     hostname: string;
-    prettyHostname?: string;
-    staticHostname?: string;
+    prettyHostname?: string | undefined;
+    staticHostname?: string | undefined;
+    dhcpHostname: string;
     defaultInterface: string | null;
     ntpServers: string[];
 }
@@ -24,7 +25,7 @@ export class SystemConfigurationService {
 
             // Wait for proxy to be ready
             await new Promise<void>((resolve, reject) => {
-                this.hostnameProxy.wait(() => {
+                (this.hostnameProxy as any).wait(() => {
                     if (this.hostnameProxy.valid) {
                         resolve();
                     } else {
@@ -86,6 +87,55 @@ export class SystemConfigurationService {
         return activeInterface ? activeInterface.Name : null;
     }
 
+    async getDhcpHostname(interfaces: Interface[]): Promise<string> {
+        try {
+            // Get the default interface
+            const defaultInterface = await this.getDefaultInterface(interfaces);
+            if (!defaultInterface) {
+                return '';
+            }
+
+            // Find the interface object
+            const iface = interfaces.find(i => i.Name === defaultInterface);
+            if (!iface || !iface.Device || !iface.Device.ActiveConnection) {
+                return '';
+            }
+
+            // Get IP4Config from the active connection
+            const activeConnection = iface.Device.ActiveConnection;
+            if (!activeConnection.Ip4Config) {
+                return '';
+            }
+
+            // Create NetworkManager D-Bus client
+            const nmClient = cockpit.dbus('org.freedesktop.NetworkManager');
+            const ip4ConfigProxy = nmClient.proxy('org.freedesktop.NetworkManager.IP4Config', activeConnection.Ip4Config);
+
+            // Wait for proxy to be ready
+            await new Promise<void>((resolve, reject) => {
+                (ip4ConfigProxy as any).wait(() => {
+                    if (ip4ConfigProxy.valid) {
+                        resolve();
+                    } else {
+                        reject(new Error('Failed to connect to IP4Config'));
+                    }
+                });
+            });
+
+            // Get DHCP options
+            const dhcpOptions = (ip4ConfigProxy.data as any).DhcpOptions || {};
+
+            // DHCP option 12 is the hostname option
+            const dhcpHostname = dhcpOptions['12'] || '';
+
+            nmClient.close();
+            return dhcpHostname;
+        } catch (error) {
+            console.warn('Failed to get DHCP hostname:', error);
+            return '';
+        }
+    }
+
     async getNtpServers(): Promise<string[]> {
         try {
             // Initialize ServerTime if not already done
@@ -98,7 +148,7 @@ export class SystemConfigurationService {
 
             if (customNtp && customNtp.servers && Array.isArray(customNtp.servers)) {
                 // Filter out empty strings and return the servers
-                return customNtp.servers.filter(server => server && server.trim().length > 0);
+                return customNtp.servers.filter((server: string) => server && server.trim().length > 0);
             }
         } catch (error) {
             console.warn('Failed to get NTP servers via ServerTime:', error);
@@ -108,16 +158,18 @@ export class SystemConfigurationService {
     }
 
     async getSystemInfo(interfaces: Interface[]): Promise<SystemInfo> {
-        const [hostnameInfo, defaultInterface, ntpServers] = await Promise.all([
+        const [hostnameInfo, defaultInterface, ntpServers, dhcpHostname] = await Promise.all([
             this.getHostnameInfo(),
             this.getDefaultInterface(interfaces),
-            this.getNtpServers()
+            this.getNtpServers(),
+            this.getDhcpHostname(interfaces)
         ]);
 
         return {
             hostname: this.getFormattedHostname(hostnameInfo),
             prettyHostname: hostnameInfo.prettyHostname,
             staticHostname: hostnameInfo.staticHostname,
+            dhcpHostname,
             defaultInterface,
             ntpServers
         };
@@ -135,7 +187,7 @@ export class SystemConfigurationService {
 
             // Wait for proxy to be ready
             await new Promise<void>((resolve, reject) => {
-                hostnameProxy.wait(() => {
+                (hostnameProxy as any).wait(() => {
                     if (hostnameProxy.valid) {
                         resolve();
                     } else {
@@ -176,10 +228,21 @@ export class SystemConfigurationService {
             }
 
             const connection = selectedIface.MainConnection;
-            const settings = { ...connection.Settings };
+            // Create a deep copy of the existing settings to modify
+            const settings = connection.copy_settings();
 
             // Configure IPv4
-            if (!settings.ipv4) settings.ipv4 = {};
+            if (!settings.ipv4) {
+                settings.ipv4 = {
+                    method: 'auto',
+                    addresses: [],
+                    dns: [],
+                    dns_search: [],
+                    routes: [],
+                    ignore_auto_dns: false,
+                    ignore_auto_routes: false
+                };
+            }
 
             if (model.networkAddress.ipv4.method === 'static') {
                 settings.ipv4.method = 'manual';
@@ -195,6 +258,7 @@ export class SystemConfigurationService {
                 ]];
 
                 // Configure DNS
+                settings.ipv4.ignore_auto_dns = !model.networkAddress.ipv4.autoDns;
                 if (!model.networkAddress.ipv4.autoDns) {
                     settings.ipv4.dns = [
                         model.networkAddress.ipv4.primaryDns,
@@ -209,11 +273,22 @@ export class SystemConfigurationService {
                 settings.ipv4.method = 'auto';
                 settings.ipv4.addresses = [];
                 settings.ipv4.dns = [];
+                settings.ipv4.ignore_auto_dns = false;
                 results.push('IPv4 configured for DHCP');
             }
 
             // Configure IPv6
-            if (!settings.ipv6) settings.ipv6 = {};
+            if (!settings.ipv6) {
+                settings.ipv6 = {
+                    method: 'auto',
+                    addresses: [],
+                    dns: [],
+                    dns_search: [],
+                    routes: [],
+                    ignore_auto_dns: false,
+                    ignore_auto_routes: false
+                };
+            }
 
             if (model.networkAddress.ipv6.method === 'static') {
                 settings.ipv6.method = 'manual';
@@ -226,28 +301,73 @@ export class SystemConfigurationService {
                         model.networkAddress.ipv6.gateway || ''
                     ]];
                     results.push(`IPv6 configured: ${address}/${prefix}`);
+                } else {
+                    settings.ipv6.addresses = [];
                 }
 
                 // Configure IPv6 DNS
+                settings.ipv6.ignore_auto_dns = !model.networkAddress.ipv6.autoDns;
                 if (!model.networkAddress.ipv6.autoDns) {
                     settings.ipv6.dns = [
                         model.networkAddress.ipv6.primaryDns,
                         model.networkAddress.ipv6.secondaryDns
                     ].filter(dns => dns && dns.trim());
+                } else {
+                    settings.ipv6.dns = [];
                 }
             } else if (model.networkAddress.ipv6.method === 'disabled') {
                 settings.ipv6.method = 'ignore';
                 settings.ipv6.addresses = [];
+                settings.ipv6.dns = [];
                 results.push('IPv6 disabled');
             } else {
                 settings.ipv6.method = 'auto';
                 settings.ipv6.addresses = [];
+                settings.ipv6.dns = [];
+                settings.ipv6.ignore_auto_dns = false;
                 results.push('IPv6 configured for auto');
             }
 
-            // Note: For now, we prepare the configuration but don't apply it
-            // to avoid complex NetworkManager D-Bus authentication issues
-            results.push('Network configuration prepared (manual application required)');
+            // Actually apply the network configuration using NetworkManager D-Bus
+            try {
+                console.log('Applying network settings to connection:', connection.Settings.connection.id);
+                console.log('New settings:', settings);
+                
+                // Apply the settings to the connection using NetworkManager D-Bus
+                await connection.apply_settings(settings);
+                results.push(`✓ Network configuration applied to ${connection.Settings.connection.id}`);
+                
+                // Reactivate the connection to apply the new settings
+                // This is necessary because apply_settings only updates the stored configuration,
+                // but doesn't automatically apply it to the active connection
+                if (selectedIface.Device) {
+                    console.log('Reactivating connection to apply new settings:', connection.Settings.connection.id);
+                    
+                    // First deactivate if there's an active connection
+                    if (selectedIface.Device.ActiveConnection) {
+                        await selectedIface.Device.ActiveConnection.deactivate();
+                        results.push(`✓ Deactivated existing connection`);
+                    }
+                    
+                    // Then activate with the new settings
+                    await connection.activate(selectedIface.Device, null);
+                    results.push(`✓ Connection ${connection.Settings.connection.id} reactivated with new settings`);
+                } else {
+                    results.push(`⚠ Warning: No device found for interface, settings updated but not applied`);
+                }
+                
+            } catch (networkError) {
+                const errorMsg = String(networkError);
+                console.error('NetworkManager configuration error:', networkError);
+                
+                // Check for common authentication errors
+                if (errorMsg.includes('Interactive authentication required') || 
+                    errorMsg.includes('org.freedesktop.PolicyKit1.Error.Failed')) {
+                    throw new Error('Network configuration requires administrator privileges. Please ensure you have sufficient permissions.');
+                }
+                
+                throw new Error(`Failed to apply network configuration: ${errorMsg}`);
+            }
 
         } catch (error) {
             throw new Error(`Network configuration failed: ${String(error)}`);
@@ -266,7 +386,7 @@ export class SystemConfigurationService {
 
             // Wait for proxy to be ready
             await new Promise<void>((resolve, reject) => {
-                timedateProxy.wait(() => {
+                (timedateProxy as any).wait(() => {
                     if (timedateProxy.valid) {
                         resolve();
                     } else {

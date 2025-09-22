@@ -155,13 +155,8 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     const finalStepName = hasEnrollmentScripts ? _('Apply and enroll') : _('Apply configuration');
 
     return (
-        <Page className='no-masthead-sidebar'>
-            <PageSection hasBodyWrapper={false} padding={{ default: "padding" }}>
-                <Flex alignItems={{ default: 'alignItemsCenter' }}>
-                    <h2>{_('System onboarding wizard')}</h2>
-                </Flex>
-            </PageSection>
-            <PageSection hasBodyWrapper={false} type={PageSectionTypes.wizard} aria-label="Wizard container">
+        <Page className='no-masthead-sidebar' isContentFilled={true} id="system-onboarding-wizard">
+            <PageSection hasBodyWrapper={false} type={PageSectionTypes.wizard} padding={{ default: 'noPadding' }} aria-label="Wizard container">
                 <Wizard>
                     <WizardStep name={_('Hostname')} id="wizard-step-1">
                         <HostnamePage />

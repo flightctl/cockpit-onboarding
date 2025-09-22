@@ -26,6 +26,7 @@ interface NetworkAddressConfig {
 export interface Model {
   hostname: {
     value: string;
+    dhcpHostname: string;
   };
   networkInterface: {
     selectedInterface: string | null;
@@ -86,6 +87,7 @@ const defaultNetworkConfig: NetworkAddressConfig = {
 const initialModel: Model = {
     hostname: {
         value: '',
+        dhcpHostname: '',
     },
     networkInterface: {
         selectedInterface: null,
@@ -356,7 +358,8 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
             setModel(prev => ({
                 ...prev,
                 hostname: {
-                    value: systemInfo.hostname
+                    value: systemInfo.hostname,
+                    dhcpHostname: systemInfo.dhcpHostname
                 },
                 networkInterface: {
                     ...prev.networkInterface,

@@ -55,7 +55,7 @@ export const HostnamePage: React.FunctionComponent = () => {
                             value={model.hostname.value}
                             onChange={(_, value) => setHostname(value)}
                             placeholder="my-system.example.com"
-                            isDisabled={!isInitialized}
+                            disabled={!isInitialized}
                         />
                     </TextInputGroup>
                     {validationError && (
