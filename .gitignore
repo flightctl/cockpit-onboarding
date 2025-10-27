@@ -5,8 +5,10 @@
 #  - patterns to match files in subdirs
 
 # general patterns
+*.log
 *.pyc
 *.rpm
+.env*
 
 # toplevel (/...)
 /Test*.html
@@ -18,6 +20,7 @@
 /bots
 /cockpit-*.tar.xz
 /cockpit-navigator.spec
+/coverage/
 /dist/
 /package-lock.json
 /pkg/
