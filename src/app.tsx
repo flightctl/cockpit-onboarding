@@ -19,7 +19,7 @@
 
 import cockpit from 'cockpit';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useEvent, useObject } from "hooks";
 
 import * as service from 'service.js';
@@ -27,6 +27,8 @@ import { NetworkManagerModel, Interface } from '../pkg/lib/cockpit/networkmanage
 
 import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
 import { ModelProvider } from './model-context';
+import { loadConfig } from './config-loader';
+import { SystemOnboardingConfig } from './types';
 
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist/esm/components/Page/index.js";
@@ -45,7 +47,26 @@ import { WithDialogs } from "dialogs.jsx";
 
 const _ = cockpit.gettext;
 
+// Configuration context to provide loaded configuration throughout the app
+interface ConfigContextType {
+    config: SystemOnboardingConfig | null;
+    isConfigLoaded: boolean;
+    configError: string | null;
+}
+
+const ConfigContext = createContext<ConfigContextType>({
+    config: null,
+    isConfigLoaded: false,
+    configError: null,
+});
+
+export const useConfig = () => useContext(ConfigContext);
+
 export const Application = () => {
+    const [config, setConfig] = useState<SystemOnboardingConfig | null>(null);
+    const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+    const [configError, setConfigError] = useState<string | null>(null);
+
     const nmService = useObject(() => service.proxy("NetworkManager"),
                                 null,
                                 []);
@@ -58,8 +79,37 @@ export const Application = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     useEvent(networkManager.client as any, "owner", (_event, owner) => { nmRunning_ref.current = owner !== null });
 
-    if (networkManager.ready === undefined)
+    // Load configuration on mount
+    useEffect(() => {
+        loadConfig()
+                .then(loadedConfig => {
+                    setConfig(loadedConfig);
+                    setIsConfigLoaded(true);
+                    console.log('Configuration loaded successfully:', loadedConfig);
+                })
+                .catch(error => {
+                    console.error('Failed to load configuration:', error);
+                    setConfigError(error.message || 'Unknown error loading configuration');
+                    setIsConfigLoaded(true); // Mark as loaded even on error to show error state
+                });
+    }, []);
+
+    // Show loading while configuration is being loaded
+    if (!isConfigLoaded || networkManager.ready === undefined)
         return <EmptyStatePanel loading />;
+
+    // Show error if configuration failed to load
+    if (configError) {
+        return (
+            <div id="system-onboarding-config-error">
+                <EmptyStatePanel
+                    icon={ExclamationCircleIcon}
+                    title={_("Configuration error")}
+                    paragraph={configError}
+                />
+            </div>
+        );
+    }
 
     if (!nmRunning_ref.current) {
         if (nmService.enabled) {
@@ -112,13 +162,15 @@ icon={ ExclamationCircleIcon }
 
     const interfaces = networkManager.list_interfaces();
 
-    /* At this point NM is running and the model is ready */
+    /* At this point NM is running, the model is ready, and configuration is loaded */
     return (
-        <ModelProvider networkManager={networkManager}>
-            <WithDialogs key="1">
-                <SystemOnboardingWizard interfaces={interfaces} />
-            </WithDialogs>
-        </ModelProvider>
+        <ConfigContext.Provider value={{ config, isConfigLoaded, configError }}>
+            <ModelProvider networkManager={networkManager}>
+                <WithDialogs key="1">
+                    <SystemOnboardingWizard interfaces={interfaces} />
+                </WithDialogs>
+            </ModelProvider>
+        </ConfigContext.Provider>
     );
 };
 
@@ -126,34 +178,14 @@ interface SystemOnboardingWizardProps {
     interfaces: Interface[];
 }
 
-const checkEnrollmentScripts = async (): Promise<boolean> => {
-    try {
-        // Use shell to expand $HOME environment variable
-        const proc = cockpit.spawn(['sh', '-c', 'find "$HOME/.config/cockpit/system-onboarding.d/" -name "*.sh" -type f -executable 2>/dev/null || true']);
-        const output = await proc;
-        const scripts = output.trim().split('\n')
-.filter(line => line.length > 0);
-        return scripts.length > 0;
-    } catch {
-        console.log('No enrollment scripts found or directory does not exist');
-        return false;
-    }
-};
-
 export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({ interfaces }) => {
-    const [hasEnrollmentScripts, setHasEnrollmentScripts] = useState<boolean | null>(null);
+    const { config } = useConfig();
 
-    useEffect(() => {
-        checkEnrollmentScripts().then(setHasEnrollmentScripts);
-    }, []);
+    // Check if enrollment services are configured
+    const hasEnrollmentServices = Boolean(config && config.enrollmentServices && config.enrollmentServices.length > 0);
 
-    // Show loading while checking for scripts
-    if (hasEnrollmentScripts === null) {
-        return <EmptyStatePanel loading />;
-    }
-
-    const reviewButtonText = hasEnrollmentScripts ? _('Enroll') : _('Apply');
-    const finalStepName = hasEnrollmentScripts ? _('Apply and enroll') : _('Apply configuration');
+    const reviewButtonText = hasEnrollmentServices ? _('Enroll') : _('Apply');
+    const finalStepName = hasEnrollmentServices ? _('Apply and enroll') : _('Apply configuration');
 
     return (
         <Page className='no-masthead-sidebar' isContentFilled id="system-onboarding-wizard">
@@ -171,15 +203,15 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     <WizardStep name={_('Network services')} id="wizard-step-4">
                         <NetworkServicesPage />
                     </WizardStep>
-                    {hasEnrollmentScripts && (
+                    {hasEnrollmentServices && (
                         <WizardStep name={_('Enrollment server')} id="wizard-step-5">
                             <EnrollmentPage />
                         </WizardStep>
                     )}
-                    <WizardStep name={_('Review')} id={hasEnrollmentScripts ? "wizard-step-6" : "wizard-step-5"} footer={{ nextButtonText: reviewButtonText }}>
-                        <ReviewPage hasEnrollmentScripts={hasEnrollmentScripts} />
+                    <WizardStep name={_('Review')} id={hasEnrollmentServices ? "wizard-step-6" : "wizard-step-5"} footer={{ nextButtonText: reviewButtonText }}>
+                        <ReviewPage hasEnrollmentScripts={hasEnrollmentServices} />
                     </WizardStep>
-                    <WizardStep name={finalStepName} id={hasEnrollmentScripts ? "wizard-step-7" : "wizard-step-6"} footer={{ nextButtonText: _('Finish'), isBackDisabled: true }}>
+                    <WizardStep name={finalStepName} id={hasEnrollmentServices ? "wizard-step-7" : "wizard-step-6"} footer={{ nextButtonText: _('Finish'), isBackDisabled: true }}>
                         <EnrollmentProgressPage />
                     </WizardStep>
                 </Wizard>

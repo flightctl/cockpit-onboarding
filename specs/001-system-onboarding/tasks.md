@@ -45,18 +45,18 @@ Project follows Cockpit module structure:
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T008 Create src/config-loader.ts to load configuration with fallback hierarchy
-- [ ] T009 Add loadConfig() function in src/config-loader.ts to read from default and user override paths
-- [ ] T010 Add validateConfig() function in src/config-loader.ts to validate against JSON schema
-- [ ] T011 Export SystemOnboardingConfig TypeScript interface in src/config-loader.ts
-- [ ] T012 Update src/model-context.tsx to include full OnboardingSession state structure from data-model.md
-- [ ] T013 Add enrollment state (selectedServices, credentials, endpoints) to model context in src/model-context.tsx
-- [ ] T014 Create src/types.d.ts with all TypeScript type definitions from data-model.md
-- [ ] T015 [P] Add EnrollmentService interface to src/types.d.ts
-- [ ] T016 [P] Add LedConfig interface to src/types.d.ts
-- [ ] T017 [P] Add NetworkConfig interface to src/types.d.ts
-- [ ] T018 Update src/app.tsx to load configuration on application initialization
-- [ ] T019 Pass loaded configuration through React context in src/app.tsx
+- [X] T008 Create src/config-loader.ts to load configuration with fallback hierarchy
+- [X] T009 Add loadConfig() function in src/config-loader.ts to read from default and user override paths
+- [X] T010 Add validateConfig() function in src/config-loader.ts to validate against JSON schema
+- [X] T011 Export SystemOnboardingConfig TypeScript interface in src/config-loader.ts
+- [X] T012 Update src/model-context.tsx to include full OnboardingSession state structure from data-model.md
+- [X] T013 Add enrollment state (selectedServices, credentials, endpoints) to model context in src/model-context.tsx
+- [X] T014 Create src/types.d.ts with all TypeScript type definitions from data-model.md
+- [X] T015 [P] Add EnrollmentService interface to src/types.d.ts
+- [X] T016 [P] Add LedConfig interface to src/types.d.ts
+- [X] T017 [P] Add NetworkConfig interface to src/types.d.ts
+- [X] T018 Update src/app.tsx to load configuration on application initialization
+- [X] T019 Pass loaded configuration through React context in src/app.tsx
 
 **Checkpoint**: Foundation ready - configuration loading works, model context includes all state, user story implementation can now begin in parallel
 
