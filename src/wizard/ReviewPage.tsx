@@ -89,9 +89,11 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                     <DescriptionListGroup>
                         <DescriptionListTerm>DNS servers</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.networkAddress.ipv4.autoDns ? (
+                            {model.networkAddress.ipv4.autoDns
+? (
                                 'auto'
-                            ) : (
+                            )
+: (
     <>
         {model.networkAddress.ipv4.primaryDns && (
         <div>{model.networkAddress.ipv4.primaryDns}</div>
@@ -136,9 +138,11 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                         <DescriptionListGroup>
                             <DescriptionListTerm>DNS servers</DescriptionListTerm>
                             <DescriptionListDescription>
-                                {model.networkAddress.ipv6.autoDns ? (
+                                {model.networkAddress.ipv6.autoDns
+? (
                                     'auto'
-                                ) : (
+                                )
+: (
     <>
         {model.networkAddress.ipv6.primaryDns && (
         <div>{model.networkAddress.ipv6.primaryDns}</div>
@@ -163,15 +167,16 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                     <DescriptionListGroup>
                         <DescriptionListTerm>NTP servers</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.networkServices.ntp.autoConfig ? (
-                                'auto'
-                            ) : (
-                                model.networkServices.ntp.servers.length > 0 ? (
+                            {model.networkServices.ntp.autoConfig
+                                ? 'auto'
+                                : (model.networkServices.ntp.servers.length > 0
+                                    ? (
                                     model.networkServices.ntp.servers.map((server, index) => (
                                         <div key={index}>{server}</div>
                                     ))
-                                ) : (
-                                    <span>(empty)</span>
+                                )
+: (
+    <span>(empty)</span>
                                 )
                             )}
                         </DescriptionListDescription>

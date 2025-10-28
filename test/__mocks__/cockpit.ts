@@ -7,7 +7,8 @@
 
 // Mock DBUS client
 const createMockDbusClient = () => ({
-  proxy: jest.fn((iface, path) => ({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  proxy: jest.fn((_iface: string, _path: string) => ({
     wait: jest.fn((callback) => {
       callback?.();
       return Promise.resolve();
@@ -21,12 +22,18 @@ const createMockDbusClient = () => ({
 });
 
 // Mock spawn process
-const createMockProcess = (stdout = '', exitCode = 0) => {
-  const promise = Promise.resolve();
-  (promise as any).stream = jest.fn((callback) => {
+interface MockProcess extends Promise<void> {
+  stream: jest.Mock;
+  then: jest.Mock;
+  catch: jest.Mock;
+}
+
+const createMockProcess = (stdout = '', exitCode = 0): MockProcess => {
+  const promise = Promise.resolve() as MockProcess;
+  promise.stream = jest.fn((callback) => {
     setTimeout(() => callback(stdout), 0);
   });
-  (promise as any).then = jest.fn((resolve, reject) => {
+  promise.then = jest.fn((resolve, reject) => {
     if (exitCode === 0) {
       resolve?.(stdout);
     } else {
@@ -34,7 +41,7 @@ const createMockProcess = (stdout = '', exitCode = 0) => {
     }
     return promise;
   });
-  (promise as any).catch = jest.fn((reject) => {
+  promise.catch = jest.fn((reject) => {
     if (exitCode !== 0) {
       reject?.(new Error(`Process exited with code ${exitCode}`));
     }
@@ -44,11 +51,11 @@ const createMockProcess = (stdout = '', exitCode = 0) => {
 };
 
 // Mock file interface
-const createMockFile = (content: any) => ({
+const createMockFile = (content: string | Record<string, unknown>) => ({
   read: jest.fn(() => Promise.resolve(content)),
   replace: jest.fn(() => Promise.resolve()),
   modify: jest.fn(() => Promise.resolve()),
-  watch: jest.fn((callback) => {
+  watch: jest.fn(() => {
     // Optionally trigger callback
     return { remove: jest.fn() };
   }),
@@ -63,13 +70,16 @@ const mockTransport = {
 // Mock cockpit object
 const cockpit = {
   // DBUS API
-  dbus: jest.fn((busName, options?) => createMockDbusClient()),
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  dbus: jest.fn((_busName: string, _options?: Record<string, unknown>) => createMockDbusClient()),
 
   // Spawn API
-  spawn: jest.fn((command, options?) => createMockProcess('', 0)),
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  spawn: jest.fn((_command: string[], _options?: Record<string, unknown>) => createMockProcess('', 0)),
 
   // File API
-  file: jest.fn((path, options?) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  file: jest.fn((_path: string, options?: { syntax?: string }) => {
     const content = options?.syntax === 'JSON' ? {} : '';
     return createMockFile(content);
   }),
@@ -88,7 +98,7 @@ const cockpit = {
   })),
 
   // Jump/navigation
-  jump: jest.fn((location, host?) => {
+  jump: jest.fn((location: string) => {
     console.log(`Mock jump to: ${location}`);
   }),
 

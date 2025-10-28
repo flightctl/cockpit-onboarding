@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { systemConfigurationService } from './system-config.js';
-import { Interface } from './interfaces.js';
-import { ip4_prefix_from_text } from './utils.js';
+import { Interface } from '../pkg/lib/cockpit/networkmanager/interfaces.js';
 
 interface NetworkAddressConfig {
   ipv4: {
@@ -123,6 +122,7 @@ const initialModel: Model = {
 
 // Context type combining existing NetworkManager model and application model
 interface ModelContextType {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   networkManager?: any; // Keep existing NetworkManager model
   model: Model;
   isInitialized: boolean;
@@ -188,12 +188,15 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     const activeConnection = iface.Device.ActiveConnection;
 
     // IPv4 configuration
-    const ipv4Method = iface.MainConnection?.Settings?.ipv4?.method || 'dhcp';
-    const ipv4ConnectionDns = iface.MainConnection?.Settings?.ipv4?.dns || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ipv4Method = (iface.MainConnection?.Settings as any)?.ipv4?.method || 'dhcp';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ipv4ConnectionDns = (iface.MainConnection?.Settings as any)?.ipv4?.dns || [];
 
     if (activeConnection.Ip4Config && activeConnection.Ip4Config.Addresses.length > 0) {
         const address = activeConnection.Ip4Config.Addresses[0];
         // Get DNS servers from active config (includes DHCP-provided DNS) and connection settings
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const activeDns = (activeConnection.Ip4Config as any).Nameservers || [];
         const hasStaticDns = ipv4ConnectionDns.length > 0;
         const dnsServers = hasStaticDns ? ipv4ConnectionDns : activeDns;
@@ -220,12 +223,15 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     }
 
     // IPv6 configuration
-    const ipv6Method = iface.MainConnection?.Settings?.ipv6?.method || 'dhcp';
-    const ipv6ConnectionDns = iface.MainConnection?.Settings?.ipv6?.dns || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ipv6Method = (iface.MainConnection?.Settings as any)?.ipv6?.method || 'dhcp';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ipv6ConnectionDns = (iface.MainConnection?.Settings as any)?.ipv6?.dns || [];
 
     if (activeConnection.Ip6Config && activeConnection.Ip6Config.Addresses.length > 0) {
         const address = activeConnection.Ip6Config.Addresses[0];
         // Get DNS servers from active config (includes DHCP-provided DNS) and connection settings
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const activeDns = (activeConnection.Ip6Config as any).Nameservers || [];
         const hasStaticDns = ipv6ConnectionDns.length > 0;
         const dnsServers = hasStaticDns ? ipv6ConnectionDns : activeDns;
@@ -254,6 +260,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
 };
 
 // Provider component
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const ModelProvider: React.FunctionComponent<{ children: ReactNode; networkManager?: any }> = ({ children, networkManager }) => {
     const [model, setModel] = useState<Model>(initialModel);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
@@ -388,7 +395,8 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
         if (networkManager && networkManager.ready && !isInitialized) {
             initializeFromSystem();
         }
-    }, [networkManager, networkManager?.ready, isInitialized, initializeFromSystem]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [networkManager, networkManager?.ready, isInitialized]);
 
     useEffect(() => {
     // Cleanup system info service on unmount

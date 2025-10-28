@@ -1,3 +1,6 @@
 node_modules/*
-pkg/lib/*
+pkg/lib/**/*.js
+pkg/lib/**/*.jsx
+pkg/lib/**/*.scss
+pkg/lib/**/*.css
 specs/*

@@ -23,7 +23,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useEvent, useObject } from "hooks";
 
 import * as service from 'service.js';
-import { NetworkManagerModel, Interface } from './interfaces.js';
+import { NetworkManagerModel, Interface } from '../pkg/lib/cockpit/networkmanager/interfaces.js';
 
 import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
 import { ModelProvider } from './model-context';
@@ -31,7 +31,6 @@ import { ModelProvider } from './model-context';
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist/esm/components/Page/index.js";
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
-import { Flex } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { Wizard, WizardStep } from '@patternfly/react-core';
 
 import { HostnamePage } from './wizard/HostnamePage.tsx';
@@ -52,11 +51,12 @@ export const Application = () => {
                                 []);
     useEvent(nmService, "changed");
 
-    const networkManager = useObject(() => new NetworkManagerModel(), null, []);
+    const networkManager = useObject(() => NetworkManagerModel(), null, []);
     useEvent(networkManager, "changed");
 
-    const nmRunning_ref = useRef(undefined);
-    useEvent(networkManager.client, "owner", (event, owner) => { nmRunning_ref.current = owner !== null });
+    const nmRunning_ref = useRef<boolean | undefined>(undefined);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useEvent(networkManager.client as any, "owner", (_event, owner) => { nmRunning_ref.current = owner !== null });
 
     if (networkManager.ready === undefined)
         return <EmptyStatePanel loading />;
@@ -69,7 +69,7 @@ export const Application = () => {
 icon={ ExclamationCircleIcon }
                                      title={ _("NetworkManager is not running") }
                                      action={nmService.exists ? _("Start service") : null}
-                                     onAction={ nmService.start }
+                                     onAction={ () => nmService.start() }
                                      secondary={
                                          <Button
 component="a"
@@ -85,7 +85,8 @@ component="a"
         } else if (!nmService.exists) {
             return (
                 <div id="networking-nm-not-found">
-                    <EmptyStatePanel icon={ ExclamationCircleIcon }
+                    <EmptyStatePanel
+icon={ ExclamationCircleIcon }
                                      title={ _("NetworkManager is not installed") }
                     />
 
@@ -94,7 +95,8 @@ component="a"
         } else {
             return (
                 <div id="networking-nm-disabled">
-                    <EmptyStatePanel icon={ ExclamationCircleIcon }
+                    <EmptyStatePanel
+icon={ ExclamationCircleIcon }
                                      title={ _("Network devices and graphs require NetworkManager") }
                                      action={nmService.exists ? _("Enable service") : null}
                                      onAction={() => {
@@ -114,14 +116,13 @@ component="a"
     return (
         <ModelProvider networkManager={networkManager}>
             <WithDialogs key="1">
-                <SystemOnboardingWizard operationInProgress={networkManager.operationInProgress} interfaces={interfaces} />
+                <SystemOnboardingWizard interfaces={interfaces} />
             </WithDialogs>
         </ModelProvider>
     );
 };
 
 interface SystemOnboardingWizardProps {
-    operationInProgress?: boolean;
     interfaces: Interface[];
 }
 
@@ -139,7 +140,7 @@ const checkEnrollmentScripts = async (): Promise<boolean> => {
     }
 };
 
-export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({ operationInProgress, interfaces }) => {
+export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({ interfaces }) => {
     const [hasEnrollmentScripts, setHasEnrollmentScripts] = useState<boolean | null>(null);
 
     useEffect(() => {
@@ -155,14 +156,14 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     const finalStepName = hasEnrollmentScripts ? _('Apply and enroll') : _('Apply configuration');
 
     return (
-        <Page className='no-masthead-sidebar' isContentFilled={true} id="system-onboarding-wizard">
+        <Page className='no-masthead-sidebar' isContentFilled id="system-onboarding-wizard">
             <PageSection hasBodyWrapper={false} type={PageSectionTypes.wizard} padding={{ default: 'noPadding' }} aria-label="Wizard container">
                 <Wizard>
                     <WizardStep name={_('Hostname')} id="wizard-step-1">
                         <HostnamePage />
                     </WizardStep>
                     <WizardStep name={_('Network interface')} id="wizard-step-2">
-                        <NetworkInterfacePage operationInProgress={operationInProgress} interfaces={interfaces} />
+                        <NetworkInterfacePage interfaces={interfaces} />
                     </WizardStep>
                     <WizardStep name={_('Network address')} id="wizard-step-3">
                         <NetworkAddressPage />

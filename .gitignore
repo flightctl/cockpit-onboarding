@@ -23,7 +23,15 @@
 /coverage/
 /dist/
 /package-lock.json
-/pkg/
+/pkg/*
+# Exception: TypeScript definitions created by this project
+!/pkg/lib/
+/pkg/lib/*
+!/pkg/lib/cockpit/
+/pkg/lib/cockpit/*
+!/pkg/lib/cockpit/networkmanager/
+/pkg/lib/cockpit/networkmanager/*
+!/pkg/lib/cockpit/networkmanager/interfaces.d.ts
 /node_modules/
 /tmp/
 /tools/

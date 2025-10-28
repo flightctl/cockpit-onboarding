@@ -9,15 +9,14 @@ import { useModelContext } from '../model-context';
 import {
     device_state_text,
     is_managed,
-} from '../interfaces.js';
+} from '../../pkg/lib/cockpit/networkmanager/interfaces.js';
 
 interface NetworkInterfacePageProps {
-    interfaces: import('../interfaces.js').Interface[];
-    operationInProgress?: boolean;
+    interfaces: import('../../pkg/lib/cockpit/networkmanager/interfaces.js').Interface[];
 }
 
 export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageProps> = ({ interfaces }) => {
-    function hasGroup(iface: import('../interfaces.js').Interface) {
+    function hasGroup(iface: import('../../pkg/lib/cockpit/networkmanager/interfaces.js').Interface) {
         return ((iface.Device &&
                  iface.Device.ActiveConnection &&
                  iface.Device.ActiveConnection.Group &&
@@ -28,7 +27,7 @@ export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageP
 
     const filteredInterfaces = interfaces.filter(iface => {
         // Skip loopback
-        if (iface.Name == "lo" || (iface.Device && iface.Device.DeviceType == 'loopback'))
+        if (iface.Name === "lo" || (iface.Device && iface.Device.DeviceType === 'loopback'))
             return false;
 
         // Skip members
@@ -53,7 +52,7 @@ export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageP
 };
 
 interface NetworkInterfaceSelectorProps {
-  interfaces: import('../interfaces.js').Interface[];
+  interfaces: import('../../pkg/lib/cockpit/networkmanager/interfaces.js').Interface[];
 }
 
 export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceSelectorProps> = ({ interfaces }) => {
@@ -68,7 +67,7 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
     state: 'State'
   };
 
-  const isIfaceSelectable = (iface: import('../interfaces.js').Interface) => is_managed(iface.Device); // Use proper NetworkManager logic
+  const isIfaceSelectable = (iface: import('../../pkg/lib/cockpit/networkmanager/interfaces.js').Interface) => is_managed(iface.Device); // Use proper NetworkManager logic
 
   // Initialize selection if not set
   React.useEffect(() => {

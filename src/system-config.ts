@@ -1,5 +1,5 @@
 import cockpit from 'cockpit';
-import { Interface } from './interfaces.js';
+import { Interface } from '../pkg/lib/cockpit/networkmanager/interfaces.js';
 import { ServerTime } from '../pkg/lib/serverTime.js';
 import { Model } from './model-context';
 
@@ -13,8 +13,11 @@ export interface SystemInfo {
 }
 
 export class SystemConfigurationService {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private hostnameClient?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private hostnameProxy?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private serverTime?: any;
 
     async getHostnameInfo(): Promise<{ hostname: string; prettyHostname?: string; staticHostname?: string }> {
@@ -25,6 +28,7 @@ export class SystemConfigurationService {
 
             // Wait for proxy to be ready
             await new Promise<void>((resolve, reject) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (this.hostnameProxy as any).wait(() => {
                     if (this.hostnameProxy.valid) {
                         resolve();
@@ -109,10 +113,13 @@ export class SystemConfigurationService {
 
             // Create NetworkManager D-Bus client
             const nmClient = cockpit.dbus('org.freedesktop.NetworkManager');
-            const ip4ConfigProxy = nmClient.proxy('org.freedesktop.NetworkManager.IP4Config', activeConnection.Ip4Config);
+            // Ip4Config is actually a D-Bus path string, not the config object
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ip4ConfigProxy = nmClient.proxy('org.freedesktop.NetworkManager.IP4Config', activeConnection.Ip4Config as any as string);
 
             // Wait for proxy to be ready
             await new Promise<void>((resolve, reject) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (ip4ConfigProxy as any).wait(() => {
                     if (ip4ConfigProxy.valid) {
                         resolve();
@@ -123,6 +130,7 @@ export class SystemConfigurationService {
             });
 
             // Get DHCP options
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const dhcpOptions = (ip4ConfigProxy.data as any).DhcpOptions || {};
 
             // DHCP option 12 is the hostname option
@@ -187,6 +195,7 @@ export class SystemConfigurationService {
 
             // Wait for proxy to be ready
             await new Promise<void>((resolve, reject) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (hostnameProxy as any).wait(() => {
                     if (hostnameProxy.valid) {
                         resolve();
@@ -197,6 +206,7 @@ export class SystemConfigurationService {
             });
 
             // Set the static hostname with interactive authentication
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (hostnameProxy as any).call('SetStaticHostname', [hostname.trim(), true]);
 
             hostnameClient.close();
@@ -205,6 +215,7 @@ export class SystemConfigurationService {
         }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async applyNetworkConfiguration(networkManager: any, model: Model): Promise<string[]> {
         const results: string[] = [];
 
@@ -248,8 +259,9 @@ export class SystemConfigurationService {
                 settings.ipv4.method = 'manual';
 
                 // Convert subnet mask to prefix length
-                const prefixLength = model.networkAddress.ipv4.subnetMask ?
-                    this.subnetMaskToPrefixLength(model.networkAddress.ipv4.subnetMask) : 24;
+                const prefixLength = model.networkAddress.ipv4.subnetMask
+                    ? this.subnetMaskToPrefixLength(model.networkAddress.ipv4.subnetMask)
+: 24;
 
                 settings.ipv4.addresses = [[
                     model.networkAddress.ipv4.address,
@@ -332,43 +344,41 @@ export class SystemConfigurationService {
             try {
                 console.log('Applying network settings to connection:', connection.Settings.connection.id);
                 console.log('New settings:', settings);
-                
+
                 // Apply the settings to the connection using NetworkManager D-Bus
                 await connection.apply_settings(settings);
                 results.push(`✓ Network configuration applied to ${connection.Settings.connection.id}`);
-                
+
                 // Reactivate the connection to apply the new settings
                 // This is necessary because apply_settings only updates the stored configuration,
                 // but doesn't automatically apply it to the active connection
                 if (selectedIface.Device) {
                     console.log('Reactivating connection to apply new settings:', connection.Settings.connection.id);
-                    
+
                     // First deactivate if there's an active connection
                     if (selectedIface.Device.ActiveConnection) {
                         await selectedIface.Device.ActiveConnection.deactivate();
                         results.push(`✓ Deactivated existing connection`);
                     }
-                    
+
                     // Then activate with the new settings
                     await connection.activate(selectedIface.Device, null);
                     results.push(`✓ Connection ${connection.Settings.connection.id} reactivated with new settings`);
                 } else {
                     results.push(`⚠ Warning: No device found for interface, settings updated but not applied`);
                 }
-                
             } catch (networkError) {
                 const errorMsg = String(networkError);
                 console.error('NetworkManager configuration error:', networkError);
-                
+
                 // Check for common authentication errors
-                if (errorMsg.includes('Interactive authentication required') || 
+                if (errorMsg.includes('Interactive authentication required') ||
                     errorMsg.includes('org.freedesktop.PolicyKit1.Error.Failed')) {
                     throw new Error('Network configuration requires administrator privileges. Please ensure you have sufficient permissions.');
                 }
-                
+
                 throw new Error(`Failed to apply network configuration: ${errorMsg}`);
             }
-
         } catch (error) {
             throw new Error(`Network configuration failed: ${String(error)}`);
         }
@@ -386,6 +396,7 @@ export class SystemConfigurationService {
 
             // Wait for proxy to be ready
             await new Promise<void>((resolve, reject) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (timedateProxy as any).wait(() => {
                     if (timedateProxy.valid) {
                         resolve();
@@ -396,6 +407,7 @@ export class SystemConfigurationService {
             });
 
             // Enable NTP with proper authentication
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (timedateProxy as any).call('SetNTP', [true, true]);
 
             if (autoConfig) {
@@ -411,10 +423,10 @@ export class SystemConfigurationService {
                     // Step 1: Get current NTP configuration to determine backend
                     const currentNtpConfig = await this.serverTime.get_custom_ntp();
                     console.log('Current NTP config:', currentNtpConfig);
-                    
+
                     // Step 2: Turn off NTP
                     await this.serverTime.set_ntp(false);
-                    
+
                     // Step 3: Set custom NTP configuration with proper backend
                     const customNtpConfig = {
                         backend: currentNtpConfig.backend, // Use existing backend (timesyncd or chronyd)
@@ -423,10 +435,10 @@ export class SystemConfigurationService {
                     };
                     console.log('Setting NTP config:', customNtpConfig);
                     await this.serverTime.set_custom_ntp(customNtpConfig);
-                    
+
                     // Step 4: Turn NTP back on
                     await this.serverTime.set_ntp(true);
-                    
+
                     results.push(`NTP configured with custom servers (${currentNtpConfig.backend}): ${servers.join(', ')}`);
                 } catch (serverTimeError) {
                     console.warn('Failed to set custom NTP servers via ServerTime:', serverTimeError);
@@ -437,7 +449,6 @@ export class SystemConfigurationService {
             }
 
             timedateClient.close();
-
         } catch (error) {
             throw new Error(`NTP configuration failed: ${String(error)}`);
         }
@@ -445,6 +456,7 @@ export class SystemConfigurationService {
         return results;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async applySystemConfiguration(networkManager: any, model: Model): Promise<{ success: boolean; results: string[] }> {
         const allResults: string[] = [];
         let hasErrors = false;

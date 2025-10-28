@@ -52,9 +52,11 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
     const initializeSteps = async () => {
         try {
             // Check for enrollment scripts
-            const proc = cockpit.spawn(['sh', '-c', 'find \"$HOME/.config/cockpit/system-onboarding.d/\" -name \"*.sh\" -type f -executable 2>/dev/null || true']);
+            const proc = cockpit.spawn(['sh', '-c', 'find "$HOME/.config/cockpit/system-onboarding.d/" -name "*.sh" -type f -executable 2>/dev/null || true']);
             const output = await proc;
-            const scripts = output.trim().split('\n').filter(line => line.length > 0).sort();
+            const scripts = output.trim().split('\n')
+.filter(line => line.length > 0)
+.sort();
             setEnrollmentScripts(scripts);
 
             // Create initial steps
@@ -155,19 +157,18 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
     const applyConfiguration = async (): Promise<{ success: boolean; output: string }> => {
         try {
             console.log('Applying system configuration...');
-            
+
             // Use SystemConfigurationService to apply all configuration
             const result = await systemConfigurationService.applySystemConfiguration(networkManager, model);
-            
-            const summary = result.success ? 
-                'Configuration applied successfully' : 
-                'Configuration applied with some errors';
-            
+
+            const summary = result.success
+                ? 'Configuration applied successfully'
+                : 'Configuration applied with some errors';
+
             return {
                 success: result.success,
                 output: `${summary}\n\nDetails:\n${result.results.join('\n')}`
             };
-            
         } catch (error) {
             const errorMsg = `Configuration failed: ${String(error)}`;
             console.error('applyConfiguration error:', error);
@@ -188,9 +189,9 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                 const testHost = 'www.google.com';
                 const url = new URL(model.enrollment.url);
                 console.log(`Testing connectivity using ${testHost} (enrollment URL: ${url.hostname})`);
-                
+
                 // Try multiple approaches for connectivity testing
-                
+
                 // Approach 1: Use getent hosts to check DNS resolution
                 try {
                     const dnsProc = cockpit.spawn(['getent', 'hosts', testHost]);
@@ -200,7 +201,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                     console.warn(`DNS resolution failed for ${testHost}:`, dnsError);
                     return { success: false, output: `DNS resolution failed for ${testHost}` };
                 }
-                
+
                 // Approach 2: Use timeout command with ping for better control
                 try {
                     const pingProc = cockpit.spawn(['timeout', '10', 'ping', '-c', '1', '-W', '5', testHost], { err: 'ignore' });
@@ -212,7 +213,6 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                     // Fall back to basic success if DNS worked
                     return { success: true, output: `DNS resolution successful for ${testHost} (ping may be blocked)` };
                 }
-                
             } catch (error) {
                 console.error('Connectivity test error:', error);
                 const errorMsg = error instanceof Error ? error.message : String(error);
@@ -245,7 +245,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                     `ENROLLMENT_TOKEN=${model.enrollment.token}`,
                 ]
             });
-            
+
             const output = await proc;
             console.log(`Script ${scriptPath} completed successfully`);
             return { success: true, output: output || 'Script completed successfully' };
@@ -311,6 +311,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         if (steps.length > 0 && !hasStarted) {
             executeEnrollment();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [steps, hasStarted]);
 
     const hasFailedSteps = steps.some(step => step.status === 'failed');
