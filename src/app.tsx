@@ -66,6 +66,8 @@ export const Application = () => {
     const [config, setConfig] = useState<SystemOnboardingConfig | null>(null);
     const [isConfigLoaded, setIsConfigLoaded] = useState(false);
     const [configError, setConfigError] = useState<string | null>(null);
+    const [onboardingComplete, setOnboardingComplete] = useState(false);
+    const [checkingMarker, setCheckingMarker] = useState(true);
 
     const nmService = useObject(() => service.proxy("NetworkManager"),
                                 null,
@@ -78,6 +80,27 @@ export const Application = () => {
     const nmRunning_ref = useRef<boolean | undefined>(undefined);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     useEvent(networkManager.client as any, "owner", (_event, owner) => { nmRunning_ref.current = owner !== null });
+
+    // Check for onboarding completion marker file
+    useEffect(() => {
+        const markerPath = '/var/lib/cockpit-system-onboarding/.onboarding-complete';
+        const markerFile = cockpit.file(markerPath);
+
+        markerFile.read()
+                .then(() => {
+                    // File exists - onboarding is complete
+                    setOnboardingComplete(true);
+                    console.log('Onboarding already complete (marker file exists)');
+                })
+                .catch(() => {
+                    // File doesn't exist - onboarding not complete
+                    setOnboardingComplete(false);
+                })
+                .finally(() => {
+                    setCheckingMarker(false);
+                    markerFile.close();
+                });
+    }, []);
 
     // Load configuration on mount
     useEffect(() => {
@@ -94,9 +117,21 @@ export const Application = () => {
                 });
     }, []);
 
-    // Show loading while configuration is being loaded
-    if (!isConfigLoaded || networkManager.ready === undefined)
+    // Show loading while checking marker file or loading configuration
+    if (checkingMarker || !isConfigLoaded || networkManager.ready === undefined)
         return <EmptyStatePanel loading />;
+
+    // Show message if onboarding is already complete
+    if (onboardingComplete) {
+        return (
+            <div id="system-onboarding-already-complete">
+                <EmptyStatePanel
+                    title={_("Onboarding complete")}
+                    paragraph={_("System onboarding has already been completed on this device.")}
+                />
+            </div>
+        );
+    }
 
     // Show error if configuration failed to load
     if (configError) {

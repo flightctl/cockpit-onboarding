@@ -70,16 +70,16 @@ Project follows Cockpit module structure:
 
 ### Implementation for User Story 1
 
-- [ ] T020 [P] [US1] Create packaging/systemd/cockpit-system-onboarding-setup.service systemd unit file
-- [ ] T021 [P] [US1] Create packaging/systemd/scripts/create-onboarding-user.sh to create temporary user
-- [ ] T022 [P] [US1] Create packaging/systemd/scripts/setup-network.sh to configure well-known Ethernet IP
-- [ ] T023 [P] [US1] Create packaging/systemd/scripts/setup-led.sh to initialize LED indicator (ready state)
-- [ ] T024 [P] [US1] Create packaging/systemd/scripts/check-dependencies.sh to verify required packages
-- [ ] T025 [US1] Update packaging/cockpit-system-onboarding.spec.in to install systemd units
-- [ ] T026 [US1] Add %post scriptlet to spec file to enable cockpit-system-onboarding-setup.service
-- [ ] T027 [US1] Add logic to create-onboarding-user.sh to install module overrides if hideModules=true
-- [ ] T028 [US1] Update src/app.tsx to check for marker file and skip wizard if already complete
-- [ ] T029 [US1] Add conditional rendering in src/app.tsx to show only Onboarding module if configured
+- [X] T020 [P] [US1] Create packaging/systemd/cockpit-system-onboarding-setup.service systemd unit file
+- [X] T021 [P] [US1] Create packaging/systemd/scripts/create-onboarding-user.sh to create temporary user
+- [X] T022 [P] [US1] Create packaging/systemd/scripts/setup-network.sh to configure well-known Ethernet IP
+- [X] T023 [P] [US1] Create packaging/systemd/scripts/setup-led.sh to initialize LED indicator (ready state)
+- [X] T024 [P] [US1] Create packaging/systemd/scripts/check-dependencies.sh to verify required packages
+- [X] T025 [US1] Update packaging/cockpit-system-onboarding.spec.in to install systemd units
+- [X] T026 [US1] Add %post scriptlet to spec file to enable cockpit-system-onboarding-setup.service
+- [X] T027 [US1] Add logic to create-onboarding-user.sh to install module overrides if hideModules=true
+- [X] T028 [US1] Update src/app.tsx to check for marker file and skip wizard if already complete
+- [X] T029 [US1] Add conditional rendering in src/app.tsx to show only Onboarding module if configured (NOTE: Implemented via module override system in T027)
 
 **Checkpoint**: System can be accessed on first boot, onboarding user can login, wizard UI loads with only Onboarding module visible
 
