@@ -337,8 +337,8 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
         setModel(prev => ({
             ...prev,
             [section]: {
-                ...prev[section],
-                ...updates,
+                ...(prev[section] as object),
+                ...(updates as object),
             },
         }));
     };
@@ -355,7 +355,7 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
             const newModel = {
                 ...prev,
                 [section]: {
-                    ...prevSection,
+                    ...(prevSection as object),
                     [subsection]: {
                         ...(prevSubsection as object),
                         ...updates,

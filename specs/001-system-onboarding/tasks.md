@@ -95,12 +95,12 @@ Project follows Cockpit module structure:
 
 ### Implementation for User Story 2
 
-- [ ] T030 [US2] Review existing src/wizard/HostnamePage.tsx validation logic against data-model.md requirements
-- [ ] T031 [US2] Update validateHostname() in src/wizard/HostnamePage.tsx if validation rules incomplete
-- [ ] T032 [US2] Verify src/system-config.ts getHostnameInfo() retrieves DHCP hostname correctly
-- [ ] T033 [US2] Verify src/system-config.ts setHostname() uses DBUS hostname1 service correctly
-- [ ] T034 [US2] Add unit tests for validateHostname() in src/wizard/__tests__/HostnamePage.test.tsx
-- [ ] T035 [US2] Add integration test for hostname configuration in test/test_hostname.py
+- [X] T030 [US2] Review existing src/wizard/HostnamePage.tsx validation logic against data-model.md requirements
+- [X] T031 [US2] Update validateHostname() in src/wizard/HostnamePage.tsx if validation rules incomplete
+- [X] T032 [US2] Verify src/system-config.ts getHostnameInfo() retrieves DHCP hostname correctly
+- [X] T033 [US2] Verify src/system-config.ts setHostname() uses DBUS hostname1 service correctly
+- [X] T034 [US2] Add unit tests for validateHostname() in src/wizard/__tests__/HostnamePage.test.tsx
+- [X] T035 [US2] Add integration test for hostname configuration in test/test_hostname.py
 
 **Checkpoint**: Users can configure hostname with validation, changes are applied via DBUS
 
