@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { systemConfigurationService } from './system-config.js';
-import { Interface } from '../pkg/lib/cockpit/networkmanager/interfaces.js';
+import { Interface } from '../pkg/networkmanager/interfaces.js';
 import {
     HostnameState,
     NetworkInterfaceState,

@@ -23,7 +23,7 @@ import React, { useState, useEffect, useRef, createContext, useContext } from 'r
 import { useEvent, useObject } from "hooks";
 
 import * as service from 'service.js';
-import { NetworkManagerModel, Interface } from '../pkg/lib/cockpit/networkmanager/interfaces.js';
+import { NetworkManagerModel, Interface } from '../pkg/networkmanager/interfaces.js';
 
 import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
 import { ModelProvider } from './model-context';
@@ -74,7 +74,7 @@ export const Application = () => {
                                 []);
     useEvent(nmService, "changed");
 
-    const networkManager = useObject(() => NetworkManagerModel(), null, []);
+    const networkManager = useObject(() => new NetworkManagerModel(), null, []);
     useEvent(networkManager, "changed");
 
     const nmRunning_ref = useRef<boolean | undefined>(undefined);
@@ -87,13 +87,20 @@ export const Application = () => {
         const markerFile = cockpit.file(markerPath);
 
         markerFile.read()
-                .then(() => {
-                    // File exists - onboarding is complete
-                    setOnboardingComplete(true);
-                    console.log('Onboarding already complete (marker file exists)');
+                .then((content) => {
+                    // File exists with content - onboarding is complete
+                    // read() returns null when file doesn't exist
+                    if (content !== null) {
+                        setOnboardingComplete(true);
+                        console.log('Onboarding already complete (marker file exists)');
+                    } else {
+                        setOnboardingComplete(false);
+                        console.log('Marker file does not exist - onboarding not complete');
+                    }
                 })
-                .catch(() => {
-                    // File doesn't exist - onboarding not complete
+                .catch((error) => {
+                    // Error reading file (permissions, etc.) - assume not complete
+                    console.log('Error checking marker file:', error);
                     setOnboardingComplete(false);
                 })
                 .finally(() => {

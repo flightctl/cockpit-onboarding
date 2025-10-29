@@ -9,14 +9,14 @@ import { useModelContext } from '../model-context';
 import {
     device_state_text,
     is_managed,
-} from '../../pkg/lib/cockpit/networkmanager/interfaces.js';
+} from '../../pkg/networkmanager/interfaces.js';
 
 interface NetworkInterfacePageProps {
-    interfaces: import('../../pkg/lib/cockpit/networkmanager/interfaces.js').Interface[];
+    interfaces: import('../../pkg/networkmanager/interfaces.js').Interface[];
 }
 
 export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageProps> = ({ interfaces }) => {
-    function hasGroup(iface: import('../../pkg/lib/cockpit/networkmanager/interfaces.js').Interface) {
+    function hasGroup(iface: import('../../pkg/networkmanager/interfaces.js').Interface) {
         return ((iface.Device &&
                  iface.Device.ActiveConnection &&
                  iface.Device.ActiveConnection.Group &&
@@ -52,7 +52,7 @@ export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageP
 };
 
 interface NetworkInterfaceSelectorProps {
-  interfaces: import('../../pkg/lib/cockpit/networkmanager/interfaces.js').Interface[];
+  interfaces: import('../../pkg/networkmanager/interfaces.js').Interface[];
 }
 
 export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceSelectorProps> = ({ interfaces }) => {
@@ -67,7 +67,7 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
     state: 'State'
   };
 
-  const isIfaceSelectable = (iface: import('../../pkg/lib/cockpit/networkmanager/interfaces.js').Interface) => is_managed(iface.Device); // Use proper NetworkManager logic
+  const isIfaceSelectable = (iface: import('../../pkg/networkmanager/interfaces.js').Interface) => is_managed(iface.Device); // Use proper NetworkManager logic
 
   // Initialize selection if not set
   React.useEffect(() => {

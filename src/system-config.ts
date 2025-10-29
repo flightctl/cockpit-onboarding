@@ -1,5 +1,5 @@
 import cockpit from 'cockpit';
-import { Interface } from '../pkg/lib/cockpit/networkmanager/interfaces.js';
+import { Interface } from '../pkg/networkmanager/interfaces.js';
 import { ServerTime } from '../pkg/lib/serverTime.js';
 import { Model } from './model-context';
 

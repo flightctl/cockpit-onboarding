@@ -89,7 +89,7 @@ export interface NetworkManagerModel extends cockpit.EventSource<NetworkManagerE
     close(): void;
 }
 
-export function NetworkManagerModel(): NetworkManagerModel;
+export const NetworkManagerModel: new () => NetworkManagerModel;
 export function show_unexpected_error(error: unknown): void;
 export function connection_settings(c: unknown): unknown;
 export function device_state_text(dev: unknown): string;

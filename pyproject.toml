@@ -23,7 +23,9 @@ exclude = [
     ".git/",
     "modules/",
     "node_modules/",
+    "specs/",
 ]
+force-exclude = true
 line-length = 118
 src = []
 
@@ -64,6 +66,9 @@ mark-parentheses = false
 known-first-party = ["cockpit"]
 
 [tool.vulture]
+exclude = [
+   "specs/",
+]
 ignore_names = [
    "test[A-Z0-9]*",
 ]

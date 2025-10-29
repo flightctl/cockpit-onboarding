@@ -27,7 +27,6 @@ class TestHostname(testlib.MachineCase):
     def testHostnameValidation(self):
         """Test that hostname validation follows RFC 1123 rules"""
         b = self.browser
-        m = self.machine
 
         self.login_and_go("/system-onboarding")
         b.wait_visible(".pf-v5-c-wizard")
@@ -103,7 +102,6 @@ class TestHostname(testlib.MachineCase):
     def testDhcpHostnameDisplay(self):
         """Test that DHCP-assigned hostname is displayed if available"""
         b = self.browser
-        m = self.machine
 
         self.login_and_go("/system-onboarding")
         b.wait_visible(".pf-v5-c-wizard")
