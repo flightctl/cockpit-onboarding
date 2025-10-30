@@ -529,6 +529,228 @@ export class SystemConfigurationService {
         return { address, prefix };
     }
 
+    async scanWifiNetworks(interfaceName: string): Promise<Array<{
+        ssid: string;
+        strength: number;
+        security: string; // e.g., "None", "WEP", "WPA", "WPA2", "WPA3", "WPA2/WPA3"
+        frequency: number;
+        channel: number;
+        band: '2.4 GHz' | '5 GHz' | 'unknown';
+        rate: number;
+        bssid: string;
+    }>> {
+        try {
+            // Get device path from NetworkManager
+            // We need to find the device path by querying NetworkManager for all devices
+            // and finding the one with matching Interface property
+            // Use superuser access for WiFi scanning (requires elevated privileges)
+            const nmClient = cockpit.dbus('org.freedesktop.NetworkManager', { superuser: 'try' });
+            const nmManager = nmClient.proxy('org.freedesktop.NetworkManager', '/org/freedesktop/NetworkManager');
+
+            // Wait for manager proxy to be ready
+            await new Promise<void>((resolve, reject) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (nmManager as any).wait(() => {
+                    if (nmManager.valid) {
+                        resolve();
+                    } else {
+                        reject(new Error('Failed to connect to NetworkManager'));
+                    }
+                });
+            });
+
+            // Get all devices and find the one matching our interface name
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const devicePaths = (nmManager.data as any).Devices || [];
+            let devicePath = null;
+
+            for (const path of devicePaths) {
+                const devProxy = nmClient.proxy('org.freedesktop.NetworkManager.Device', path);
+                await new Promise<void>((resolve, reject) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (devProxy as any).wait(() => {
+                        if (devProxy.valid) {
+                            resolve();
+                        } else {
+                            reject(new Error('Failed to connect to device'));
+                        }
+                    });
+                });
+
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const devData = devProxy.data as any;
+                if (devData.Interface === interfaceName && devData.DeviceType === 2) { // 2 = WiFi
+                    devicePath = path;
+                    break;
+                }
+            }
+
+            if (!devicePath) {
+                throw new Error(`WiFi device ${interfaceName} not found`);
+            }
+
+            const deviceProxy = nmClient.proxy('org.freedesktop.NetworkManager.Device.Wireless', devicePath);
+
+            // Wait for proxy to be ready
+            await new Promise<void>((resolve, reject) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (deviceProxy as any).wait(() => {
+                    if (deviceProxy.valid) {
+                        resolve();
+                    } else {
+                        reject(new Error('Failed to connect to WiFi device'));
+                    }
+                });
+            });
+
+            // Request WiFi scan
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (deviceProxy as any).call('RequestScan', [{}]);
+
+            // Wait for scan to complete (typical scan takes 2-3 seconds)
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Get access points
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const deviceData = deviceProxy.data as any;
+            const apPaths = deviceData.AccessPoints || [];
+            const aps = [];
+
+            for (const apPath of apPaths) {
+                const apProxy = nmClient.proxy('org.freedesktop.NetworkManager.AccessPoint', apPath);
+
+                // Wait for access point proxy to be ready
+                await new Promise<void>((resolve, reject) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (apProxy as any).wait(() => {
+                        if (apProxy.valid) {
+                            resolve();
+                        } else {
+                            reject(new Error('Failed to connect to access point'));
+                        }
+                    });
+                });
+
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const apData = apProxy.data as any;
+
+                // Decode SSID - Cockpit's DBUS proxy returns byte arrays as Base64 strings
+                const ssidData = apData.Ssid || '';
+
+                let ssid = '';
+                if (typeof ssidData === 'string') {
+                    // SSID is Base64 encoded, decode it
+                    try {
+                        const base64Decoded = atob(ssidData);
+                        ssid = base64Decoded;
+                    } catch (e) {
+                        console.error('Failed to decode Base64 SSID:', e);
+                    }
+                } else if (Array.isArray(ssidData)) {
+                    // Fallback: if it's a byte array
+                    ssid = new TextDecoder().decode(new Uint8Array(ssidData));
+                }
+
+                // Skip hidden SSIDs (empty strings)
+                if (!ssid || ssid.trim().length === 0) {
+                    continue;
+                }
+
+                const strength = apData.Strength || 0;
+                const frequency = apData.Frequency || 0;
+                const bssid = apData.HwAddress || '';
+                const rate = Math.floor((apData.MaxBitrate || 0) / 1000); // Convert from Kbps to Mbps
+
+                // Get channel from NetworkManager (not computed from frequency)
+                // NetworkManager may provide this via the wireless device, but typically
+                // we compute it from frequency for display purposes
+                // Channel calculation based on standard WiFi channels
+                let channel = 0;
+                if (frequency >= 2412 && frequency <= 2484) {
+                    // 2.4 GHz band
+                    if (frequency === 2484) {
+                        channel = 14;
+                    } else {
+                        channel = Math.floor((frequency - 2407) / 5);
+                    }
+                } else if (frequency >= 5000) {
+                    // 5 GHz band
+                    channel = Math.floor((frequency - 5000) / 5);
+                }
+
+                // Determine band based on channel number
+                let band: '2.4 GHz' | '5 GHz' | 'unknown' = 'unknown';
+                if (channel >= 1 && channel <= 14) {
+                    band = '2.4 GHz';
+                } else if (channel >= 32 && channel <= 177) {
+                    band = '5 GHz';
+                }
+
+                // Determine security type from flags
+                // NetworkManager AP security flags:
+                // - Flags: 0x1 = privacy required (WEP or authentication needed)
+                // - WpaFlags: WPA (older) security flags
+                // - RsnFlags: WPA2/WPA3 (RSN = Robust Security Network) flags
+                //   - 0x100 = WPA-PSK (WPA2-Personal)
+                //   - 0x400 = SAE (WPA3-Personal)
+                const flags = apData.Flags || 0;
+                const wpaFlags = apData.WpaFlags || 0;
+                const rsnFlags = apData.RsnFlags || 0;
+
+                const securityMethods: string[] = [];
+
+                // Check for WPA3 (SAE - Simultaneous Authentication of Equals)
+                const NM_802_11_AP_SEC_KEY_MGMT_SAE = 0x400;
+                if (rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_SAE) {
+                    securityMethods.push('WPA3');
+                }
+
+                // Check for WPA2 (RSN with PSK or 802.1X but not SAE-only)
+                const NM_802_11_AP_SEC_KEY_MGMT_PSK = 0x100;
+                const NM_802_11_AP_SEC_KEY_MGMT_802_1X = 0x200;
+                if (rsnFlags !== 0 && (rsnFlags & (NM_802_11_AP_SEC_KEY_MGMT_PSK | NM_802_11_AP_SEC_KEY_MGMT_802_1X))) {
+                    if (!securityMethods.includes('WPA3') || (rsnFlags & ~NM_802_11_AP_SEC_KEY_MGMT_SAE)) {
+                        securityMethods.push('WPA2');
+                    }
+                }
+
+                // Check for WPA (older)
+                if (wpaFlags !== 0) {
+                    securityMethods.push('WPA');
+                }
+
+                // Check for WEP (privacy flag set but no WPA/RSN)
+                const NM_802_11_AP_FLAGS_PRIVACY = 0x1;
+                if (securityMethods.length === 0 && (flags & NM_802_11_AP_FLAGS_PRIVACY)) {
+                    securityMethods.push('WEP');
+                }
+
+                // Determine final security string
+                let security: string;
+                if (securityMethods.length === 0) {
+                    security = 'None';
+                } else if (securityMethods.length > 1) {
+                    // Multiple methods supported (e.g., "WPA2/WPA3")
+                    security = securityMethods.join('/');
+                } else {
+                    security = securityMethods[0];
+                }
+
+                aps.push({ ssid, strength, security, frequency, channel, band, rate, bssid });
+            }
+
+            nmClient.close();
+
+            // Sort by signal strength (strongest first)
+            aps.sort((a, b) => b.strength - a.strength);
+
+            return aps;
+        } catch (error) {
+            console.error('WiFi scan failed:', error);
+            throw new Error(`WiFi network scan failed: ${String(error)}`);
+        }
+    }
+
     close() {
         if (this.hostnameClient) {
             this.hostnameClient.close();

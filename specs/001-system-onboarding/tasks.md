@@ -114,17 +114,17 @@ Project follows Cockpit module structure:
 
 ### Implementation for User Story 3
 
-- [ ] T036 [US3] Review existing src/wizard/NetworkInterfacePage.tsx against requirements
-- [ ] T037 [US3] Add WiFi network scanning functionality to src/wizard/NetworkInterfacePage.tsx using NetworkManager DBUS
-- [ ] T038 [US3] Implement scanWifiNetworks() function in src/system-config.ts (from research.md example)
-- [ ] T039 [US3] Add WiFi SSID selection UI to src/wizard/NetworkInterfacePage.tsx
-- [ ] T040 [US3] Add WiFi password input field to src/wizard/NetworkInterfacePage.tsx
-- [ ] T041 [US3] Add WiFi security type selection to src/wizard/NetworkInterfacePage.tsx
-- [ ] T042 [US3] Add optional VLAN ID input field to src/wizard/NetworkInterfacePage.tsx
-- [ ] T043 [US3] Add VLAN ID validation (1-4094) to src/wizard/NetworkInterfacePage.tsx
-- [ ] T044 [US3] Update model context to store wifiSsid, wifiPassword, wifiSecurity, vlanId in src/model-context.tsx
-- [ ] T045 [US3] Add integration test for network interface selection in test/test_network_interface.py
-- [ ] T046 [US3] Add integration test for WiFi configuration in test/test_wifi.py
+- [X] T036 [US3] Review existing src/wizard/NetworkInterfacePage.tsx against requirements
+- [X] T037 [US3] Add WiFi network scanning functionality to src/wizard/NetworkInterfacePage.tsx using NetworkManager DBUS
+- [X] T038 [US3] Implement scanWifiNetworks() function in src/system-config.ts (from research.md example)
+- [X] T039 [US3] Add WiFi SSID selection UI to src/wizard/NetworkInterfacePage.tsx
+- [X] T040 [US3] Add WiFi password input field to src/wizard/NetworkInterfacePage.tsx
+- [X] T041 [US3] Add WiFi security type selection to src/wizard/NetworkInterfacePage.tsx
+- [X] T042 [US3] Add optional VLAN ID input field to src/wizard/NetworkInterfacePage.tsx
+- [X] T043 [US3] Add VLAN ID validation (1-4094) to src/wizard/NetworkInterfacePage.tsx
+- [X] T044 [US3] Update model context to store wifiSsid, wifiPassword, wifiSecurity, vlanId in src/model-context.tsx
+- [X] T045 [US3] Add integration test for network interface selection in test/test_network_interface.py
+- [X] T046 [US3] Add integration test for WiFi configuration in test/test_wifi.py
 
 **Checkpoint**: Users can select network interface, configure WiFi with credentials, optionally specify VLAN
 
