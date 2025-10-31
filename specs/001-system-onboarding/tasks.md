@@ -138,21 +138,21 @@ Project follows Cockpit module structure:
 
 ### Implementation for User Story 4
 
-- [ ] T047 [US4] Review existing src/wizard/NetworkAddressPage.tsx against requirements
-- [ ] T048 [US4] Add IPv4 method selection (auto/static/disabled) to src/wizard/NetworkAddressPage.tsx
-- [ ] T049 [US4] Add IPv4 static configuration fields (address, subnet mask, gateway) to src/wizard/NetworkAddressPage.tsx
-- [ ] T050 [US4] Add IPv4 DNS configuration (auto/manual, primary DNS, secondary DNS) to src/wizard/NetworkAddressPage.tsx
-- [ ] T051 [US4] Add IPv6 method selection (auto/static/disabled) to src/wizard/NetworkAddressPage.tsx
-- [ ] T052 [US4] Add IPv6 static configuration fields (address with prefix, gateway) to src/wizard/NetworkAddressPage.tsx
-- [ ] T053 [US4] Add IPv6 DNS configuration (auto/manual, primary DNS, secondary DNS) to src/wizard/NetworkAddressPage.tsx
-- [ ] T054 [US4] Add validation functions for IPv4 address format in src/wizard/NetworkAddressPage.tsx
-- [ ] T055 [US4] Add validation functions for IPv6 address format in src/wizard/NetworkAddressPage.tsx
-- [ ] T056 [US4] Add validation functions for DNS server addresses in src/wizard/NetworkAddressPage.tsx
-- [ ] T057 [US4] Update src/system-config.ts applyNetworkConfiguration() to handle IPv4 static configuration
-- [ ] T058 [US4] Update src/system-config.ts applyNetworkConfiguration() to handle IPv6 static/disabled configuration
-- [ ] T059 [US4] Update src/system-config.ts applyNetworkConfiguration() to handle DNS configuration
-- [ ] T060 [US4] Add unit tests for IP address validation in src/wizard/__tests__/NetworkAddressPage.test.tsx
-- [ ] T061 [US4] Add integration test for static IP configuration in test/test_ip_configuration.py
+- [X] T047 [US4] Review existing src/wizard/NetworkAddressPage.tsx against requirements
+- [X] T048 [US4] Add IPv4 method selection (auto/static/disabled) to src/wizard/NetworkAddressPage.tsx
+- [X] T049 [US4] Add IPv4 static configuration fields (address, subnet mask, gateway) to src/wizard/NetworkAddressPage.tsx
+- [X] T050 [US4] Add IPv4 DNS configuration (auto/manual, primary DNS, secondary DNS) to src/wizard/NetworkAddressPage.tsx
+- [X] T051 [US4] Add IPv6 method selection (auto/static/disabled) to src/wizard/NetworkAddressPage.tsx
+- [X] T052 [US4] Add IPv6 static configuration fields (address with prefix, gateway) to src/wizard/NetworkAddressPage.tsx
+- [X] T053 [US4] Add IPv6 DNS configuration (auto/manual, primary DNS, secondary DNS) to src/wizard/NetworkAddressPage.tsx
+- [X] T054 [US4] Add validation functions for IPv4 address format in src/wizard/NetworkAddressPage.tsx
+- [X] T055 [US4] Add validation functions for IPv6 address format in src/wizard/NetworkAddressPage.tsx
+- [X] T056 [US4] Add validation functions for DNS server addresses in src/wizard/NetworkAddressPage.tsx
+- [X] T057 [US4] Update src/system-config.ts applyNetworkConfiguration() to handle IPv4 static configuration
+- [X] T058 [US4] Update src/system-config.ts applyNetworkConfiguration() to handle IPv6 static/disabled configuration
+- [X] T059 [US4] Update src/system-config.ts applyNetworkConfiguration() to handle DNS configuration
+- [X] T060 [US4] Add unit tests for IP address validation in src/wizard/__tests__/NetworkAddressPage.test.tsx
+- [X] T061 [US4] Add integration test for static IP configuration in test/test_ip_configuration.py
 
 **Checkpoint**: Users can configure IPv4 and IPv6 with DHCP or static, configure DNS servers, all validated correctly
 

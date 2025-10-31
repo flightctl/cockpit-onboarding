@@ -6,131 +6,13 @@ import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/in
 import { TextInputGroup, TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
 import { Stack, StackItem, Flex, FlexItem, ValidatedOptions } from '@patternfly/react-core';
 import { useModelContext } from '../model-context';
-
-// Validation functions
-const validateIPv4 = (ip: string): string | null => {
-    if (!ip.trim()) return 'IPv4 address is required';
-
-    const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-    const match = ip.match(ipRegex);
-
-    if (!match) return 'Invalid IPv4 address format';
-
-    const octets = match.slice(1).map(Number);
-    for (const octet of octets) {
-        if (octet < 0 || octet > 255) {
-            return 'IPv4 octets must be between 0 and 255';
-        }
-    }
-
-    return null;
-};
-
-const validateSubnetMask = (mask: string): string | null => {
-    if (!mask.trim()) return 'Subnet mask is required';
-
-    // Support CIDR notation (/24)
-    if (mask.startsWith('/')) {
-        const prefix = parseInt(mask.slice(1), 10);
-        if (isNaN(prefix) || prefix < 0 || prefix > 32) {
-            return 'CIDR prefix must be between 0 and 32';
-        }
-        return null;
-    }
-
-    // Support dotted decimal notation (255.255.255.0)
-    const ipv4Error = validateIPv4(mask);
-    if (ipv4Error) return 'Invalid subnet mask format';
-
-    // Validate that it's a valid subnet mask
-    const octets = mask.split('.').map(Number);
-    let binaryMask = '';
-    for (const octet of octets) {
-        binaryMask += octet.toString(2).padStart(8, '0');
-    }
-
-    // Valid subnet mask should have consecutive 1s followed by consecutive 0s
-    if (!/^1*0*$/.test(binaryMask)) {
-        return 'Invalid subnet mask - must have consecutive 1s followed by 0s';
-    }
-
-    return null;
-};
-
-const validateIPv6 = (ip: string, requirePrefix = false): string | null => {
-    if (!ip.trim()) return requirePrefix ? 'IPv6 address is required' : null;
-
-    let address = ip;
-    let prefix = null;
-
-    // Extract prefix if present
-    if (ip.includes('/')) {
-        const parts = ip.split('/');
-        if (parts.length !== 2) return 'Invalid IPv6 address format';
-        address = parts[0];
-        prefix = parseInt(parts[1], 10);
-
-        if (isNaN(prefix) || prefix < 0 || prefix > 128) {
-            return 'IPv6 prefix must be between 0 and 128';
-        }
-    } else if (requirePrefix) {
-        return 'IPv6 address must include prefix (e.g., /64)';
-    }
-
-    // Validate IPv6 address format
-    const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$|^::$|^::1$|^([0-9a-fA-F]{0,4}:){1,6}:$|^:([0-9a-fA-F]{0,4}:){1,6}$/;
-    const expandedRegex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-
-    // Handle compressed format
-    if (address.includes('::')) {
-        const parts = address.split('::');
-        if (parts.length > 2) return 'Invalid IPv6 address format';
-
-        const beforeParts = parts[0] ? parts[0].split(':').filter(p => p !== '') : [];
-        const afterParts = parts[1] ? parts[1].split(':').filter(p => p !== '') : [];
-
-        if (beforeParts.length + afterParts.length >= 8) return 'Invalid IPv6 address format';
-
-        // Validate each part
-        for (const part of [...beforeParts, ...afterParts]) {
-            if (!/^[0-9a-fA-F]{1,4}$/.test(part)) return 'Invalid IPv6 address format';
-        }
-    } else if (!expandedRegex.test(address) && !ipv6Regex.test(address)) {
-        return 'Invalid IPv6 address format';
-    }
-
-    return null;
-};
-
-const validateIPv6Gateway = (gateway: string): string | null => {
-    if (!gateway.trim()) return null; // Optional field
-
-    const error = validateIPv6(gateway);
-    if (error) return error;
-
-    // Check if it's a link-local address (not allowed for gateway)
-    if (gateway.toLowerCase().startsWith('fe80:')) {
-        return 'Gateway cannot be a link-local address (fe80::)';
-    }
-
-    return null;
-};
-
-const validateDNSServer = (dns: string, isRequired = false): string | null => {
-    if (!dns.trim()) {
-        return isRequired ? 'DNS server is required' : null;
-    }
-
-    // Try IPv4 first
-    const ipv4Error = validateIPv4(dns);
-    if (!ipv4Error) return null;
-
-    // Try IPv6
-    const ipv6Error = validateIPv6(dns);
-    if (!ipv6Error) return null;
-
-    return 'Invalid DNS server address';
-};
+import {
+    validateIPv4,
+    validateSubnetMask,
+    validateIPv6,
+    validateIPv6Gateway,
+    validateDNSServer
+} from '../validation';
 
 export const NetworkAddressPage: React.FunctionComponent = () => {
     return (
@@ -160,7 +42,9 @@ export const NetworkConfigIPv4: React.FunctionComponent = () => {
     });
 
     const setIpv4Method = (method: 'dhcp' | 'static') => {
-        updateNestedModel('networkAddress', 'ipv4', { method });
+        // Map 'dhcp' to 'auto' for the model
+        const modelMethod = method === 'dhcp' ? 'auto' : method;
+        updateNestedModel('networkAddress', 'ipv4', { method: modelMethod as 'auto' | 'static' | 'disabled' });
     };
 
     const setIpv4Address = (address: string) => {
@@ -210,7 +94,7 @@ export const NetworkConfigIPv4: React.FunctionComponent = () => {
                             id="dhcpv4-radio"
                             name="ipv4-method"
                             label="DHCPv4"
-                            isChecked={model.networkAddress.ipv4.method === 'dhcp'}
+                            isChecked={model.networkAddress.ipv4.method === 'auto'}
                             onChange={() => setIpv4Method('dhcp')}
                         />
                     </FlexItem>
@@ -236,7 +120,7 @@ export const NetworkConfigIPv4: React.FunctionComponent = () => {
                                 <TextInputGroup validated={validationErrors.address ? ValidatedOptions.error : (model.networkAddress.ipv4.address && !validationErrors.address ? ValidatedOptions.success : ValidatedOptions.warning)}>
                                     <TextInputGroupMain
                                         id="ipv4-address"
-                                        value={model.networkAddress.ipv4.address}
+                                        value={model.networkAddress.ipv4.address || ''}
                                         onChange={(_, value) => setIpv4Address(value)}
                                         placeholder="192.168.1.100"
                                     />
@@ -251,7 +135,7 @@ export const NetworkConfigIPv4: React.FunctionComponent = () => {
                                 <TextInputGroup validated={validationErrors.subnetMask ? ValidatedOptions.error : (model.networkAddress.ipv4.subnetMask && !validationErrors.subnetMask ? ValidatedOptions.success : ValidatedOptions.warning)}>
                                     <TextInputGroupMain
                                         id="subnet-mask"
-                                        value={model.networkAddress.ipv4.subnetMask}
+                                        value={model.networkAddress.ipv4.subnetMask || ''}
                                         onChange={(_, value) => setSubnetMask(value)}
                                         placeholder="255.255.255.0 or /24"
                                     />
@@ -266,7 +150,7 @@ export const NetworkConfigIPv4: React.FunctionComponent = () => {
                                 <TextInputGroup validated={validationErrors.gateway ? ValidatedOptions.error : (model.networkAddress.ipv4.gateway && !validationErrors.gateway ? ValidatedOptions.success : ValidatedOptions.warning)}>
                                     <TextInputGroupMain
                                         id="gateway-ip"
-                                        value={model.networkAddress.ipv4.gateway}
+                                        value={model.networkAddress.ipv4.gateway || ''}
                                         onChange={(_, value) => setGatewayIp(value)}
                                         placeholder="192.168.1.1"
                                     />
@@ -293,7 +177,7 @@ export const NetworkConfigIPv4: React.FunctionComponent = () => {
                                 <TextInputGroup validated={validationErrors.primaryDns ? ValidatedOptions.error : (model.networkAddress.ipv4.primaryDns && !validationErrors.primaryDns ? ValidatedOptions.success : ValidatedOptions.warning)}>
                                     <TextInputGroupMain
                                         id="primary-dns-ipv4"
-                                        value={model.networkAddress.ipv4.primaryDns}
+                                        value={model.networkAddress.ipv4.primaryDns || ''}
                                         onChange={(_, value) => setPrimaryDns(value)}
                                         placeholder="8.8.8.8"
                                     />
@@ -307,7 +191,7 @@ export const NetworkConfigIPv4: React.FunctionComponent = () => {
                                 <TextInputGroup validated={validationErrors.secondaryDns ? ValidatedOptions.error : (model.networkAddress.ipv4.secondaryDns && !validationErrors.secondaryDns ? ValidatedOptions.success : ValidatedOptions.warning)}>
                                     <TextInputGroupMain
                                         id="secondary-dns-ipv4"
-                                        value={model.networkAddress.ipv4.secondaryDns}
+                                        value={model.networkAddress.ipv4.secondaryDns || ''}
                                         onChange={(_, value) => setSecondaryDns(value)}
                                         placeholder="8.8.4.4"
                                     />
@@ -333,7 +217,9 @@ export const NetworkConfigIPv6: React.FunctionComponent = () => {
     });
 
     const setIpv6Method = (method: 'dhcp' | 'static' | 'disabled') => {
-        updateNestedModel('networkAddress', 'ipv6', { method });
+        // Map 'dhcp' to 'auto' for the model
+        const modelMethod = method === 'dhcp' ? 'auto' : method;
+        updateNestedModel('networkAddress', 'ipv6', { method: modelMethod as 'auto' | 'static' | 'disabled' });
     };
 
     const setIpv6Address = (address: string) => {
@@ -386,7 +272,7 @@ export const NetworkConfigIPv6: React.FunctionComponent = () => {
                             id="dhcpv6-radio"
                             name="ipv6-method"
                             label="DHCPv6"
-                            isChecked={model.networkAddress.ipv6.method === 'dhcp'}
+                            isChecked={model.networkAddress.ipv6.method === 'auto'}
                             onChange={() => setIpv6Method('dhcp')}
                         />
                     </FlexItem>
@@ -421,7 +307,7 @@ export const NetworkConfigIPv6: React.FunctionComponent = () => {
                                 <TextInputGroup validated={validationErrors.address ? ValidatedOptions.error : (model.networkAddress.ipv6.address && !validationErrors.address ? ValidatedOptions.success : ValidatedOptions.warning)}>
                                     <TextInputGroupMain
                                         id="ipv6-address"
-                                        value={model.networkAddress.ipv6.address}
+                                        value={model.networkAddress.ipv6.address || ''}
                                         onChange={(_, value) => setIpv6Address(value)}
                                         onBlur={(e) => handleIpv6AddressBlur(e.currentTarget.value)}
                                         placeholder="2001:db8::1/64"
@@ -436,7 +322,7 @@ export const NetworkConfigIPv6: React.FunctionComponent = () => {
                                 <TextInputGroup validated={validationErrors.gateway ? ValidatedOptions.error : (model.networkAddress.ipv6.gateway && !validationErrors.gateway ? ValidatedOptions.success : ValidatedOptions.warning)}>
                                     <TextInputGroupMain
                                         id="gateway-ipv6"
-                                        value={model.networkAddress.ipv6.gateway}
+                                        value={model.networkAddress.ipv6.gateway || ''}
                                         onChange={(_, value) => setGatewayIpv6(value)}
                                         placeholder="2001:db8::1"
                                     />
@@ -464,7 +350,7 @@ export const NetworkConfigIPv6: React.FunctionComponent = () => {
                                     <TextInputGroup validated={validationErrors.primaryDns ? ValidatedOptions.error : (model.networkAddress.ipv6.primaryDns && !validationErrors.primaryDns ? ValidatedOptions.success : ValidatedOptions.warning)}>
                                         <TextInputGroupMain
                                         id="primary-dns-ipv6"
-                                        value={model.networkAddress.ipv6.primaryDns}
+                                        value={model.networkAddress.ipv6.primaryDns || ''}
                                         onChange={(_, value) => setPrimaryDnsIpv6(value)}
                                         placeholder="2001:4860:4860::8888"
                                         />
@@ -478,7 +364,7 @@ export const NetworkConfigIPv6: React.FunctionComponent = () => {
                                     <TextInputGroup validated={validationErrors.secondaryDns ? ValidatedOptions.error : (model.networkAddress.ipv6.secondaryDns && !validationErrors.secondaryDns ? ValidatedOptions.success : ValidatedOptions.warning)}>
                                         <TextInputGroupMain
                                         id="secondary-dns-ipv6"
-                                        value={model.networkAddress.ipv6.secondaryDns}
+                                        value={model.networkAddress.ipv6.secondaryDns || ''}
                                         onChange={(_, value) => setSecondaryDnsIpv6(value)}
                                         placeholder="2001:4860:4860::8844"
                                         />

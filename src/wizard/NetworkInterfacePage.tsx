@@ -100,9 +100,11 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
       );
       if (defaultSelectedInterface) {
         updateModel('networkInterface', { selectedInterface: defaultSelectedInterface.Name });
+        // Load the network configuration for the default interface
+        switchToInterfaceConfig(defaultSelectedInterface.Name);
       }
     }
-  }, [interfaces, model.networkInterface.selectedInterface, updateModel]);
+  }, [interfaces, model.networkInterface.selectedInterface, updateModel, switchToInterfaceConfig]);
 
   const setSelectedIfaceName = (name: string) => {
     updateModel('networkInterface', { selectedInterface: name });
