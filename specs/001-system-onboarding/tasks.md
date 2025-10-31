@@ -239,16 +239,16 @@ Project follows Cockpit module structure:
 
 ### Implementation for User Story 6
 
-- [ ] T096 [US6] Review existing src/wizard/ReviewPage.tsx against requirements
-- [ ] T097 [US6] Add hostname summary display to src/wizard/ReviewPage.tsx
-- [ ] T098 [US6] Add network interface summary display to src/wizard/ReviewPage.tsx
-- [ ] T099 [US6] Add IP configuration summary display (IPv4/IPv6) to src/wizard/ReviewPage.tsx
-- [ ] T100 [US6] Add network services summary display (NTP, proxy) to src/wizard/ReviewPage.tsx
-- [ ] T101 [US6] Add enrollment services summary display to src/wizard/ReviewPage.tsx
-- [ ] T102 [US6] Add edit/back navigation buttons for each section in src/wizard/ReviewPage.tsx
-- [ ] T103 [US6] Ensure wizard navigation allows backward movement in src/app.tsx
-- [ ] T104 [US6] Ensure wizard prevents forward skipping without validation in src/app.tsx
-- [ ] T105 [US6] Add integration test for review and navigation in test/test_review.py
+- [X] T096 [US6] Review existing src/wizard/ReviewPage.tsx against requirements
+- [X] T097 [US6] Add hostname summary display to src/wizard/ReviewPage.tsx
+- [X] T098 [US6] Add network interface summary display to src/wizard/ReviewPage.tsx
+- [X] T099 [US6] Add IP configuration summary display (IPv4/IPv6) to src/wizard/ReviewPage.tsx
+- [X] T100 [US6] Add network services summary display (NTP, proxy) to src/wizard/ReviewPage.tsx
+- [X] T101 [US6] Add enrollment services summary display to src/wizard/ReviewPage.tsx
+- [X] T102 [US6] Add edit/back navigation buttons for each section in src/wizard/ReviewPage.tsx
+- [X] T103 [US6] Ensure wizard navigation allows backward movement in src/app.tsx
+- [X] T104 [US6] Ensure wizard prevents forward skipping without validation in src/app.tsx
+- [X] T105 [US6] Add integration test for review and navigation in test/test_review.py
 
 **Checkpoint**: Users can review all configurations, navigate back to modify, summary reflects changes
 
