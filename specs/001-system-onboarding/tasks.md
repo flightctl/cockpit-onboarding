@@ -166,14 +166,14 @@ Project follows Cockpit module structure:
 
 ### Implementation for User Story 5
 
-- [ ] T062 [US5] Review existing src/wizard/NetworkServicesPage.tsx for NTP configuration
-- [ ] T063 [US5] Add NTP configuration section to src/wizard/NetworkServicesPage.tsx
-- [ ] T064 [US5] Add NTP auto-config toggle to src/wizard/NetworkServicesPage.tsx
-- [ ] T065 [US5] Add custom NTP servers input fields (array) to src/wizard/NetworkServicesPage.tsx
-- [ ] T066 [US5] Add NTP server address validation to src/wizard/NetworkServicesPage.tsx
-- [ ] T067 [US5] Verify src/system-config.ts configureNtpServers() implements NTP configuration correctly
-- [ ] T068 [US5] Update src/system-config.ts configureNtpServers() to handle custom NTP servers via ServerTime
-- [ ] T069 [US5] Add integration test for NTP configuration in test/test_ntp.py
+- [X] T062 [US5] Review existing src/wizard/NetworkServicesPage.tsx for NTP configuration
+- [X] T063 [US5] Add NTP configuration section to src/wizard/NetworkServicesPage.tsx
+- [X] T064 [US5] Add NTP auto-config toggle to src/wizard/NetworkServicesPage.tsx
+- [X] T065 [US5] Add custom NTP servers input fields (array) to src/wizard/NetworkServicesPage.tsx
+- [X] T066 [US5] Add NTP server address validation to src/wizard/NetworkServicesPage.tsx
+- [X] T067 [US5] Verify src/system-config.ts configureNtpServers() implements NTP configuration correctly
+- [X] T068 [US5] Update src/system-config.ts configureNtpServers() to handle custom NTP servers via ServerTime
+- [X] T069 [US5] Add integration test for NTP configuration in test/test_ntp.py
 
 **Checkpoint**: Users can configure NTP with network-assigned or custom servers, configuration applied correctly
 
