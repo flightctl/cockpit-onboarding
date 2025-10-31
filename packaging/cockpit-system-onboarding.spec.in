@@ -68,6 +68,10 @@ install -m 644 packaging/sudoers.d/cockpit-system-onboarding %{buildroot}%{_data
 mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/overrides
 install -m 644 packaging/overrides/*.override.json %{buildroot}%{_datadir}/cockpit/system-onboarding/overrides/
 
+# Install example enrollment scripts
+mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d
+install -m 755 packaging/system-onboarding.d/*.sh %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d/
+
 # Create state directory
 mkdir -p %{buildroot}%{_localstatedir}/lib/cockpit-system-onboarding
 

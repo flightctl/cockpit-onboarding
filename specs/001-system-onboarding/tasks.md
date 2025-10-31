@@ -209,23 +209,23 @@ Project follows Cockpit module structure:
 
 ### Implementation for User Story 8
 
-- [ ] T079 [P] [US8] Create src/enrollment-executor.ts for enrollment script execution
-- [ ] T080 [US8] Implement executeEnrollmentScript() function in src/enrollment-executor.ts
-- [ ] T081 [US8] Build environment variables from model state in src/enrollment-executor.ts
-- [ ] T082 [US8] Execute script using cockpit.spawn() with environment variables in src/enrollment-executor.ts
-- [ ] T083 [US8] Capture stdout/stderr in real-time in src/enrollment-executor.ts
-- [ ] T084 [US8] Parse DEVICE_URL: from stdout in src/enrollment-executor.ts
-- [ ] T085 [US8] Handle script exit codes (0-4) and return appropriate result in src/enrollment-executor.ts
-- [ ] T086 [US8] Review existing src/wizard/EnrollmentPage.tsx against requirements
-- [ ] T087 [US8] Display enrollment services from configuration in src/wizard/EnrollmentPage.tsx
-- [ ] T088 [US8] Allow user to select which services to enroll in src/wizard/EnrollmentPage.tsx
-- [ ] T089 [US8] Render credentials form using react-jsonschema-form in src/wizard/EnrollmentPage.tsx
-- [ ] T090 [US8] Validate credentials against service credentialsSchema in src/wizard/EnrollmentPage.tsx
-- [ ] T091 [US8] Add endpoint URL override field if allowUserOverride=true in src/wizard/EnrollmentPage.tsx
-- [ ] T092 [US8] Store selected services, credentials, and endpoints in model context
-- [ ] T093 [US8] Add unit tests for enrollment executor in src/__tests__/enrollment-executor.test.ts
-- [ ] T094 [US8] Create example enrollment script in packaging/overrides/system-onboarding.d/example-enroll.sh
-- [ ] T095 [US8] Add integration test for enrollment execution in test/test_enrollment.py
+- [X] T079 [P] [US8] Create src/enrollment-executor.ts for enrollment script execution
+- [X] T080 [US8] Implement executeEnrollmentScript() function in src/enrollment-executor.ts
+- [X] T081 [US8] Build environment variables from model state in src/enrollment-executor.ts
+- [X] T082 [US8] Execute script using cockpit.spawn() with environment variables in src/enrollment-executor.ts
+- [X] T083 [US8] Capture stdout/stderr in real-time in src/enrollment-executor.ts
+- [X] T084 [US8] Parse DEVICE_URL: from stdout in src/enrollment-executor.ts
+- [X] T085 [US8] Handle script exit codes (0-4) and return appropriate result in src/enrollment-executor.ts
+- [X] T086 [US8] Review existing src/wizard/EnrollmentPage.tsx against requirements
+- [X] T087 [US8] Display enrollment services from configuration in src/wizard/EnrollmentPage.tsx
+- [X] T088 [US8] Allow user to select which services to enroll in src/wizard/EnrollmentPage.tsx
+- [X] T089 [US8] Render credentials form using react-jsonschema-form in src/wizard/EnrollmentPage.tsx
+- [X] T090 [US8] Validate credentials against service credentialsSchema in src/wizard/EnrollmentPage.tsx
+- [X] T091 [US8] Add endpoint URL override field if allowUserOverride=true in src/wizard/EnrollmentPage.tsx
+- [X] T092 [US8] Store selected services, credentials, and endpoints in model context
+- [X] T093 [US8] Add unit tests for enrollment executor in src/__tests__/enrollment-executor.test.ts
+- [X] T094 [US8] Create example enrollment script in packaging/system-onboarding.d/example-enroll.sh
+- [X] T095 [US8] Add integration test for enrollment execution in test/test_enrollment.py
 
 **Checkpoint**: Users can select enrollment services, enter credentials, enrollment scripts execute with correct environment variables
 
@@ -507,7 +507,7 @@ Task: "[P] [US1] Create packaging/systemd/scripts/check-dependencies.sh to verif
 ```bash
 # Launch enrollment-related tasks in parallel:
 Task: "[P] [US8] Create src/enrollment-executor.ts for enrollment script execution"
-Task: "[P] [US8] Create example enrollment script in packaging/overrides/system-onboarding.d/example-enroll.sh"
+Task: "[P] [US8] Create example enrollment script in packaging/system-onboarding.d/example-enroll.sh"
 ```
 
 ---

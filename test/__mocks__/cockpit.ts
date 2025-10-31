@@ -24,6 +24,9 @@ const createMockDbusClient = () => ({
 // Mock spawn process
 interface MockProcess extends Promise<void> {
   stream: jest.Mock;
+  done: jest.Mock;
+  fail: jest.Mock;
+  close?: jest.Mock;
   then: jest.Mock;
   catch: jest.Mock;
 }
@@ -33,6 +36,21 @@ const createMockProcess = (stdout = '', exitCode = 0): MockProcess => {
   promise.stream = jest.fn((callback) => {
     setTimeout(() => callback(stdout), 0);
   });
+  promise.done = jest.fn((callback) => {
+    if (exitCode === 0) {
+      setTimeout(() => callback(), 0);
+    }
+    return promise;
+  });
+  promise.fail = jest.fn((callback) => {
+    if (exitCode !== 0) {
+      const error = new Error(`Process exited with code ${exitCode}`) as any;
+      error.exit_status = exitCode;
+      setTimeout(() => callback(error), 0);
+    }
+    return promise;
+  });
+  promise.close = jest.fn();
   promise.then = jest.fn((resolve, reject) => {
     if (exitCode === 0) {
       resolve?.(stdout);
