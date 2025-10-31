@@ -97,7 +97,7 @@ class TestNtp(testlib.MachineCase):
 
         # Test empty server (should show error)
         b.set_input_text("#ntp-server-input", "")
-        b.wait_in_text(".pf-v5-c-form__helper-text", "NTP server is required")
+        b.wait_in_text(".pf-v5-c-form__helper-text", "Hostname or IP address is required")
         # Add button should be disabled
         self.assertTrue(b.is_present("button:contains('Add')[disabled]"))
 
@@ -110,7 +110,7 @@ class TestNtp(testlib.MachineCase):
 
         # Test invalid IPv4 address
         b.set_input_text("#ntp-server-input", "256.256.256.256")
-        b.wait_in_text(".pf-v5-c-form__helper-text", "Invalid IPv4 address")
+        b.wait_in_text(".pf-v5-c-form__helper-text", "Invalid hostname or IP address")
 
         # Test valid IPv6 address
         b.set_input_text("#ntp-server-input", "2001:4860:4860::8888")
@@ -127,15 +127,15 @@ class TestNtp(testlib.MachineCase):
         # Test invalid hostname (too long)
         long_hostname = "a" * 255
         b.set_input_text("#ntp-server-input", long_hostname)
-        b.wait_in_text(".pf-v5-c-form__helper-text", "253 characters")
+        b.wait_in_text(".pf-v5-c-form__helper-text", "Invalid hostname or IP address")
 
         # Test invalid hostname (empty label)
         b.set_input_text("#ntp-server-input", "ntp..example.com")
-        b.wait_in_text(".pf-v5-c-form__helper-text", "empty labels")
+        b.wait_in_text(".pf-v5-c-form__helper-text", "Invalid hostname or IP address")
 
         # Test invalid hostname (starts with hyphen)
         b.set_input_text("#ntp-server-input", "-ntp.example.com")
-        b.wait_in_text(".pf-v5-c-form__helper-text", "must start with an alphanumeric character")
+        b.wait_in_text(".pf-v5-c-form__helper-text", "Invalid hostname or IP address")
 
     def testNtpDuplicateServers(self):
         """Test that duplicate NTP servers are not added"""

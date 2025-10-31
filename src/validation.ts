@@ -17,10 +17,13 @@ import * as ipaddr from 'ipaddr.js';
  * - Labels cannot be all numeric in FQDN
  *
  * @param hostname - The hostname to validate
+ * @param required - Whether the hostname is required (default: true)
  * @returns Error message or null if valid
  */
-export const validateHostname = (hostname: string): string | null => {
-    if (!hostname.trim()) return 'Hostname is required';
+export const validateHostname = (hostname: string, required = true): string | null => {
+    if (!hostname.trim()) {
+        return required ? 'Hostname is required' : null;
+    }
 
     // RFC 1123 hostname validation
     if (hostname.length > 253) return 'Hostname must be 253 characters or less';
@@ -175,22 +178,77 @@ export const validateIPv6Gateway = (gateway: string): string | null => {
 };
 
 /**
- * Validate DNS server address (IPv4 or IPv6)
+ * Validate IP address (IPv4 or IPv6)
  *
- * @param dns - The DNS server address to validate
- * @param isRequired - Whether the field is required
+ * Useful for DNS servers, gateways, and any field that accepts IP addresses
+ *
+ * @param ip - The IP address to validate
+ * @param required - Whether the field is required
  * @returns Error message or null if valid
  */
-export const validateDNSServer = (dns: string, isRequired = false): string | null => {
-    if (!dns.trim()) {
-        return isRequired ? 'DNS server is required' : null;
+export const validateIP = (ip: string, required = true): string | null => {
+    if (!ip.trim()) {
+        return required ? 'IP address is required' : null;
     }
 
     // Try IPv4 first (using ipaddr.js)
-    if (ipaddr.IPv4.isValidFourPartDecimal(dns)) return null;
+    if (ipaddr.IPv4.isValidFourPartDecimal(ip)) return null;
 
     // Try IPv6 (using ipaddr.js)
-    if (ipaddr.IPv6.isValid(dns)) return null;
+    if (ipaddr.IPv6.isValid(ip)) return null;
 
-    return 'Invalid DNS server address';
+    return 'Invalid IP address';
+};
+
+/**
+ * @deprecated Use validateIP instead - DNS servers are just IP addresses
+ * Alias for backward compatibility
+ */
+export const validateDNSServer = validateIP;
+
+/**
+ * Validate hostname or IP address (IPv4 or IPv6)
+ *
+ * Useful for fields that accept any of these formats (e.g., proxy hostname, NTP server)
+ *
+ * @param value - The value to validate
+ * @param required - Whether the field is required
+ * @returns Error message or null if valid
+ */
+export const validateHostnameOrIP = (value: string, required = true): string | null => {
+    if (!value.trim()) {
+        return required ? 'Hostname or IP address is required' : null;
+    }
+
+    // Try IPv4 first (quick check)
+    if (ipaddr.IPv4.isValidFourPartDecimal(value)) return null;
+
+    // Try IPv6 (quick check)
+    if (ipaddr.IPv6.isValid(value)) return null;
+
+    // Finally try hostname validation
+    const hostnameError = validateHostname(value, true);
+    if (!hostnameError) return null;
+
+    // Return a user-friendly combined error
+    return 'Invalid hostname or IP address';
+};
+
+/**
+ * Validate port number
+ *
+ * @param port - The port number to validate
+ * @param required - Whether the field is required
+ * @returns Error message or null if valid
+ */
+export const validatePort = (port: number | null, required = true): string | null => {
+    if (port === null) {
+        return required ? 'Port is required' : null;
+    }
+
+    if (port < 1 || port > 65535) {
+        return 'Port must be between 1 and 65535';
+    }
+
+    return null;
 };

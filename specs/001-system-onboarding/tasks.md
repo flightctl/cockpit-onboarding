@@ -187,15 +187,15 @@ Project follows Cockpit module structure:
 
 ### Implementation for User Story 7
 
-- [ ] T070 [US7] Add proxy configuration section to src/wizard/NetworkServicesPage.tsx
-- [ ] T071 [US7] Add proxy enabled toggle to src/wizard/NetworkServicesPage.tsx
-- [ ] T072 [US7] Add proxy hostname input field to src/wizard/NetworkServicesPage.tsx
-- [ ] T073 [US7] Add proxy port input field (with numeric validation) to src/wizard/NetworkServicesPage.tsx
-- [ ] T074 [US7] Add proxy username input field (optional) to src/wizard/NetworkServicesPage.tsx
-- [ ] T075 [US7] Add proxy password input field (optional) to src/wizard/NetworkServicesPage.tsx
-- [ ] T076 [US7] Add validation for proxy port (1-65535) to src/wizard/NetworkServicesPage.tsx
-- [ ] T077 [US7] Update model context to store proxy configuration in src/model-context.tsx
-- [ ] T078 [US7] Add integration test for proxy configuration in test/test_proxy.py
+- [X] T070 [US7] Add proxy configuration section to src/wizard/NetworkServicesPage.tsx
+- [X] T071 [US7] Add proxy enabled toggle to src/wizard/NetworkServicesPage.tsx
+- [X] T072 [US7] Add proxy hostname input field to src/wizard/NetworkServicesPage.tsx
+- [X] T073 [US7] Add proxy port input field (with numeric validation) to src/wizard/NetworkServicesPage.tsx
+- [X] T074 [US7] Add proxy username input field (optional) to src/wizard/NetworkServicesPage.tsx
+- [X] T075 [US7] Add proxy password input field (optional) to src/wizard/NetworkServicesPage.tsx
+- [X] T076 [US7] Add validation for proxy port (1-65535) to src/wizard/NetworkServicesPage.tsx
+- [X] T077 [US7] Update model context to store proxy configuration in src/model-context.tsx
+- [X] T078 [US7] Add integration test for proxy configuration in test/test_proxy.py
 
 **Checkpoint**: Users can configure HTTP proxy with optional authentication, all fields validated
 

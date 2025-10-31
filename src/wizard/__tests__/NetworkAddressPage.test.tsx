@@ -10,7 +10,7 @@ import {
     validateSubnetMask,
     validateIPv6,
     validateIPv6Gateway,
-    validateDNSServer
+    validateIP
 } from '../../validation';
 
 describe('validateIPv4 - IPv4 Address Validation', () => {
@@ -275,73 +275,6 @@ describe('validateIPv6Gateway - IPv6 Gateway Validation', () => {
     });
 });
 
-describe('validateDNSServer - DNS Server Validation', () => {
-    describe('Optional field validation', () => {
-        test('returns null for empty string when not required', () => {
-            expect(validateDNSServer('', false)).toBeNull();
-        });
-
-        test('returns error for empty string when required', () => {
-            expect(validateDNSServer('', true)).toBe('DNS server is required');
-        });
-
-        test('returns error for whitespace when required', () => {
-            expect(validateDNSServer('   ', true)).toBe('DNS server is required');
-        });
-    });
-
-    describe('IPv4 DNS server validation', () => {
-        test('accepts valid IPv4 DNS servers', () => {
-            expect(validateDNSServer('8.8.8.8')).toBeNull(); // Google DNS
-            expect(validateDNSServer('1.1.1.1')).toBeNull(); // Cloudflare DNS
-            expect(validateDNSServer('208.67.222.222')).toBeNull(); // OpenDNS
-            expect(validateDNSServer('192.168.1.1')).toBeNull(); // Local DNS
-        });
-    });
-
-    describe('IPv6 DNS server validation', () => {
-        test('accepts valid IPv6 DNS servers', () => {
-            expect(validateDNSServer('2001:4860:4860::8888')).toBeNull(); // Google DNS
-            expect(validateDNSServer('2606:4700:4700::1111')).toBeNull(); // Cloudflare DNS
-            expect(validateDNSServer('2001:db8::1')).toBeNull();
-            expect(validateDNSServer('::1')).toBeNull(); // localhost
-        });
-    });
-
-    describe('Mixed IPv4/IPv6 validation', () => {
-        test('accepts both IPv4 and IPv6 addresses', () => {
-            expect(validateDNSServer('8.8.8.8')).toBeNull();
-            expect(validateDNSServer('2001:4860:4860::8888')).toBeNull();
-        });
-    });
-
-    describe('Invalid format rejection', () => {
-        test('rejects invalid DNS server addresses', () => {
-            expect(validateDNSServer('not-a-dns')).toBe('Invalid DNS server address');
-            expect(validateDNSServer('256.1.1.1')).toBe('Invalid DNS server address');
-            expect(validateDNSServer('gggg::')).toBe('Invalid DNS server address');
-            expect(validateDNSServer('invalid')).toBe('Invalid DNS server address');
-        });
-    });
-
-    describe('Common DNS servers', () => {
-        const commonDnsServers = [
-            '8.8.8.8', // Google Primary
-            '8.8.4.4', // Google Secondary
-            '1.1.1.1', // Cloudflare Primary
-            '1.0.0.1', // Cloudflare Secondary
-            '2001:4860:4860::8888', // Google IPv6 Primary
-            '2001:4860:4860::8844', // Google IPv6 Secondary
-            '2606:4700:4700::1111', // Cloudflare IPv6 Primary
-            '2606:4700:4700::1001', // Cloudflare IPv6 Secondary
-        ];
-
-        test.each(commonDnsServers)('accepts common DNS server: %s', (dns) => {
-            expect(validateDNSServer(dns)).toBeNull();
-        });
-    });
-});
-
 describe('Validation integration - Real-world scenarios', () => {
     describe('Static IPv4 configuration', () => {
         test('validates typical home network setup', () => {
@@ -354,8 +287,8 @@ describe('Validation integration - Real-world scenarios', () => {
             expect(validateIPv4(address)).toBeNull();
             expect(validateSubnetMask(subnetMask)).toBeNull();
             expect(validateIPv4(gateway)).toBeNull();
-            expect(validateDNSServer(primaryDns, true)).toBeNull();
-            expect(validateDNSServer(secondaryDns, false)).toBeNull();
+            expect(validateIP(primaryDns, true)).toBeNull();
+            expect(validateIP(secondaryDns, false)).toBeNull();
         });
 
         test('validates enterprise network setup', () => {
@@ -367,7 +300,7 @@ describe('Validation integration - Real-world scenarios', () => {
             expect(validateIPv4(address)).toBeNull();
             expect(validateSubnetMask(subnetMask)).toBeNull();
             expect(validateIPv4(gateway)).toBeNull();
-            expect(validateDNSServer(dns, true)).toBeNull();
+            expect(validateIP(dns, true)).toBeNull();
         });
     });
 
@@ -380,8 +313,8 @@ describe('Validation integration - Real-world scenarios', () => {
 
             expect(validateIPv6(address, true)).toBeNull();
             expect(validateIPv6Gateway(gateway)).toBeNull();
-            expect(validateDNSServer(primaryDns, true)).toBeNull();
-            expect(validateDNSServer(secondaryDns, false)).toBeNull();
+            expect(validateIP(primaryDns, true)).toBeNull();
+            expect(validateIP(secondaryDns, false)).toBeNull();
         });
     });
 

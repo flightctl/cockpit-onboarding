@@ -11,7 +11,7 @@ import {
     validateSubnetMask,
     validateIPv6,
     validateIPv6Gateway,
-    validateDNSServer
+    validateIP
 } from '../validation';
 
 export const NetworkAddressPage: React.FunctionComponent = () => {
@@ -74,13 +74,13 @@ export const NetworkConfigIPv4: React.FunctionComponent = () => {
     };
 
     const setPrimaryDns = (primaryDns: string) => {
-        const error = validateDNSServer(primaryDns, !model.networkAddress.ipv4.autoDns);
+        const error = validateIP(primaryDns, !model.networkAddress.ipv4.autoDns);
         setValidationErrors(prev => ({ ...prev, primaryDns: error }));
         updateNestedModel('networkAddress', 'ipv4', { primaryDns });
     };
 
     const setSecondaryDns = (secondaryDns: string) => {
-        const error = validateDNSServer(secondaryDns, false);
+        const error = validateIP(secondaryDns, false);
         setValidationErrors(prev => ({ ...prev, secondaryDns: error }));
         updateNestedModel('networkAddress', 'ipv4', { secondaryDns });
     };
@@ -252,13 +252,13 @@ export const NetworkConfigIPv6: React.FunctionComponent = () => {
     };
 
     const setPrimaryDnsIpv6 = (primaryDns: string) => {
-        const error = validateDNSServer(primaryDns, !model.networkAddress.ipv6.autoDns);
+        const error = validateIP(primaryDns, !model.networkAddress.ipv6.autoDns);
         setValidationErrors(prev => ({ ...prev, primaryDns: error }));
         updateNestedModel('networkAddress', 'ipv6', { primaryDns });
     };
 
     const setSecondaryDnsIpv6 = (secondaryDns: string) => {
-        const error = validateDNSServer(secondaryDns, false);
+        const error = validateIP(secondaryDns, false);
         setValidationErrors(prev => ({ ...prev, secondaryDns: error }));
         updateNestedModel('networkAddress', 'ipv6', { secondaryDns });
     };
