@@ -5,7 +5,7 @@
  * Dynamically renders credential forms based on each service's JSON schema.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Stack,
     StackItem,
@@ -24,6 +24,7 @@ import {
 } from '@patternfly/react-core';
 import { useModelContext } from '../model-context';
 import { useConfig } from '../app';
+import { validateURL } from '../validation';
 import type { EnrollmentService } from '../types';
 
 /**
@@ -52,10 +53,14 @@ interface JsonSchemaFormProps {
 
 const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onChange }) => {
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [touched, setTouched] = useState<Record<string, boolean>>({});
 
     const handleFieldChange = (fieldName: string, value: unknown) => {
         const newFormData = { ...formData, [fieldName]: value };
         onChange(newFormData);
+
+        // Mark field as touched
+        setTouched(prev => ({ ...prev, [fieldName]: true }));
 
         // Validate field
         const fieldSchema = schema.properties[fieldName];
@@ -116,6 +121,20 @@ const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onCha
                 const value = formData[fieldName];
                 const error = errors[fieldName];
 
+                const showError = touched[fieldName] && error;
+                // Determine validation state:
+                // - Show error if there's an error
+                // - Show success if there's a valid value
+                // - Show warning if required and empty
+                // - Show default otherwise
+                const validationState = error
+                    ? ValidatedOptions.error
+                    : (value && String(value).trim())
+                        ? ValidatedOptions.success
+                        : isRequired
+                            ? ValidatedOptions.warning
+                            : ValidatedOptions.default;
+
                 switch (fieldSchema.type) {
                 case 'string':
                     return (
@@ -126,10 +145,10 @@ const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onCha
                                     type={fieldSchema.format === 'password' ? 'password' : 'text'}
                                     value={String(value || '')}
                                     onChange={(_event, val) => handleFieldChange(fieldName, val)}
-                                    validated={error ? ValidatedOptions.error : ValidatedOptions.default}
+                                    validated={validationState}
                                     isRequired={isRequired}
                                 />
-                                {error && (
+                                {showError && (
                                     <FormHelperText>
                                         <HelperText>
                                             <HelperTextItem variant="error">{error}</HelperTextItem>
@@ -149,10 +168,10 @@ const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onCha
                                     type="number"
                                     value={String(value || '')}
                                     onChange={(_event, val) => handleFieldChange(fieldName, Number(val))}
-                                    validated={error ? ValidatedOptions.error : ValidatedOptions.default}
+                                    validated={validationState}
                                     isRequired={isRequired}
                                 />
-                                {error && (
+                                {showError && (
                                     <FormHelperText>
                                         <HelperText>
                                             <HelperTextItem variant="error">{error}</HelperTextItem>
@@ -199,6 +218,26 @@ export const EnrollmentPage: React.FunctionComponent = () => {
     const credentials = model.enrollment.credentials || {};
     const endpoints = model.enrollment.endpoints || {};
 
+    // Track endpoint validation errors and touched state
+    const [endpointErrors, setEndpointErrors] = useState<Record<string, string>>({});
+    const [endpointTouched, setEndpointTouched] = useState<Record<string, boolean>>({});
+
+    // Validate endpoints on mount and when they change
+    useEffect(() => {
+        const errors: Record<string, string> = {};
+        for (const serviceId of selectedServices) {
+            const service = enrollmentServices.find(s => s.id === serviceId);
+            if (service) {
+                const endpoint = endpoints[serviceId] || service.endpoint.url;
+                const error = validateURL(endpoint, true);
+                if (error) {
+                    errors[serviceId] = error;
+                }
+            }
+        }
+        setEndpointErrors(errors);
+    }, [endpoints, selectedServices, enrollmentServices]);
+
     const toggleServiceSelection = (serviceId: string) => {
         const newSelectedServices = selectedServices.includes(serviceId)
             ? selectedServices.filter(id => id !== serviceId)
@@ -219,6 +258,13 @@ export const EnrollmentPage: React.FunctionComponent = () => {
     };
 
     const updateServiceEndpoint = (serviceId: string, endpoint: string) => {
+        // Mark as touched
+        setEndpointTouched(prev => ({ ...prev, [serviceId]: true }));
+
+        // Validate
+        const error = validateURL(endpoint, true);
+        setEndpointErrors(prev => ({ ...prev, [serviceId]: error || '' }));
+
         updateModel('enrollment', {
             endpoints: {
                 ...endpoints,
@@ -254,7 +300,18 @@ export const EnrollmentPage: React.FunctionComponent = () => {
             {enrollmentServices.map((service: EnrollmentService) => {
                 const isSelected = selectedServices.includes(service.id);
                 const serviceCredentials = credentials[service.id] || {};
-                const serviceEndpoint = endpoints[service.id] || service.endpoint.url;
+                // Use nullish coalescing to only fall back to default if undefined/null, not empty string
+                const serviceEndpoint = endpoints[service.id] ?? service.endpoint.url;
+                const endpointError = endpointErrors[service.id];
+                const showEndpointError = endpointTouched[service.id] && endpointError;
+
+                // Determine validation state for endpoint
+                // Show warning if empty, error if invalid, success if valid
+                const endpointValidated = endpointError
+                    ? ValidatedOptions.error
+                    : serviceEndpoint?.trim()
+                        ? ValidatedOptions.success
+                        : ValidatedOptions.warning;
 
                 return (
                     <StackItem key={service.id}>
@@ -283,7 +340,15 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                                                     value={serviceEndpoint}
                                                     onChange={(_event, value) => updateServiceEndpoint(service.id, value)}
                                                     isDisabled={!service.endpoint.allowUserOverride}
+                                                    validated={endpointValidated}
                                                 />
+                                                {showEndpointError && (
+                                                    <FormHelperText>
+                                                        <HelperText>
+                                                            <HelperTextItem variant="error">{endpointError}</HelperTextItem>
+                                                        </HelperText>
+                                                    </FormHelperText>
+                                                )}
                                                 {!service.endpoint.allowUserOverride && (
                                                     <div style={{ fontSize: 'var(--pf-global--FontSize--sm)', color: 'var(--pf-global--Color--200)', marginTop: '0.25rem' }}>
                                                         Endpoint is configured by the administrator
@@ -309,18 +374,6 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                     </StackItem>
                 );
             })}
-
-            {selectedServices.length === 0 && (
-                <StackItem>
-                    <Alert
-                        variant={AlertVariant.info}
-                        isInline
-                        title="No services selected"
-                    >
-                        Select at least one service to enroll, or skip this step if enrollment is not needed.
-                    </Alert>
-                </StackItem>
-            )}
         </Stack>
     );
 };

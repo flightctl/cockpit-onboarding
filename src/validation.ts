@@ -21,15 +21,17 @@ import * as ipaddr from 'ipaddr.js';
  * @returns Error message or null if valid
  */
 export const validateHostname = (hostname: string, required = true): string | null => {
-    if (!hostname.trim()) {
+    const trimmedHostname = hostname.trim();
+
+    if (!trimmedHostname) {
         return required ? 'Hostname is required' : null;
     }
 
     // RFC 1123 hostname validation
-    if (hostname.length > 253) return 'Hostname must be 253 characters or less';
+    if (trimmedHostname.length > 253) return 'Hostname must be 253 characters or less';
 
     // Split into labels (parts separated by dots)
-    const labels = hostname.split('.');
+    const labels = trimmedHostname.split('.');
 
     for (const label of labels) {
         // Each label must be 1-63 characters
@@ -42,9 +44,13 @@ export const validateHostname = (hostname: string, required = true): string | nu
         // Must start and end with alphanumeric character
         if (!/^[a-zA-Z0-9]/.test(label)) return 'Each hostname label must start with an alphanumeric character';
         if (!/[a-zA-Z0-9]$/.test(label)) return 'Each hostname label must end with an alphanumeric character';
+    }
 
-        // Cannot be all numeric (for FQDN compliance)
-        if (/^\d+$/.test(label) && labels.length > 1) return 'Hostname labels cannot be all numeric in a FQDN';
+    // Reject if ALL labels are numeric (looks like an IPv4 address)
+    // But allow FQDNs with some all-numeric labels like "1.ntp.org"
+    const allLabelsNumeric = labels.every(label => /^\d+$/.test(label));
+    if (allLabelsNumeric && labels.length > 1) {
+        return 'Hostname labels cannot be all numeric in a FQDN';
     }
 
     return null;
@@ -59,14 +65,15 @@ export const validateHostname = (hostname: string, required = true): string | nu
  * @returns Error message or null if valid
  */
 export const validateIPv4 = (ip: string): string | null => {
-    if (!ip.trim()) return 'IPv4 address is required';
+    const trimmedIp = ip.trim();
+    if (!trimmedIp) return 'IPv4 address is required';
 
     // Use ipaddr.js validation (same as NetworkManager utils)
     // IPv4.isValidFourPartDecimal explicitly requires all 4 octets
-    if (!ipaddr.IPv4.isValidFourPartDecimal(ip)) {
+    if (!ipaddr.IPv4.isValidFourPartDecimal(trimmedIp)) {
         // Provide more specific error for user feedback
         const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-        const match = ip.match(ipRegex);
+        const match = trimmedIp.match(ipRegex);
 
         if (!match) return 'Invalid IPv4 address format';
 
@@ -90,11 +97,12 @@ export const validateIPv4 = (ip: string): string | null => {
  * @returns Error message or null if valid
  */
 export const validateSubnetMask = (mask: string): string | null => {
-    if (!mask.trim()) return 'Subnet mask is required';
+    const trimmedMask = mask.trim();
+    if (!trimmedMask) return 'Subnet mask is required';
 
     // Support CIDR notation (/24)
-    if (mask.startsWith('/')) {
-        const prefix = parseInt(mask.slice(1), 10);
+    if (trimmedMask.startsWith('/')) {
+        const prefix = parseInt(trimmedMask.slice(1), 10);
         if (isNaN(prefix) || prefix < 0 || prefix > 32) {
             return 'CIDR prefix must be between 0 and 32';
         }
@@ -102,11 +110,11 @@ export const validateSubnetMask = (mask: string): string | null => {
     }
 
     // Support dotted decimal notation (255.255.255.0)
-    const ipv4Error = validateIPv4(mask);
+    const ipv4Error = validateIPv4(trimmedMask);
     if (ipv4Error) return 'Invalid subnet mask format';
 
     // Validate that it's a valid subnet mask
-    const octets = mask.split('.').map(Number);
+    const octets = trimmedMask.split('.').map(Number);
     let binaryMask = '';
     for (const octet of octets) {
         binaryMask += octet.toString(2).padStart(8, '0');
@@ -130,14 +138,15 @@ export const validateSubnetMask = (mask: string): string | null => {
  * @returns Error message or null if valid
  */
 export const validateIPv6 = (ip: string, requirePrefix = false): string | null => {
-    if (!ip.trim()) return requirePrefix ? 'IPv6 address is required' : null;
+    const trimmedIp = ip.trim();
+    if (!trimmedIp) return requirePrefix ? 'IPv6 address is required' : null;
 
-    let address = ip;
+    let address = trimmedIp;
     let prefix: number | null = null;
 
     // Extract prefix if present
-    if (ip.includes('/')) {
-        const parts = ip.split('/');
+    if (trimmedIp.includes('/')) {
+        const parts = trimmedIp.split('/');
         if (parts.length !== 2) return 'Invalid IPv6 address format';
         address = parts[0];
         prefix = parseInt(parts[1], 10);
@@ -164,13 +173,14 @@ export const validateIPv6 = (ip: string, requirePrefix = false): string | null =
  * @returns Error message or null if valid
  */
 export const validateIPv6Gateway = (gateway: string): string | null => {
-    if (!gateway.trim()) return null; // Optional field
+    const trimmedGateway = gateway.trim();
+    if (!trimmedGateway) return null; // Optional field
 
-    const error = validateIPv6(gateway);
+    const error = validateIPv6(trimmedGateway);
     if (error) return error;
 
     // Check if it's a link-local address (not allowed for gateway)
-    if (gateway.toLowerCase().startsWith('fe80:')) {
+    if (trimmedGateway.toLowerCase().startsWith('fe80:')) {
         return 'Gateway cannot be a link-local address (fe80::)';
     }
 
@@ -187,15 +197,17 @@ export const validateIPv6Gateway = (gateway: string): string | null => {
  * @returns Error message or null if valid
  */
 export const validateIP = (ip: string, required = true): string | null => {
-    if (!ip.trim()) {
+    const trimmedIp = ip.trim();
+
+    if (!trimmedIp) {
         return required ? 'IP address is required' : null;
     }
 
     // Try IPv4 first (using ipaddr.js)
-    if (ipaddr.IPv4.isValidFourPartDecimal(ip)) return null;
+    if (ipaddr.IPv4.isValidFourPartDecimal(trimmedIp)) return null;
 
     // Try IPv6 (using ipaddr.js)
-    if (ipaddr.IPv6.isValid(ip)) return null;
+    if (ipaddr.IPv6.isValid(trimmedIp)) return null;
 
     return 'Invalid IP address';
 };
@@ -216,18 +228,20 @@ export const validateDNSServer = validateIP;
  * @returns Error message or null if valid
  */
 export const validateHostnameOrIP = (value: string, required = true): string | null => {
-    if (!value.trim()) {
+    const trimmedValue = value.trim();
+
+    if (!trimmedValue) {
         return required ? 'Hostname or IP address is required' : null;
     }
 
     // Try IPv4 first (quick check)
-    if (ipaddr.IPv4.isValidFourPartDecimal(value)) return null;
+    if (ipaddr.IPv4.isValidFourPartDecimal(trimmedValue)) return null;
 
     // Try IPv6 (quick check)
-    if (ipaddr.IPv6.isValid(value)) return null;
+    if (ipaddr.IPv6.isValid(trimmedValue)) return null;
 
     // Finally try hostname validation
-    const hostnameError = validateHostname(value, true);
+    const hostnameError = validateHostname(trimmedValue, true);
     if (!hostnameError) return null;
 
     // Return a user-friendly combined error
@@ -251,4 +265,43 @@ export const validatePort = (port: number | null, required = true): string | nul
     }
 
     return null;
+};
+
+/**
+ * Validate URL
+ *
+ * @param url - The URL to validate
+ * @param required - Whether the field is required
+ * @returns Error message or null if valid
+ */
+export const validateURL = (url: string, required = true): string | null => {
+    const trimmedUrl = url.trim();
+
+    if (!trimmedUrl) {
+        return required ? 'URL is required' : null;
+    }
+
+    try {
+        const urlObj = new URL(trimmedUrl);
+
+        // Check for valid protocol (http or https)
+        if (!['http:', 'https:'].includes(urlObj.protocol)) {
+            return 'URL must use http:// or https:// protocol';
+        }
+
+        // Check that hostname is valid and not empty
+        if (!urlObj.hostname || urlObj.hostname.length === 0) {
+            return 'URL must have a valid hostname';
+        }
+
+        // Use the existing hostname validation function for consistency
+        const hostnameError = validateHostname(urlObj.hostname, true);
+        if (hostnameError) {
+            return `URL hostname is invalid: ${hostnameError}`;
+        }
+
+        return null;
+    } catch (_e) {
+        return 'Invalid URL format';
+    }
 };

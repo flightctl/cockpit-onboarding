@@ -105,29 +105,42 @@ export class SystemConfigurationService {
                 return '';
             }
 
+            // Check if the interface is using DHCP (auto) before querying DHCP options
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ipv4Method = (iface.MainConnection?.Settings as any)?.ipv4?.method;
+            if (ipv4Method === 'manual') {
+                // Static IP configuration - no DHCP hostname available
+                return '';
+            }
+
             // Get IP4Config from the active connection
             const activeConnection = iface.Device.ActiveConnection;
             if (!activeConnection.Ip4Config) {
                 return '';
             }
 
-            // Create NetworkManager D-Bus client
-            const nmClient = cockpit.dbus('org.freedesktop.NetworkManager');
+            // Create NetworkManager D-Bus client with superuser access
+            const nmClient = cockpit.dbus('org.freedesktop.NetworkManager', { superuser: 'try' });
             // Ip4Config is actually a D-Bus path string, not the config object
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const ip4ConfigProxy = nmClient.proxy('org.freedesktop.NetworkManager.IP4Config', activeConnection.Ip4Config as any as string);
 
-            // Wait for proxy to be ready
-            await new Promise<void>((resolve, reject) => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (ip4ConfigProxy as any).wait(() => {
-                    if (ip4ConfigProxy.valid) {
-                        resolve();
-                    } else {
-                        reject(new Error('Failed to connect to IP4Config'));
-                    }
-                });
-            });
+            // Wait for proxy to be ready with a 2 second timeout
+            await Promise.race([
+                new Promise<void>((resolve, reject) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (ip4ConfigProxy as any).wait(() => {
+                        if (ip4ConfigProxy.valid) {
+                            resolve();
+                        } else {
+                            reject(new Error('Failed to connect to IP4Config'));
+                        }
+                    });
+                }),
+                new Promise<void>((_, reject) => {
+                    setTimeout(() => reject(new Error('Timeout waiting for IP4Config proxy')), 2000);
+                })
+            ]);
 
             // Get DHCP options
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -139,7 +152,8 @@ export class SystemConfigurationService {
             nmClient.close();
             return dhcpHostname;
         } catch (error) {
-            console.warn('Failed to get DHCP hostname:', error);
+            // DHCP hostname is optional, so just warn if unavailable
+            console.warn('Could not retrieve DHCP hostname:', error);
             return '';
         }
     }
@@ -166,12 +180,26 @@ export class SystemConfigurationService {
     }
 
     async getSystemInfo(interfaces: Interface[]): Promise<SystemInfo> {
-        const [hostnameInfo, defaultInterface, ntpServers, dhcpHostname] = await Promise.all([
-            this.getHostnameInfo(),
-            this.getDefaultInterface(interfaces),
-            this.getNtpServers(),
-            this.getDhcpHostname(interfaces)
-        ]);
+        // Fetch system information with error handling for each component
+        const hostnameInfo = await this.getHostnameInfo().catch((err): { hostname: string; prettyHostname?: string; staticHostname?: string } => {
+            console.error('Failed to get hostname info:', err);
+            return { hostname: '' };
+        });
+
+        const defaultInterface = await this.getDefaultInterface(interfaces).catch((err): string | null => {
+            console.error('Failed to get default interface:', err);
+            return null;
+        });
+
+        const ntpServers = await this.getNtpServers().catch((err): string[] => {
+            console.error('Failed to get NTP servers:', err);
+            return [];
+        });
+
+        const dhcpHostname = await this.getDhcpHostname(interfaces).catch((err): string => {
+            console.warn('Failed to get DHCP hostname:', err);
+            return '';
+        });
 
         return {
             hostname: this.getFormattedHostname(hostnameInfo),
@@ -529,6 +557,179 @@ export class SystemConfigurationService {
         return { address, prefix };
     }
 
+    async getCurrentWifiConnection(interfaceName: string): Promise<{
+        ssid: string;
+        bssid: string;
+        password: string;
+        security: 'none' | 'wep' | 'wpa';
+    } | null> {
+        try {
+            // Use superuser access to read connection secrets
+            const nmClient = cockpit.dbus('org.freedesktop.NetworkManager', { superuser: 'try' });
+            const nmManager = nmClient.proxy('org.freedesktop.NetworkManager', '/org/freedesktop/NetworkManager');
+
+            // Wait for manager proxy to be ready
+            await new Promise<void>((resolve, reject) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (nmManager as any).wait(() => {
+                    if (nmManager.valid) {
+                        resolve();
+                    } else {
+                        reject(new Error('Failed to connect to NetworkManager'));
+                    }
+                });
+            });
+
+            // Get all devices and find the WiFi device for this interface
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const devicePaths = (nmManager.data as any).Devices || [];
+            let devicePath = null;
+            let activeConnectionPath = null;
+
+            for (const path of devicePaths) {
+                const devProxy = nmClient.proxy('org.freedesktop.NetworkManager.Device', path);
+                await new Promise<void>((resolve, reject) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (devProxy as any).wait(() => {
+                        if (devProxy.valid) {
+                            resolve();
+                        } else {
+                            reject(new Error('Failed to connect to device'));
+                        }
+                    });
+                });
+
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const devData = devProxy.data as any;
+                if (devData.Interface === interfaceName && devData.DeviceType === 2) { // 2 = WiFi
+                    devicePath = path;
+                    activeConnectionPath = devData.ActiveConnection;
+                    break;
+                }
+            }
+
+            if (!devicePath || !activeConnectionPath || activeConnectionPath === '/') {
+                // No active WiFi connection
+                nmClient.close();
+                return null;
+            }
+
+            // Get active connection details
+            const activeConnProxy = nmClient.proxy('org.freedesktop.NetworkManager.Connection.Active', activeConnectionPath);
+            await new Promise<void>((resolve, reject) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (activeConnProxy as any).wait(() => {
+                    if (activeConnProxy.valid) {
+                        resolve();
+                    } else {
+                        reject(new Error('Failed to connect to active connection'));
+                    }
+                });
+            });
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const activeConnData = activeConnProxy.data as any;
+            const connectionPath = activeConnData.Connection;
+
+            if (!connectionPath || connectionPath === '/') {
+                nmClient.close();
+                return null;
+            }
+
+            // Get the connection settings
+            const connectionProxy = nmClient.proxy('org.freedesktop.NetworkManager.Settings.Connection', connectionPath);
+            await new Promise<void>((resolve, reject) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (connectionProxy as any).wait(() => {
+                    if (connectionProxy.valid) {
+                        resolve();
+                    } else {
+                        reject(new Error('Failed to connect to connection'));
+                    }
+                });
+            });
+
+            // Get connection settings including secrets
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const settingsResult = await (connectionProxy as any).call('GetSettings', []);
+            const settings = settingsResult[0];
+
+            // Get connection secrets (includes WiFi password)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            let secrets: any = {};
+            try {
+                const secretsResult = await (connectionProxy as any).call('GetSecrets', ['802-11-wireless-security']);
+                secrets = secretsResult[0];
+            } catch (secretsError) {
+                console.warn('Failed to get WiFi secrets, password will not be available:', secretsError);
+                // Continue without secrets - we can still pre-select the network
+            }
+
+            // Extract SSID
+            const ssidRaw = settings['802-11-wireless']?.ssid;
+
+            let ssid = '';
+            if (ssidRaw?.v) {
+                const ssidBytes = ssidRaw.v;
+
+                if (Array.isArray(ssidBytes)) {
+                    // Array of bytes
+                    ssid = new TextDecoder().decode(new Uint8Array(ssidBytes));
+                } else if (typeof ssidBytes === 'string') {
+                    // Base64 encoded string (Cockpit D-Bus returns byte arrays as base64)
+                    try {
+                        const decoded = atob(ssidBytes);
+                        ssid = decoded;
+                    } catch (e) {
+                        console.error('Failed to decode base64 SSID:', e);
+                        ssid = ssidBytes;
+                    }
+                }
+            }
+
+            // Extract BSSID (if available, otherwise use empty string)
+            const bssidRaw = settings['802-11-wireless']?.bssid?.v;
+            let bssid = '';
+            if (bssidRaw) {
+                bssid = bssidRaw;
+            }
+
+            // Extract password from secrets
+            let password = '';
+            const securitySettings = secrets['802-11-wireless-security'];
+            if (securitySettings) {
+                // Try different possible password fields
+                password = securitySettings.psk?.v ||
+                          securitySettings['wep-key0']?.v ||
+                          securitySettings['leap-password']?.v ||
+                          '';
+            }
+
+            // Determine security type
+            let security: 'none' | 'wep' | 'wpa' = 'none';
+            const keyMgmt = settings['802-11-wireless-security']?.['key-mgmt']?.v;
+            if (keyMgmt) {
+                if (keyMgmt === 'none') {
+                    security = 'wep';
+                } else if (keyMgmt.includes('wpa') || keyMgmt.includes('sae')) {
+                    security = 'wpa';
+                }
+            }
+
+            nmClient.close();
+
+            return {
+                ssid,
+                bssid,
+                password,
+                security
+            };
+        } catch (error) {
+            console.error('Failed to get current WiFi connection:', error);
+            return null;
+        }
+    }
+
     async scanWifiNetworks(interfaceName: string): Promise<Array<{
         ssid: string;
         strength: number;
@@ -617,22 +818,23 @@ export class SystemConfigurationService {
             const aps = [];
 
             for (const apPath of apPaths) {
-                const apProxy = nmClient.proxy('org.freedesktop.NetworkManager.AccessPoint', apPath);
+                try {
+                    const apProxy = nmClient.proxy('org.freedesktop.NetworkManager.AccessPoint', apPath);
 
-                // Wait for access point proxy to be ready
-                await new Promise<void>((resolve, reject) => {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    (apProxy as any).wait(() => {
-                        if (apProxy.valid) {
-                            resolve();
-                        } else {
-                            reject(new Error('Failed to connect to access point'));
-                        }
+                    // Wait for access point proxy to be ready
+                    await new Promise<void>((resolve, reject) => {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        (apProxy as any).wait(() => {
+                            if (apProxy.valid) {
+                                resolve();
+                            } else {
+                                reject(new Error('Failed to connect to access point'));
+                            }
+                        });
                     });
-                });
 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const apData = apProxy.data as any;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const apData = apProxy.data as any;
 
                 // Decode SSID - Cockpit's DBUS proxy returns byte arrays as Base64 strings
                 const ssidData = apData.Ssid || '';
@@ -736,7 +938,12 @@ export class SystemConfigurationService {
                     security = securityMethods[0];
                 }
 
-                aps.push({ ssid, strength, security, frequency, channel, band, rate, bssid });
+                    aps.push({ ssid, strength, security, frequency, channel, band, rate, bssid });
+                } catch (error) {
+                    // Skip this access point if there's an error reading it
+                    console.warn(`Failed to read access point ${apPath}:`, error);
+                    continue;
+                }
             }
 
             nmClient.close();

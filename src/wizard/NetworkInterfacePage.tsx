@@ -99,7 +99,11 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
         iface.Device && iface.Device.State === 100 && isIfaceSelectable(iface)
       );
       if (defaultSelectedInterface) {
-        updateModel('networkInterface', { selectedInterface: defaultSelectedInterface.Name });
+        const isWifi = defaultSelectedInterface.Device?.DeviceType === '802-11-wireless';
+        updateModel('networkInterface', {
+          selectedInterface: defaultSelectedInterface.Name,
+          interfaceType: isWifi ? 'wifi' : 'ethernet'
+        });
         // Load the network configuration for the default interface
         switchToInterfaceConfig(defaultSelectedInterface.Name);
       }
@@ -107,13 +111,24 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
   }, [interfaces, model.networkInterface.selectedInterface, updateModel, switchToInterfaceConfig]);
 
   const setSelectedIfaceName = (name: string) => {
-    updateModel('networkInterface', { selectedInterface: name });
+    // Determine if the selected interface is WiFi
+    const selectedIface = interfaces.find(iface => iface.Name === name);
+    const isWifi = selectedIface?.Device?.DeviceType === '802-11-wireless';
+
+    updateModel('networkInterface', {
+      selectedInterface: name,
+      interfaceType: isWifi ? 'wifi' : 'ethernet',
+      // Clear WiFi-specific fields when switching to non-WiFi interface
+      wifiSsid: isWifi ? model.networkInterface.wifiSsid : null,
+      wifiPassword: isWifi ? model.networkInterface.wifiPassword : null,
+      wifiSecurity: isWifi ? model.networkInterface.wifiSecurity : null,
+    });
     // Switch to the configuration of the newly selected interface
     switchToInterfaceConfig(name);
   };
 
   return (
-      <Table aria-label="Network interface selector">
+      <Table aria-label="Network interface selector" variant="compact">
           <Thead>
               <Tr>
                   <Th screenReaderText="Row select" />
@@ -175,15 +190,71 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
   const [networks, setNetworks] = React.useState<WifiNetwork[]>([]);
   const [scanError, setScanError] = React.useState<string | null>(null);
   const [selectedBssid, setSelectedBssid] = React.useState<string | null>(null);
+  const hasPreSelected = React.useRef(false);
+  // Store current connection details in a ref so it can be accessed in handleNetworkSelection
+  const currentConnectionRef = React.useRef<{
+    ssid: string;
+    bssid: string;
+    password: string;
+    security: 'none' | 'wep' | 'wpa';
+  } | null>(null);
 
-  // Scan for WiFi networks when component mounts
+  // Get current WiFi connection details and scan networks
   React.useEffect(() => {
-    const scanNetworks = async () => {
+    const initializeWifi = async () => {
+      // First, get current connection if any
+      let current = null;
+      try {
+        current = await systemConfigurationService.getCurrentWifiConnection(interfaceName);
+        currentConnectionRef.current = current;
+      } catch (error) {
+        console.error('Failed to get current WiFi connection:', error);
+      }
+
+      // Then scan for networks
       setIsScanning(true);
       setScanError(null);
       try {
         const scannedNetworks = await systemConfigurationService.scanWifiNetworks(interfaceName);
         setNetworks(scannedNetworks);
+
+        // If we have a current connection and it's in the scanned list, pre-select it
+        if (current && !hasPreSelected.current) {
+          // Try to find by BSSID first (most specific), then by SSID
+          let matchingNetwork = scannedNetworks.find(n =>
+            current.bssid && n.bssid === current.bssid
+          );
+
+          if (!matchingNetwork) {
+            // If no BSSID match, try to find by SSID (might match a different AP of the same network)
+            matchingNetwork = scannedNetworks.find(n => n.ssid === current.ssid);
+          }
+
+          if (matchingNetwork) {
+            // Pre-select the current network
+            setSelectedBssid(matchingNetwork.bssid);
+
+            // Map security string to the model's expected type
+            let securityType: 'none' | 'wep' | 'wpa' = 'wpa';
+            if (matchingNetwork.security === 'None') {
+              securityType = 'none';
+            } else if (matchingNetwork.security === 'WEP') {
+              securityType = 'wep';
+            } else {
+              securityType = 'wpa';
+            }
+
+            // Update model with current network info
+            updateModel('networkInterface', {
+              wifiSsid: matchingNetwork.ssid,
+              wifiSecurity: securityType,
+              wifiPassword: current.password, // Pre-fill password
+              interfaceType: 'wifi'
+            });
+
+            hasPreSelected.current = true;
+          }
+        }
       } catch (error) {
         console.error('WiFi scan failed:', error);
         setScanError(String(error));
@@ -192,7 +263,8 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
       }
     };
 
-    scanNetworks();
+    initializeWifi();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interfaceName]);
 
   const handleNetworkSelection = (bssid: string) => {
@@ -213,9 +285,16 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
         securityType = 'wpa';
       }
 
+      // Check if this is the currently connected network
+      const isCurrentNetwork = currentConnectionRef.current &&
+        (currentConnectionRef.current.bssid === bssid ||
+         currentConnectionRef.current.ssid === selectedNetwork.ssid);
+
       updateModel('networkInterface', {
         wifiSsid: selectedNetwork.ssid,
         wifiSecurity: securityType,
+        // Pre-fill password if this is the currently connected network
+        wifiPassword: isCurrentNetwork ? currentConnectionRef.current!.password : null,
         interfaceType: 'wifi'
       });
     }
@@ -279,7 +358,7 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
 : (
     <>
         <StackItem>
-            <Table aria-label="WiFi network selector">
+            <Table aria-label="WiFi network selector" variant="compact">
                 <Thead>
                     <Tr>
                         <Th screenReaderText="Row select" />

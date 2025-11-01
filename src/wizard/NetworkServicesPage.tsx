@@ -23,20 +23,28 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
 
     const handleNtpServerInputChange = (value: string) => {
         setNtpServerInput(value);
-        const error = validateHostnameOrIP(value, true);
+        // Only validate if the input is not empty, since this field is optional
+        // (user only needs to fill it if they want to add a server)
+        const error = value.trim() ? validateHostnameOrIP(value, false) : null;
         setNtpValidationError(error);
     };
 
     const addNtpServer = () => {
         const trimmedInput = ntpServerInput.trim();
-        const error = validateHostnameOrIP(trimmedInput, true);
+
+        // Don't add if input is empty
+        if (!trimmedInput) {
+            return;
+        }
+
+        const error = validateHostnameOrIP(trimmedInput, false);
 
         if (error) {
             setNtpValidationError(error);
             return;
         }
 
-        if (trimmedInput && !model.networkServices.ntp.servers.includes(trimmedInput)) {
+        if (!model.networkServices.ntp.servers.includes(trimmedInput)) {
             const newServers = [...model.networkServices.ntp.servers, trimmedInput];
             updateNestedModel('networkServices', 'ntp', { servers: newServers.sort() });
             setNtpServerInput('');
@@ -98,7 +106,13 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                             <FormGroup label="NTP Server Hostname">
                                 <Flex>
                                     <FlexItem flex={{ default: 'flex_1' }}>
-                                        <TextInputGroup validated={ntpValidationError ? ValidatedOptions.error : (ntpServerInput && !ntpValidationError ? ValidatedOptions.success : ValidatedOptions.warning)}>
+                                        <TextInputGroup
+                                            {...(ntpValidationError
+                                                ? { validated: ValidatedOptions.error }
+                                                : ntpServerInput.trim()
+                                                    ? { validated: ValidatedOptions.success }
+                                                    : {})}
+                                        >
                                             <TextInputGroupMain
                                                 id="ntp-server-input"
                                                 value={ntpServerInput}
@@ -131,7 +145,7 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                         </StackItem>
                         <StackItem>
                             <p>Configured NTP Servers:</p>
-                            <Table aria-label="NTP servers table">
+                            <Table aria-label="NTP servers table" variant="compact">
                                 <Thead>
                                     <Tr>
                                         <Th>Server</Th>

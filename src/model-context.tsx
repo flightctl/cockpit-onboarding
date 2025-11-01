@@ -261,7 +261,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ipv4ConnectionDns = (iface.MainConnection?.Settings as any)?.ipv4?.dns || [];
 
-    if (activeConnection.Ip4Config && activeConnection.Ip4Config.Addresses.length > 0) {
+    if (activeConnection.Ip4Config && activeConnection.Ip4Config.Addresses && activeConnection.Ip4Config.Addresses.length > 0) {
         const address = activeConnection.Ip4Config.Addresses[0];
         // Get DNS servers from active config (includes DHCP-provided DNS) and connection settings
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -296,7 +296,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ipv6ConnectionDns = (iface.MainConnection?.Settings as any)?.ipv6?.dns || [];
 
-    if (activeConnection.Ip6Config && activeConnection.Ip6Config.Addresses.length > 0) {
+    if (activeConnection.Ip6Config && activeConnection.Ip6Config.Addresses && activeConnection.Ip6Config.Addresses.length > 0) {
         const address = activeConnection.Ip6Config.Addresses[0];
         // Get DNS servers from active config (includes DHCP-provided DNS) and connection settings
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -413,7 +413,15 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
     };
 
     const initializeFromSystem = async () => {
-        if (!networkManager || !networkManager.ready) {
+        if (!networkManager) {
+            console.warn('Cannot initialize: networkManager is not available');
+            setIsInitialized(true);
+            return;
+        }
+
+        if (!networkManager.ready) {
+            console.warn('Cannot initialize: networkManager is not ready');
+            setIsInitialized(true);
             return;
         }
 
@@ -432,16 +440,28 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
                 ? originalConfigs[systemInfo.defaultInterface]
                 : defaultNetworkConfig;
 
+            // Determine the best default hostname
+            // Use DHCP hostname if static hostname is not set or is localhost
+            let defaultHostname = systemInfo.hostname;
+            if (!defaultHostname || defaultHostname === 'localhost' || defaultHostname === 'localhost.localdomain') {
+                defaultHostname = systemInfo.dhcpHostname || defaultHostname;
+            }
+
+            // Determine the interface type for the default interface
+            const defaultInterface = interfaces.find(iface => iface.Name === systemInfo.defaultInterface);
+            const defaultInterfaceType = defaultInterface?.Device?.DeviceType === '802-11-wireless' ? 'wifi' : 'ethernet';
+
             // Update model with system information
             setModel(prev => ({
                 ...prev,
                 hostname: {
-                    value: systemInfo.hostname,
+                    value: defaultHostname,
                     dhcpHostname: systemInfo.dhcpHostname
                 },
                 networkInterface: {
                     ...prev.networkInterface,
-                    selectedInterface: systemInfo.defaultInterface
+                    selectedInterface: systemInfo.defaultInterface,
+                    interfaceType: systemInfo.defaultInterface ? defaultInterfaceType : null
                 },
                 networkAddress: configToState(defaultConfig),
                 originalNetworkConfigs: originalConfigs,
@@ -460,14 +480,22 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
 
             setIsInitialized(true);
         } catch (error) {
-            console.warn('Failed to initialize model from system:', error);
+            console.error('Failed to initialize model from system:', error);
             setIsInitialized(true); // Still mark as initialized even if some parts failed
         }
     };
 
     useEffect(() => {
-        if (networkManager && networkManager.ready && !isInitialized) {
-            initializeFromSystem();
+        if (networkManager && !isInitialized) {
+            // If networkManager exists, attempt initialization regardless of ready state
+            // This handles cases where ready might be false or undefined
+            if (networkManager.ready) {
+                initializeFromSystem();
+            } else {
+                // If not ready, still mark as initialized to prevent infinite loading
+                // The wizard will work with default/empty values
+                setIsInitialized(true);
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [networkManager, networkManager?.ready, isInitialized]);

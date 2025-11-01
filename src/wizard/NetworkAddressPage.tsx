@@ -188,7 +188,13 @@ export const NetworkConfigIPv4: React.FunctionComponent = () => {
                             <FormGroup
                                 label="Secondary Server"
                             >
-                                <TextInputGroup validated={validationErrors.secondaryDns ? ValidatedOptions.error : (model.networkAddress.ipv4.secondaryDns && !validationErrors.secondaryDns ? ValidatedOptions.success : ValidatedOptions.warning)}>
+                                <TextInputGroup
+                                    {...(validationErrors.secondaryDns
+                                        ? { validated: ValidatedOptions.error }
+                                        : model.networkAddress.ipv4.secondaryDns?.trim()
+                                            ? { validated: ValidatedOptions.success }
+                                            : {})}
+                                >
                                     <TextInputGroupMain
                                         id="secondary-dns-ipv4"
                                         value={model.networkAddress.ipv4.secondaryDns || ''}
@@ -319,7 +325,13 @@ export const NetworkConfigIPv6: React.FunctionComponent = () => {
                             <FormGroup
                                 label="Gateway IP"
                             >
-                                <TextInputGroup validated={validationErrors.gateway ? ValidatedOptions.error : (model.networkAddress.ipv6.gateway && !validationErrors.gateway ? ValidatedOptions.success : ValidatedOptions.warning)}>
+                                <TextInputGroup
+                                    {...(validationErrors.gateway
+                                        ? { validated: ValidatedOptions.error }
+                                        : model.networkAddress.ipv6.gateway?.trim()
+                                            ? { validated: ValidatedOptions.success }
+                                            : {})}
+                                >
                                     <TextInputGroupMain
                                         id="gateway-ipv6"
                                         value={model.networkAddress.ipv6.gateway || ''}
@@ -361,7 +373,13 @@ export const NetworkConfigIPv6: React.FunctionComponent = () => {
                                 <FormGroup
                                 label="Secondary Server"
                                 >
-                                    <TextInputGroup validated={validationErrors.secondaryDns ? ValidatedOptions.error : (model.networkAddress.ipv6.secondaryDns && !validationErrors.secondaryDns ? ValidatedOptions.success : ValidatedOptions.warning)}>
+                                    <TextInputGroup
+                                        {...(validationErrors.secondaryDns
+                                            ? { validated: ValidatedOptions.error }
+                                            : model.networkAddress.ipv6.secondaryDns?.trim()
+                                                ? { validated: ValidatedOptions.success }
+                                                : {})}
+                                    >
                                         <TextInputGroupMain
                                         id="secondary-dns-ipv6"
                                         value={model.networkAddress.ipv6.secondaryDns || ''}

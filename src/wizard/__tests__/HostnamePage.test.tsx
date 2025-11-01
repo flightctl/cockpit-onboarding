@@ -120,10 +120,17 @@ describe('validateHostname - RFC 1123 Validation', () => {
             expect(validateHostname('server')).toBeNull();
         });
 
-        test('rejects all-numeric label in FQDN', () => {
+        test('rejects all-numeric labels in FQDN (IPv4-like)', () => {
+            // Reject when ALL labels are numeric (looks like IPv4 address)
             expect(validateHostname('192.168.1.1')).toBe('Hostname labels cannot be all numeric in a FQDN');
-            expect(validateHostname('server.123.com')).toBe('Hostname labels cannot be all numeric in a FQDN');
             expect(validateHostname('1.2.3.4')).toBe('Hostname labels cannot be all numeric in a FQDN');
+        });
+
+        test('accepts FQDN with some numeric labels', () => {
+            // Accept when not all labels are numeric (valid hostnames)
+            expect(validateHostname('server.123.com')).toBeNull();
+            expect(validateHostname('1.ntp.org')).toBeNull();
+            expect(validateHostname('0.pool.ntp.org')).toBeNull();
         });
 
         test('accepts all-numeric single label (not FQDN)', () => {
