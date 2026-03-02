@@ -8,7 +8,7 @@ import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
-import { Stack, StackItem } from '@patternfly/react-core';
+import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { WifiIcon } from '@patternfly/react-icons';
 import { useModelContext } from '../model-context';

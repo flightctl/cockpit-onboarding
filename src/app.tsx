@@ -33,7 +33,7 @@ import { SystemOnboardingConfig } from './types';
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist/esm/components/Page/index.js";
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
-import { Wizard, WizardStep } from '@patternfly/react-core';
+import { Wizard, WizardStep } from "@patternfly/react-core/dist/esm/components/Wizard/index.js";
 
 import { HostnamePage } from './wizard/HostnamePage.tsx';
 import { NetworkInterfacePage } from './wizard/NetworkInterfacePage.tsx';
@@ -248,8 +248,8 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     // Check if enrollment services are configured
     const hasEnrollmentServices = Boolean(config && config.enrollmentServices && config.enrollmentServices.length > 0);
 
-    const reviewButtonText = hasEnrollmentServices ? _('Enroll') : _('Apply');
-    const finalStepName = hasEnrollmentServices ? _('Apply and enroll') : _('Apply configuration');
+    const reviewButtonText = hasEnrollmentServices ? _("Enroll") : _("Apply");
+    const finalStepName = hasEnrollmentServices ? _("Apply and enroll") : _("Apply configuration");
 
     // Compute validation state for each step
     const isHostnameValid = validateHostnameStep(model);
@@ -270,7 +270,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     ];
 
     // Handle step navigation - using PatternFly Wizard's correct signature
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
     const handleStepChange = (_event: any, currentStep: any, _prevStep: any) => {
         const stepId = typeof currentStep.id === 'string' ? currentStep.id : '';
         const stepNumber = parseInt(stepId.split('-').pop() || '1', 10);
@@ -308,7 +308,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
             return {
                 isBackDisabled: true,
                 isNextDisabled: false,
-                nextButtonText: _('Cancel'),
+                nextButtonText: _("Cancel"),
                 onNext: () => {
                     if (cancelEnrollmentRef.current) {
                         cancelEnrollmentRef.current();
@@ -321,7 +321,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
             return {
                 isBackDisabled: true,
                 isNextDisabled: false,
-                nextButtonText: _('Finish'),
+                nextButtonText: _("Finish"),
                 isCancelHidden: true
             };
         } else if (enrollmentExecutionState === 'failed') {
@@ -329,14 +329,14 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
             return {
                 isBackDisabled: false,
                 isNextDisabled: true,
-                nextButtonText: _('Finish'),
+                nextButtonText: _("Finish"),
                 isCancelHidden: true
             };
         } else {
             // Default/idle state
             return {
                 isBackDisabled: true,
-                nextButtonText: _('Finish'),
+                nextButtonText: _("Finish"),
                 isCancelHidden: true
             };
         }
@@ -347,7 +347,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
             <PageSection hasBodyWrapper={false} type={PageSectionTypes.wizard} padding={{ default: 'noPadding' }} aria-label="Wizard container">
                 <Wizard onStepChange={handleStepChange}>
                     <WizardStep
-                        name={_('Hostname')}
+                        name={_("Hostname")}
                         id="wizard-step-1"
                         footer={{ isNextDisabled: !isHostnameValid, isCancelHidden: true }}
                         isDisabled={canNavigateToStep(1)}
@@ -355,7 +355,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         <HostnamePage />
                     </WizardStep>
                     <WizardStep
-                        name={_('Network interface')}
+                        name={_("Network interface")}
                         id="wizard-step-2"
                         footer={{ isNextDisabled: !isNetworkInterfaceValid, isCancelHidden: true }}
                         isDisabled={canNavigateToStep(2)}
@@ -363,7 +363,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         <NetworkInterfacePage interfaces={interfaces} />
                     </WizardStep>
                     <WizardStep
-                        name={_('Network address')}
+                        name={_("Network address")}
                         id="wizard-step-3"
                         footer={{ isNextDisabled: !isNetworkAddressValid, isCancelHidden: true }}
                         isDisabled={canNavigateToStep(3)}
@@ -371,7 +371,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         <NetworkAddressPage />
                     </WizardStep>
                     <WizardStep
-                        name={_('Network services')}
+                        name={_("Network services")}
                         id="wizard-step-4"
                         footer={{ isNextDisabled: !isNetworkServicesValid, isCancelHidden: true }}
                         isDisabled={canNavigateToStep(4)}
@@ -380,7 +380,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     </WizardStep>
                     {hasEnrollmentServices && (
                         <WizardStep
-                            name={_('Enrollment server')}
+                            name={_("Enrollment server")}
                             id="wizard-step-5"
                             footer={{ isNextDisabled: !isEnrollmentValid, isCancelHidden: true }}
                             isDisabled={canNavigateToStep(5)}
@@ -389,7 +389,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         </WizardStep>
                     )}
                     <WizardStep
-                        name={_('Review')}
+                        name={_("Review")}
                         id={hasEnrollmentServices ? "wizard-step-6" : "wizard-step-5"}
                         footer={{ nextButtonText: reviewButtonText, isCancelHidden: true }}
                         isDisabled={canNavigateToStep(hasEnrollmentServices ? 6 : 5)}

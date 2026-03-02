@@ -280,7 +280,7 @@ class TestProxy(testlib.MachineCase):
             "443": "HTTPS"
         }
 
-        for port, description in common_ports.items():
+        for port, _description in common_ports.items():
             b.set_input_text("#proxy-port-input", port)
             b.wait_not_present("#proxy-port-input ~ .pf-v5-c-form__helper-text.pf-m-error")
 

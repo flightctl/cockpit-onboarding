@@ -5,23 +5,15 @@
  * Dynamically renders credential forms based on each service's JSON schema.
  */
 
-import React, { useState, useEffect } from 'react';
-import {
-    Stack,
-    StackItem,
-    FormGroup,
-    Checkbox,
-    TextInput,
-    Card,
-    CardBody,
-    CardTitle,
-    Alert,
-    AlertVariant,
-    ValidatedOptions,
-    FormHelperText,
-    HelperText,
-    HelperTextItem,
-} from '@patternfly/react-core';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { FormGroup, FormHelperText } from "@patternfly/react-core/dist/esm/components/Form/index.js";
+import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
+import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
+import { Card, CardBody, CardTitle } from "@patternfly/react-core/dist/esm/components/Card/index.js";
+import { Alert, AlertVariant } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
+import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
+import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/components/HelperText/index.js";
 import { useModelContext } from '../model-context';
 import { useConfig } from '../app';
 import { validateURL } from '../validation';
@@ -213,10 +205,10 @@ export const EnrollmentPage: React.FunctionComponent = () => {
     const { config } = useConfig();
     const { model, updateModel } = useModelContext();
 
-    const enrollmentServices = config?.enrollmentServices || [];
-    const selectedServices = model.enrollment.selectedServices || [];
+    const enrollmentServices = useMemo(() => config?.enrollmentServices || [], [config?.enrollmentServices]);
+    const selectedServices = useMemo(() => model.enrollment.selectedServices || [], [model.enrollment.selectedServices]);
     const credentials = model.enrollment.credentials || {};
-    const endpoints = model.enrollment.endpoints || {};
+    const endpoints = useMemo(() => model.enrollment.endpoints || {}, [model.enrollment.endpoints]);
 
     // Track endpoint validation errors and touched state
     const [endpointErrors, setEndpointErrors] = useState<Record<string, string>>({});

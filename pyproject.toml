@@ -71,4 +71,6 @@ exclude = [
 ]
 ignore_names = [
    "test[A-Z0-9]*",
+   "provision",
+   "setUp",
 ]

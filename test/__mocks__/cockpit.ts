@@ -44,6 +44,7 @@ const createMockProcess = (stdout = '', exitCode = 0): MockProcess => {
   });
   promise.fail = jest.fn((callback) => {
     if (exitCode !== 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const error = new Error(`Process exited with code ${exitCode}`) as any;
       error.exit_status = exitCode;
       setTimeout(() => callback(error), 0);

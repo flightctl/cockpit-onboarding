@@ -6,19 +6,20 @@ Integration test for enrollment functionality
 Tests the enrollment page UI and enrollment script execution.
 """
 
-import unittest
-import json
-import os
-import tempfile
+from __future__ import annotations
 
-from testlib import MachineCase, nondestructive, wait
+import json
+import typing
+import unittest
+
+from testlib import MachineCase, nondestructive
 
 
 @nondestructive
 class TestEnrollment(MachineCase):
     """Test enrollment service selection and credential input"""
 
-    provision = {
+    provision: typing.ClassVar = {
         "0": {"memory_mb": 512}
     }
 
@@ -82,7 +83,6 @@ exit 0
     def testEnrollmentPageDisplay(self):
         """Test that enrollment services are displayed correctly"""
         b = self.browser
-        m = self.machine
 
         self.login_and_go("/system-onboarding")
 

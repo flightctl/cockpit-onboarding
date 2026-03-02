@@ -5,7 +5,9 @@ import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/
 import { TextInputGroup, TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
-import { Stack, StackItem, Flex, FlexItem, ValidatedOptions } from '@patternfly/react-core';
+import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
+import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { useModelContext } from '../model-context';
 import { validateHostnameOrIP, validatePort } from '../validation';

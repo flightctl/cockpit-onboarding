@@ -3,6 +3,8 @@
  * Derived from data-model.md
  */
 
+/* eslint-disable no-use-before-define, @typescript-eslint/no-explicit-any */
+
 // ========== Configuration Types (SystemOnboardingConfig) ==========
 
 export interface SystemOnboardingConfig {

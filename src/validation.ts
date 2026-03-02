@@ -301,6 +301,7 @@ export const validateURL = (url: string, required = true): string | null => {
         }
 
         return null;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (_e) {
         return 'Invalid URL format';
     }

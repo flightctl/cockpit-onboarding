@@ -110,7 +110,7 @@ describe('enrollment-executor', () => {
                 stream: jest.fn(),
                 done: jest.fn(),
                 fail: jest.fn((callback) => {
-                    const error = new Error(mockStderr) as cockpit.ProcessError;
+                    const error = new Error(mockStderr) as unknown as cockpit.ProcessError;
                     error.exit_status = 2;
                     error.message = mockStderr;
                     callback(error);
@@ -133,7 +133,7 @@ describe('enrollment-executor', () => {
                 stream: jest.fn(),
                 done: jest.fn(),
                 fail: jest.fn((callback) => {
-                    const error = new Error(mockStderr) as cockpit.ProcessError;
+                    const error = new Error(mockStderr) as unknown as cockpit.ProcessError;
                     error.exit_status = 3;
                     error.message = mockStderr;
                     callback(error);
@@ -156,7 +156,7 @@ describe('enrollment-executor', () => {
                 stream: jest.fn(),
                 done: jest.fn(),
                 fail: jest.fn((callback) => {
-                    const error = new Error(mockStderr) as cockpit.ProcessError;
+                    const error = new Error(mockStderr) as unknown as cockpit.ProcessError;
                     error.exit_status = 4;
                     error.message = mockStderr;
                     callback(error);

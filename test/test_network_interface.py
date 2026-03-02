@@ -46,7 +46,8 @@ class TestNetworkInterface(testlib.MachineCase):
         b.wait_text("th:nth-child(4)", "MAC address")
 
         # Get actual interfaces from system (exclude loopback)
-        interfaces = m.execute("ip -o link show | grep -v 'lo:' | awk '{print $2}' | sed 's/:$//'").strip().split('\n')
+        cmd = "ip -o link show | grep -v 'lo:' | awk '{print $2}' | sed 's/:$//'"
+        interfaces = m.execute(cmd).strip().split('\n')
 
         # Verify interfaces appear in table (at least one non-loopback interface should be present)
         self.assertGreater(len(interfaces), 0, "No network interfaces found")
@@ -64,7 +65,6 @@ class TestNetworkInterface(testlib.MachineCase):
     def testInterfaceSelection(self):
         """Test that user can select a network interface"""
         b = self.browser
-        m = self.machine
 
         self.login_and_go("/system-onboarding")
         b.wait_visible(".pf-v5-c-wizard")

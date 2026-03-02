@@ -3,7 +3,11 @@ import cockpit from 'cockpit';
 
 import { Progress } from "@patternfly/react-core/dist/esm/components/Progress/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
-import { Stack, StackItem, List, ListItem, Title, Card, CardBody, Alert } from '@patternfly/react-core';
+import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { List, ListItem } from "@patternfly/react-core/dist/esm/components/List/index.js";
+import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
+import { Card, CardBody } from "@patternfly/react-core/dist/esm/components/Card/index.js";
+import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { CheckCircleIcon, ExclamationCircleIcon, InProgressIcon } from '@patternfly/react-icons';
 import { useModelContext } from '../model-context';
 import { systemConfigurationService } from '../system-config';
@@ -88,13 +92,13 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             const initialSteps: Step[] = [
                 {
                     id: 'apply-config',
-                    name: _('Applying configuration changes'),
+                    name: _("Applying configuration changes"),
                     status: 'pending',
                     isBuiltIn: true
                 },
                 {
                     id: 'test-connectivity',
-                    name: _('Testing network connectivity'),
+                    name: _("Testing network connectivity"),
                     status: 'pending',
                     isBuiltIn: true
                 }
@@ -104,7 +108,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             servicesToEnroll.forEach((service) => {
                 initialSteps.push({
                     id: `enroll-${service.id}`,
-                    name: _('Enrolling into {{serviceName}}').replace('{{serviceName}}', service.name),
+                    name: _("Enrolling into {{serviceName}}").replace('{{serviceName}}', service.name),
                     status: 'pending',
                     isBuiltIn: false
                 });
@@ -113,7 +117,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             // Add finalize step
             initialSteps.push({
                 id: 'finalize',
-                name: servicesToEnroll.length > 0 ? _('Finalizing enrollment') : _('Finalizing configuration'),
+                name: servicesToEnroll.length > 0 ? _("Finalizing enrollment") : _("Finalizing configuration"),
                 status: 'pending',
                 isBuiltIn: true
             });
@@ -125,19 +129,19 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             setSteps([
                 {
                     id: 'apply-config',
-                    name: _('Applying configuration changes'),
+                    name: _("Applying configuration changes"),
                     status: 'pending',
                     isBuiltIn: true
                 },
                 {
                     id: 'test-connectivity',
-                    name: _('Testing network connectivity'),
+                    name: _("Testing network connectivity"),
                     status: 'pending',
                     isBuiltIn: true
                 },
                 {
                     id: 'finalize',
-                    name: _('Finalizing configuration'),
+                    name: _("Finalizing configuration"),
                     status: 'pending',
                     isBuiltIn: true
                 }
@@ -550,7 +554,6 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
 
     const overallProgress = steps.length > 0 ? Math.round((steps.filter(s => s.status === 'success').length / steps.length) * 100) : 0;
     const executionState = model.enrollmentProgress.executionState;
-    const isComplete = executionState === 'success' || executionState === 'failed';
 
     const hasEnrollmentServices = enrollmentServices.length > 0;
 
@@ -559,22 +562,22 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             <StackItem>
                 <p>
                     {hasEnrollmentServices
-                        ? _('Applying your configuration changes and enrolling the system.')
-                        : _('Applying your configuration changes to the system.')}
+                        ? _("Applying your configuration changes and enrolling the system.")
+                        : _("Applying your configuration changes to the system.")}
                 </p>
             </StackItem>
 
             <StackItem>
                 <Card>
                     <CardBody>
-                        <Title headingLevel="h3" size="md">{_('Overall Progress')}</Title>
+                        <Title headingLevel="h3" size="md">{_("Overall Progress")}</Title>
                         <Progress
                             value={overallProgress}
                             size="lg"
                             variant={executionState === 'failed' ? 'danger' : 'success'}
                         />
 
-                        <Title headingLevel="h3" size="md" style={{ marginTop: '1rem' }}>{_('Steps')}</Title>
+                        <Title headingLevel="h3" size="md" style={{ marginTop: '1rem' }}>{_("Steps")}</Title>
                         <List isPlain>
                             {steps.map((step) => {
                                 const serviceId = step.id.startsWith('enroll-') ? step.id.replace('enroll-', '') : null;
@@ -594,17 +597,17 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                                                 {step.name}
                                                 {step.deviceUrl && service && (
                                                     <>
-                                                        {' ('}
+                                                        {" ("}
                                                         <a href={step.deviceUrl} target="_blank" rel="noopener noreferrer">
-                                                            {_('view system')}
+                                                            {_("view system")}
                                                         </a>
-                                                        {')'}
+                                                        )
                                                     </>
                                                 )}
                                             </span>
                                             {step.status === 'running' && (
                                                 <span style={{ fontStyle: 'italic', color: 'var(--pf-v6-global--Color--200)' }}>
-                                                    {_('Running...')}
+                                                    {_("Running...")}
                                                 </span>
                                             )}
                                         </div>
@@ -614,35 +617,38 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                         </List>
 
                         {executionState === 'failed' && (
-                            <Alert variant="danger" title={_('Enrollment failed')}>
-                                {_('The enrollment process was cancelled or failed. Please check the results above and try again.')}
+                            <Alert variant="danger" title={_("Enrollment failed")}>
+                                {_("The enrollment process was cancelled or failed. Please check the results above and try again.")}
                             </Alert>
                         )}
                         {executionState === 'success' && (
                             <>
-                                <Alert variant="success" title={_('Enrollment completed successfully')}>
-                                    {_('Your system has been configured and enrolled successfully.')}
+                                <Alert variant="success" title={_("Enrollment completed successfully")}>
+                                    {_("Your system has been configured and enrolled successfully.")}
                                 </Alert>
                                 {autoReboot
                                     ? (
-                                        <Alert variant="info" title={_('System will reboot automatically')} style={{ marginTop: '0.5rem' }}>
+                                        <Alert variant="info" title={_("System will reboot automatically")} style={{ marginTop: '0.5rem' }}>
                                             {rebootCountdown !== null && rebootCountdown > 0
-                                                ? _('Rebooting in {{seconds}} seconds...').replace('{{seconds}}', String(rebootCountdown))
-                                                : _('Rebooting now...')}
+                                                ? _("Rebooting in {{seconds}} seconds...").replace('{{seconds}}', String(rebootCountdown))
+                                                : _("Rebooting now...")}
                                         </Alert>
                                     )
                                     : (
-                                        <Alert variant="info" title={_('Reboot required')} style={{ marginTop: '0.5rem' }}
+                                        <Alert
+                                            variant="info"
+                                            title={_("Reboot required")}
+                                            style={{ marginTop: '0.5rem' }}
                                             actionLinks={
                                                 <Button variant="link" onClick={handleReboot}>
-                                                    {_('Reboot now')}
+                                                    {_("Reboot now")}
                                                 </Button>
                                             }
                                         >
-                                            {_('A system reboot is recommended to fully apply all configuration changes. You can reboot now or do it later from the system menu.')}
+                                            {_("A system reboot is recommended to fully apply all configuration changes. You can reboot now or do it later from the system menu.")}
                                         </Alert>
-                                    )
-                                }
+                                    )}
+
                             </>
                         )}
                     </CardBody>
@@ -650,7 +656,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             </StackItem>
 
             <StackItem>
-                <Title headingLevel="h3" size="md">{_('Details')}</Title>
+                <Title headingLevel="h3" size="md">{_("Details")}</Title>
                 {results.length > 0 && (
                     <pre style={{
                         fontFamily: 'monospace',

@@ -158,6 +158,7 @@ export const validateNetworkServicesStep = (model: Model): boolean => {
  * Note: This function needs access to the config to validate properly.
  * For now, we do basic validation. Full validation is done in the UI component.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[]): boolean => {
     const { selectedServices, credentials, endpoints } = model.enrollment;
 
@@ -179,6 +180,7 @@ export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[])
 
     // Full validation with config
     for (const serviceId of selectedServices) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const service = enrollmentServices.find((s: any) => s.id === serviceId);
         if (!service) continue;
 
@@ -211,6 +213,7 @@ export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[])
  * Validate the review step
  * No validation needed - this is a summary/review page
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const validateReviewStep = (_model: Model): boolean => {
     // Review step has no validation requirements
     // It's just a summary of all previous steps

@@ -137,7 +137,7 @@ export class SystemConfigurationService {
                         }
                     });
                 }),
-                new Promise<void>((_, reject) => {
+                new Promise<void>((_resolve, reject) => {
                     setTimeout(() => reject(new Error('Timeout waiting for IP4Config proxy')), 2000);
                 })
             ]);
@@ -658,6 +658,7 @@ export class SystemConfigurationService {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let secrets: any = {};
             try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const secretsResult = await (connectionProxy as any).call('GetSecrets', ['802-11-wireless-security']);
                 secrets = secretsResult[0];
             } catch (secretsError) {
