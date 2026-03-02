@@ -241,7 +241,7 @@ interface SystemOnboardingWizardProps {
 
 export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({ interfaces }) => {
     const { config } = useConfig();
-    const { model } = useModelContext();
+    const { model, cancelEnrollmentRef } = useModelContext();
     const [currentStepIndex, setCurrentStepIndex] = useState(1);
     const [maxReachedStep, setMaxReachedStep] = useState(1);
 
@@ -300,6 +300,48 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
         return true; // disabled
     };
 
+    // Dynamic footer configuration for EnrollmentProgressPage
+    const enrollmentExecutionState = model.enrollmentProgress.executionState;
+    const getProgressPageFooter = () => {
+        if (enrollmentExecutionState === 'running') {
+            // While running: disable Back, enable Next as "Cancel"
+            return {
+                isBackDisabled: true,
+                isNextDisabled: false,
+                nextButtonText: _('Cancel'),
+                onNext: () => {
+                    if (cancelEnrollmentRef.current) {
+                        cancelEnrollmentRef.current();
+                    }
+                },
+                isCancelHidden: true
+            };
+        } else if (enrollmentExecutionState === 'success') {
+            // On success: disable Back, enable Next as "Finish"
+            return {
+                isBackDisabled: true,
+                isNextDisabled: false,
+                nextButtonText: _('Finish'),
+                isCancelHidden: true
+            };
+        } else if (enrollmentExecutionState === 'failed') {
+            // On failure: enable Back, disable Next
+            return {
+                isBackDisabled: false,
+                isNextDisabled: true,
+                nextButtonText: _('Finish'),
+                isCancelHidden: true
+            };
+        } else {
+            // Default/idle state
+            return {
+                isBackDisabled: true,
+                nextButtonText: _('Finish'),
+                isCancelHidden: true
+            };
+        }
+    };
+
     return (
         <Page className='no-masthead-sidebar' isContentFilled id="system-onboarding-wizard">
             <PageSection hasBodyWrapper={false} type={PageSectionTypes.wizard} padding={{ default: 'noPadding' }} aria-label="Wizard container">
@@ -307,7 +349,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     <WizardStep
                         name={_('Hostname')}
                         id="wizard-step-1"
-                        footer={{ isNextDisabled: !isHostnameValid }}
+                        footer={{ isNextDisabled: !isHostnameValid, isCancelHidden: true }}
                         isDisabled={canNavigateToStep(1)}
                     >
                         <HostnamePage />
@@ -315,7 +357,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     <WizardStep
                         name={_('Network interface')}
                         id="wizard-step-2"
-                        footer={{ isNextDisabled: !isNetworkInterfaceValid }}
+                        footer={{ isNextDisabled: !isNetworkInterfaceValid, isCancelHidden: true }}
                         isDisabled={canNavigateToStep(2)}
                     >
                         <NetworkInterfacePage interfaces={interfaces} />
@@ -323,7 +365,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     <WizardStep
                         name={_('Network address')}
                         id="wizard-step-3"
-                        footer={{ isNextDisabled: !isNetworkAddressValid }}
+                        footer={{ isNextDisabled: !isNetworkAddressValid, isCancelHidden: true }}
                         isDisabled={canNavigateToStep(3)}
                     >
                         <NetworkAddressPage />
@@ -331,7 +373,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     <WizardStep
                         name={_('Network services')}
                         id="wizard-step-4"
-                        footer={{ isNextDisabled: !isNetworkServicesValid }}
+                        footer={{ isNextDisabled: !isNetworkServicesValid, isCancelHidden: true }}
                         isDisabled={canNavigateToStep(4)}
                     >
                         <NetworkServicesPage />
@@ -340,7 +382,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         <WizardStep
                             name={_('Enrollment server')}
                             id="wizard-step-5"
-                            footer={{ isNextDisabled: !isEnrollmentValid }}
+                            footer={{ isNextDisabled: !isEnrollmentValid, isCancelHidden: true }}
                             isDisabled={canNavigateToStep(5)}
                         >
                             <EnrollmentPage />
@@ -349,7 +391,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     <WizardStep
                         name={_('Review')}
                         id={hasEnrollmentServices ? "wizard-step-6" : "wizard-step-5"}
-                        footer={{ nextButtonText: reviewButtonText }}
+                        footer={{ nextButtonText: reviewButtonText, isCancelHidden: true }}
                         isDisabled={canNavigateToStep(hasEnrollmentServices ? 6 : 5)}
                     >
                         <ReviewPage hasEnrollmentScripts={hasEnrollmentServices} />
@@ -357,7 +399,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     <WizardStep
                         name={finalStepName}
                         id={hasEnrollmentServices ? "wizard-step-7" : "wizard-step-6"}
-                        footer={{ nextButtonText: _('Finish'), isBackDisabled: true }}
+                        footer={getProgressPageFooter()}
                         isDisabled={canNavigateToStep(hasEnrollmentServices ? 7 : 6)}
                     >
                         <EnrollmentProgressPage />

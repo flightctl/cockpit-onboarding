@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { systemConfigurationService } from './system-config.js';
 import { Interface } from '../pkg/networkmanager/interfaces.js';
 import {
@@ -45,7 +45,7 @@ export interface Model {
     currentStep: number; // 0-3
     stepStates: ('pending' | 'running' | 'success' | 'error')[];
     logs: string[]; // execution logs
-    isRunning: boolean; // overall execution state
+    executionState: 'idle' | 'running' | 'success' | 'failed'; // overall execution state
     canCancel: boolean; // whether cancellation is possible
     overallProgress: number; // 0-100 percentage
   };
@@ -130,7 +130,7 @@ const initialModel: Model = {
         currentStep: 0,
         stepStates: ['pending', 'pending', 'pending', 'pending'],
         logs: [],
-        isRunning: false,
+        executionState: 'idle',
         canCancel: false,
         overallProgress: 0,
     },
@@ -153,6 +153,7 @@ interface ModelContextType {
   saveCurrentNetworkConfig: () => void;
   parseIpv6Address: (addressWithPrefix: string) => { address: string; prefix: number };
   formatIpv6Address: (address: string, prefix: number) => string;
+  cancelEnrollmentRef: React.MutableRefObject<(() => void) | null>;
 }
 
 // Create context
@@ -332,6 +333,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
 export const ModelProvider: React.FunctionComponent<{ children: ReactNode; networkManager?: any }> = ({ children, networkManager }) => {
     const [model, setModel] = useState<Model>(initialModel);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
+    const cancelEnrollmentRef = useRef<(() => void) | null>(null);
 
     const updateModel = (section: keyof Model, updates: Partial<Model[keyof Model]>) => {
         setModel(prev => ({
@@ -517,7 +519,8 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
             switchToInterfaceConfig,
             saveCurrentNetworkConfig,
             parseIpv6Address,
-            formatIpv6Address
+            formatIpv6Address,
+            cancelEnrollmentRef
         }}
         >
             {children}

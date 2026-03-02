@@ -262,25 +262,25 @@ Project follows Cockpit module structure:
 
 ### Implementation for User Story 9
 
-- [ ] T106 [US9] Review existing src/wizard/EnrollmentProgressPage.tsx against requirements
-- [ ] T107 [US9] Add progress indicator component to src/wizard/EnrollmentProgressPage.tsx
-- [ ] T108 [US9] Display real-time log messages in src/wizard/EnrollmentProgressPage.tsx
-- [ ] T109 [US9] Call src/system-config.ts applySystemConfiguration() when apply button clicked
-- [ ] T110 [US9] Display hostname application result in src/wizard/EnrollmentProgressPage.tsx
-- [ ] T111 [US9] Display network configuration result in src/wizard/EnrollmentProgressPage.tsx
-- [ ] T112 [US9] Display NTP configuration result in src/wizard/EnrollmentProgressPage.tsx
-- [ ] T113 [US9] Execute enrollment scripts and display results in src/wizard/EnrollmentProgressPage.tsx
-- [ ] T114 [US9] Parse and display DEVICE_URL as hyperlink in src/wizard/EnrollmentProgressPage.tsx
-- [ ] T115 [US9] Handle errors during application and display clear messages in src/wizard/EnrollmentProgressPage.tsx
-- [ ] T116 [US9] Create marker file at /var/lib/cockpit-system-onboarding/.onboarding-complete on success
-- [ ] T117 [US9] Create packaging/systemd/scripts/cleanup-onboarding.sh for post-completion cleanup
-- [ ] T118 [US9] Add cleanup logic based on runOnce configuration to cleanup-onboarding.sh
-- [ ] T119 [US9] Delete onboarding user if runOnce=true in cleanup-onboarding.sh
-- [ ] T120 [US9] Disable systemd service if runOnce=true in cleanup-onboarding.sh
-- [ ] T121 [US9] Force password change if keepCockpit=true in cleanup-onboarding.sh
-- [ ] T122 [US9] Trigger auto-reboot if autoReboot=true in src/wizard/EnrollmentProgressPage.tsx
-- [ ] T123 [US9] Display manual reboot prompt if autoReboot=false in src/wizard/EnrollmentProgressPage.tsx
-- [ ] T124 [US9] Add integration test for apply and progress monitoring in test/test_apply_configuration.py
+- [X] T106 [US9] Review existing src/wizard/EnrollmentProgressPage.tsx against requirements
+- [X] T107 [US9] Add progress indicator component to src/wizard/EnrollmentProgressPage.tsx
+- [X] T108 [US9] Display real-time log messages in src/wizard/EnrollmentProgressPage.tsx
+- [X] T109 [US9] Call src/system-config.ts applySystemConfiguration() when apply button clicked
+- [X] T110 [US9] Display hostname application result in src/wizard/EnrollmentProgressPage.tsx
+- [X] T111 [US9] Display network configuration result in src/wizard/EnrollmentProgressPage.tsx
+- [X] T112 [US9] Display NTP configuration result in src/wizard/EnrollmentProgressPage.tsx
+- [X] T113 [US9] Execute enrollment scripts and display results in src/wizard/EnrollmentProgressPage.tsx
+- [X] T114 [US9] Parse and display DEVICE_URL as hyperlink in src/wizard/EnrollmentProgressPage.tsx
+- [X] T115 [US9] Handle errors during application and display clear messages in src/wizard/EnrollmentProgressPage.tsx
+- [X] T116 [US9] Create marker file at /var/lib/cockpit-system-onboarding/.onboarding-complete on success
+- [X] T117 [US9] Create packaging/systemd/scripts/cleanup-onboarding.sh for post-completion cleanup
+- [X] T118 [US9] Add cleanup logic based on runOnce configuration to cleanup-onboarding.sh
+- [X] T119 [US9] Delete onboarding user if runOnce=true in cleanup-onboarding.sh
+- [X] T120 [US9] Disable systemd service if runOnce=true in cleanup-onboarding.sh
+- [X] T121 [US9] Force password change if keepCockpit=true in cleanup-onboarding.sh
+- [X] T122 [US9] Trigger auto-reboot if autoReboot=true in src/wizard/EnrollmentProgressPage.tsx
+- [X] T123 [US9] Display manual reboot prompt if autoReboot=false in src/wizard/EnrollmentProgressPage.tsx
+- [X] T124 [US9] Add integration test for apply and progress monitoring in test/test_apply_configuration.py
 
 **Checkpoint**: Configuration changes are applied to system, progress displayed, cleanup executed based on configuration, marker file prevents re-run
 
