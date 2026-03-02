@@ -203,4 +203,32 @@ $(NODE_MODULES_TEST): package.json
 	env -u NODE_ENV npm install --ignore-scripts
 	env -u NODE_ENV npm prune
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check vm print-vm
+help:
+	@echo "Development targets:"
+	@echo "  all              Build the project (default)"
+	@echo "  watch            Build and watch for changes"
+	@echo "  clean            Remove build artifacts"
+	@echo "  codecheck        Run static analysis (ESLint, Stylelint)"
+	@echo ""
+	@echo "Install targets:"
+	@echo "  install          Install to PREFIX (default /usr/local)"
+	@echo "  devel-install    Symlink dist/ into ~/.local/share/cockpit for development"
+	@echo "  devel-uninstall  Remove the development symlink"
+	@echo ""
+	@echo "Packaging targets:"
+	@echo "  dist             Create release tarball"
+	@echo "  srpm             Build source RPM"
+	@echo "  rpm              Build binary RPM"
+	@echo "  node-cache       Create node_modules cache tarball"
+	@echo "  print-version    Print the current version"
+	@echo ""
+	@echo "Testing targets:"
+	@echo "  check            Run browser integration tests"
+	@echo "  prepare-check    Set up test VM and dependencies without running tests"
+	@echo "  vm               Build a test VM image"
+	@echo "  print-vm         Print the test VM image path"
+	@echo ""
+	@echo "i18n targets:"
+	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
+
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check vm print-vm help
