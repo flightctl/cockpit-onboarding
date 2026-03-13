@@ -289,30 +289,33 @@ export class SystemConfigurationService {
                 // Convert subnet mask to prefix length
                 const prefixLength = model.networkAddress.ipv4.subnetMask
                     ? this.subnetMaskToPrefixLength(model.networkAddress.ipv4.subnetMask)
-: 24;
+                    : 24;
 
-                settings.ipv4.addresses = [[
-                    model.networkAddress.ipv4.address,
-                    prefixLength,
-                    model.networkAddress.ipv4.gateway || ''
-                ]];
+                // Cockpit NM model uses address_data (array of {address, prefix} objects)
+                // and gateway as a separate field — not the raw NM 'addresses' array
+                settings.ipv4.address_data = [{
+                    address: model.networkAddress.ipv4.address,
+                    prefix: String(prefixLength),
+                }];
+                settings.ipv4.gateway = model.networkAddress.ipv4.gateway || '';
 
-                // Configure DNS
+                // Configure DNS (Cockpit NM model uses dns_data, not dns)
                 settings.ipv4.ignore_auto_dns = !model.networkAddress.ipv4.autoDns;
                 if (!model.networkAddress.ipv4.autoDns) {
-                    settings.ipv4.dns = [
+                    settings.ipv4.dns_data = [
                         model.networkAddress.ipv4.primaryDns,
                         model.networkAddress.ipv4.secondaryDns
                     ].filter(dns => dns && dns.trim());
                 } else {
-                    settings.ipv4.dns = [];
+                    settings.ipv4.dns_data = [];
                 }
 
                 results.push(`IPv4 configured: ${model.networkAddress.ipv4.address}/${prefixLength}`);
             } else {
                 settings.ipv4.method = 'auto';
-                settings.ipv4.addresses = [];
-                settings.ipv4.dns = [];
+                settings.ipv4.address_data = [];
+                settings.ipv4.gateway = '';
+                settings.ipv4.dns_data = [];
                 settings.ipv4.ignore_auto_dns = false;
                 results.push('IPv4 configured for DHCP');
             }
@@ -335,35 +338,38 @@ export class SystemConfigurationService {
 
                 if (model.networkAddress.ipv6.address) {
                     const { address, prefix } = this.parseIpv6Address(model.networkAddress.ipv6.address);
-                    settings.ipv6.addresses = [[
+                    settings.ipv6.address_data = [{
                         address,
-                        prefix,
-                        model.networkAddress.ipv6.gateway || ''
-                    ]];
+                        prefix: String(prefix),
+                    }];
+                    settings.ipv6.gateway = model.networkAddress.ipv6.gateway || '';
                     results.push(`IPv6 configured: ${address}/${prefix}`);
                 } else {
-                    settings.ipv6.addresses = [];
+                    settings.ipv6.address_data = [];
+                    settings.ipv6.gateway = '';
                 }
 
-                // Configure IPv6 DNS
+                // Configure IPv6 DNS (Cockpit NM model uses dns_data)
                 settings.ipv6.ignore_auto_dns = !model.networkAddress.ipv6.autoDns;
                 if (!model.networkAddress.ipv6.autoDns) {
-                    settings.ipv6.dns = [
+                    settings.ipv6.dns_data = [
                         model.networkAddress.ipv6.primaryDns,
                         model.networkAddress.ipv6.secondaryDns
                     ].filter(dns => dns && dns.trim());
                 } else {
-                    settings.ipv6.dns = [];
+                    settings.ipv6.dns_data = [];
                 }
             } else if (model.networkAddress.ipv6.method === 'disabled') {
                 settings.ipv6.method = 'ignore';
-                settings.ipv6.addresses = [];
-                settings.ipv6.dns = [];
+                settings.ipv6.address_data = [];
+                settings.ipv6.gateway = '';
+                settings.ipv6.dns_data = [];
                 results.push('IPv6 disabled');
             } else {
                 settings.ipv6.method = 'auto';
-                settings.ipv6.addresses = [];
-                settings.ipv6.dns = [];
+                settings.ipv6.address_data = [];
+                settings.ipv6.gateway = '';
+                settings.ipv6.dns_data = [];
                 settings.ipv6.ignore_auto_dns = false;
                 results.push('IPv6 configured for auto');
             }
