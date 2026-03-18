@@ -245,11 +245,13 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     const [currentStepIndex, setCurrentStepIndex] = useState(1);
     const [maxReachedStep, setMaxReachedStep] = useState(1);
 
-    // Check if enrollment services are configured
+    // Check if enrollment services are configured (controls whether step 5 is shown)
     const hasEnrollmentServices = Boolean(config && config.enrollmentServices && config.enrollmentServices.length > 0);
+    // Check if the user actually selected any enrollment services
+    const hasSelectedEnrollments = hasEnrollmentServices && model.enrollment.selectedServices.length > 0;
 
-    const reviewButtonText = hasEnrollmentServices ? _("Enroll") : _("Apply");
-    const finalStepName = hasEnrollmentServices ? _("Apply and enroll") : _("Apply configuration");
+    const reviewButtonText = hasSelectedEnrollments ? _("Enroll") : _("Apply");
+    const finalStepName = hasSelectedEnrollments ? _("Apply and enroll") : _("Apply configuration");
 
     // Compute validation state for each step
     const isHostnameValid = validateHostnameStep(model);
