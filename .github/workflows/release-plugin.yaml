@@ -17,6 +17,7 @@ jobs:
     steps:
       - name: Install build dependencies
         run: |
+          dnf module enable -y nodejs:20
           dnf install -y git make rpm-build nodejs npm gettext \
             libappstream-glib
 

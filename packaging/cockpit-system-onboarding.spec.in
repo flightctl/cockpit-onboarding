@@ -21,6 +21,7 @@ BuildRequires: appstream-glib
 BuildRequires: libappstream-glib
 %endif
 BuildRequires: gettext
+BuildRequires: systemd-rpm-macros
 %if 0%{?rhel} && 0%{?rhel} <= 8
 BuildRequires: libappstream-glib-devel
 %endif

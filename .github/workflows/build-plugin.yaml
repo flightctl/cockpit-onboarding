@@ -18,8 +18,9 @@ jobs:
     steps:
       - name: Install build dependencies
         run: |
+          dnf module enable -y nodejs:20
           dnf install -y git make rpm-build nodejs npm gettext \
-            libappstream-glib
+            libappstream-glib systemd-rpm-macros
 
       - name: Checkout code
         uses: actions/checkout@v4

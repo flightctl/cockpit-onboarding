@@ -19,7 +19,7 @@
 /*.whl
 /bots
 /cockpit-*.tar.xz
-/cockpit-navigator.spec
+/cockpit-system-onboarding.spec
 /coverage/
 /dist/
 /package-lock.json
