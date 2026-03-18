@@ -52,6 +52,7 @@ find %{buildroot}%{_datadir}/cockpit/ -name '*.map' | xargs --no-run-if-empty rm
 # Install systemd unit file
 mkdir -p %{buildroot}%{_unitdir}
 install -m 644 packaging/systemd/cockpit-system-onboarding-setup.service %{buildroot}%{_unitdir}/
+install -m 644 packaging/systemd/cockpit-system-onboarding-wifi-ap@.service %{buildroot}%{_unitdir}/
 
 # Install setup scripts
 mkdir -p %{buildroot}%{_libexecdir}/cockpit-system-onboarding
@@ -59,6 +60,8 @@ install -m 755 packaging/systemd/scripts/check-dependencies.sh %{buildroot}%{_li
 install -m 755 packaging/systemd/scripts/create-onboarding-user.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/setup-network.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/setup-led.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/setup-wifi-ap.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/cleanup-onboarding.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 
 # Install sudoers configuration
 mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding
@@ -116,6 +119,7 @@ fi
 %{_datadir}/cockpit/*
 %{_datadir}/metainfo/*
 %{_unitdir}/cockpit-system-onboarding-setup.service
+%{_unitdir}/cockpit-system-onboarding-wifi-ap@.service
 %{_libexecdir}/cockpit-system-onboarding/
 %dir %{_localstatedir}/lib/cockpit-system-onboarding
 

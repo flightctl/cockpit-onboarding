@@ -45,6 +45,12 @@ HIDE_MODULES=$(load_config '.hideModules' 'true')
 
 echo "Cleanup configuration: runOnce=$RUN_ONCE, keepCockpit=$KEEP_COCKPIT, hideModules=$HIDE_MODULES"
 
+# Remove the onboarding Ethernet connection
+if nmcli connection show "Cockpit-Onboarding-Ethernet" >/dev/null 2>&1; then
+    nmcli connection delete "Cockpit-Onboarding-Ethernet" 2>/dev/null || true
+    echo "Removed onboarding Ethernet connection"
+fi
+
 # Remove module overrides if they were installed
 if [ "$HIDE_MODULES" = "true" ]; then
     if [ -d ~${ONBOARDING_USER}/.config/cockpit ]; then
@@ -68,12 +74,15 @@ if [ "$RUN_ONCE" = "true" ]; then
         echo "Disabled $SERVICE_NAME"
     fi
 
-    # Also disable WiFi AP service if it exists
-    if systemctl is-enabled "cockpit-system-onboarding-wifi-ap.service" >/dev/null 2>&1; then
-        systemctl disable "cockpit-system-onboarding-wifi-ap.service" 2>/dev/null || true
-        systemctl stop "cockpit-system-onboarding-wifi-ap.service" 2>/dev/null || true
-        echo "Disabled WiFi AP service"
-    fi
+    # Stop and disable all WiFi AP template instances
+    for unit in $(systemctl list-units --plain --no-legend 'cockpit-system-onboarding-wifi-ap@*.service' 2>/dev/null | awk '{print $1}'); do
+        systemctl stop "$unit" 2>/dev/null || true
+        systemctl disable "$unit" 2>/dev/null || true
+        echo "Disabled $unit"
+    done
+
+    # Clean up runtime files (hostapd configs, env files)
+    rm -rf /run/cockpit-system-onboarding 2>/dev/null || true
 
     if [ "$KEEP_COCKPIT" = "true" ]; then
         # Keep Cockpit running but force password change on the onboarding user

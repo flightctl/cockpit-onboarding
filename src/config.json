@@ -7,7 +7,7 @@
   "network": {
     "wifiAp": {
       "enabled": false,
-      "ssidPrefix": "setup-",
+      "ssidPrefix": "cockpit-",
       "password": "onboarding"
     },
     "ethernet": {

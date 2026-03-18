@@ -1,7 +1,8 @@
 [Unit]
 Description=Cockpit System Onboarding Setup
 Documentation=https://github.com/cockpit-project/cockpit-system-onboarding
-After=multi-user.target network.target
+After=network-online.target
+Wants=network-online.target
 ConditionPathExists=!/var/lib/cockpit-system-onboarding/.onboarding-complete
 ConditionPathExists=/etc/cockpit/system-onboarding/config.json
 
@@ -11,6 +12,7 @@ RemainAfterExit=yes
 ExecStartPre=/usr/libexec/cockpit-system-onboarding/check-dependencies.sh
 ExecStart=/usr/libexec/cockpit-system-onboarding/create-onboarding-user.sh
 ExecStart=/usr/libexec/cockpit-system-onboarding/setup-network.sh
+ExecStart=/usr/libexec/cockpit-system-onboarding/setup-wifi-ap.sh
 ExecStart=/usr/libexec/cockpit-system-onboarding/setup-led.sh
 StandardOutput=journal
 StandardError=journal
