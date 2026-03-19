@@ -21,11 +21,12 @@ BuildRequires: appstream-glib
 BuildRequires: libappstream-glib
 %endif
 BuildRequires: gettext
+BuildRequires: systemd-rpm-macros
 %if 0%{?rhel} && 0%{?rhel} <= 8
 BuildRequires: libappstream-glib-devel
 %endif
 
-Requires: cockpit-bridge
+Requires: cockpit
 
 %{NPM_PROVIDES}
 
@@ -49,16 +50,78 @@ NODE_ENV=production make
 # drop source maps, they are large and just for debugging
 find %{buildroot}%{_datadir}/cockpit/ -name '*.map' | xargs --no-run-if-empty rm --verbose
 
+# Install systemd unit file
+mkdir -p %{buildroot}%{_unitdir}
+install -m 644 packaging/systemd/cockpit-system-onboarding-setup.service %{buildroot}%{_unitdir}/
+install -m 644 packaging/systemd/cockpit-system-onboarding-wifi-ap@.service %{buildroot}%{_unitdir}/
+
+# Install setup scripts
+mkdir -p %{buildroot}%{_libexecdir}/cockpit-system-onboarding
+install -m 755 packaging/systemd/scripts/check-dependencies.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/create-onboarding-user.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/setup-network.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/setup-led.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/setup-wifi-ap.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/cleanup-onboarding.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+
+# Install sudoers configuration
+mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding
+install -m 644 packaging/sudoers.d/cockpit-system-onboarding %{buildroot}%{_datadir}/cockpit/system-onboarding/sudoers.conf
+
+# Install module override files (for hiding other Cockpit modules)
+mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/overrides
+install -m 644 packaging/overrides/*.override.json %{buildroot}%{_datadir}/cockpit/system-onboarding/overrides/
+
+# Install example enrollment scripts
+mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d
+install -m 755 packaging/system-onboarding.d/*.sh %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d/
+
+# Create state directory
+mkdir -p %{buildroot}%{_localstatedir}/lib/cockpit-system-onboarding
+
 %check
 appstream-util validate-relax --nonet %{buildroot}/%{_datadir}/metainfo/*
 
 # this can't be meaningfully tested during package build; tests happen through
 # FMF (see plans/all.fmf) during package gating
 
+%post
+# Enable the onboarding setup service on first boot
+%systemd_post cockpit-system-onboarding-setup.service
+
+# Only enable if not already run (marker file doesn't exist)
+if [ ! -f /var/lib/cockpit-system-onboarding/.onboarding-complete ]; then
+    systemctl enable cockpit-system-onboarding-setup.service >/dev/null 2>&1 || :
+fi
+
+%preun
+%systemd_preun cockpit-system-onboarding-setup.service
+
+%postun
+%systemd_postun cockpit-system-onboarding-setup.service
+
+# Clean up onboarding user and configuration if package is being removed
+if [ $1 -eq 0 ]; then
+    # Remove onboarding user if it exists
+    if id onboarding >/dev/null 2>&1; then
+        userdel -r onboarding >/dev/null 2>&1 || :
+    fi
+
+    # Remove sudoers file
+    rm -f /etc/sudoers.d/cockpit-system-onboarding || :
+
+    # Remove state directory
+    rm -rf /var/lib/cockpit-system-onboarding || :
+fi
+
 %files
 %doc README.md
 %license LICENSE dist/index.js.LEGAL.txt
 %{_datadir}/cockpit/*
 %{_datadir}/metainfo/*
+%{_unitdir}/cockpit-system-onboarding-setup.service
+%{_unitdir}/cockpit-system-onboarding-wifi-ap@.service
+%{_libexecdir}/cockpit-system-onboarding/
+%dir %{_localstatedir}/lib/cockpit-system-onboarding
 
 %changelog

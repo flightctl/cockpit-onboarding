@@ -1,102 +1,166 @@
-import cockpit from 'cockpit';
+/**
+ * TypeScript type definitions for Cockpit System Onboarding Plugin
+ * Derived from data-model.md
+ */
 
-// Augment the NetworkManagerModel function to return an EventSource
-declare global {
-    namespace JSX {
-        // This ensures the file is treated as a module
-    }
+/* eslint-disable no-use-before-define, @typescript-eslint/no-explicit-any */
+
+// ========== Configuration Types (SystemOnboardingConfig) ==========
+
+export interface SystemOnboardingConfig {
+    version: string;
+    runOnce?: boolean;
+    keepCockpit?: boolean;
+    hideModules?: boolean;
+    autoReboot?: boolean;
+    network?: NetworkConfig;
+    enrollmentServices?: EnrollmentService[];
+    led?: LedConfig;
 }
 
-// Module declarations for imports that need event source typing
-declare module './interfaces.js' {
-    interface NetworkManagerEvents extends cockpit.EventMap {
-        changed: () => void;
-    }
+export interface NetworkConfig {
+    wifiAp?: WifiApConfig;
+    ethernet?: EthernetConfig;
+}
 
-    interface Interface {
-        Name: string;
-        Device: Device | null;
-        Connections: Connection[];
-        MainConnection: Connection | null;
-    }
+export interface WifiApConfig {
+    enabled?: boolean;
+    ssidPrefix?: string;
+    interface?: string;
+    password?: string;
+}
 
-    interface Device {
-        DeviceType: string;
-        Interface: string;
-        StateText: string;
-        State: number;
-        HwAddress: string;
-        AvailableConnections: Connection[];
-        ActiveConnection: ActiveConnection | null;
-        Ip4Config: Ipv4Config | null;
-        Ip6Config: Ipv6Config | null;
-        Udi: string;
-        IdVendor: string;
-        IdModel: string;
-        Driver: string;
-        Carrier: boolean;
-        Speed?: number;
-        Managed: boolean;
-        Members: Device[];
+export interface EthernetConfig {
+    enabled?: boolean;
+    interface?: string;
+    staticIp?: string;
+}
 
-        activate(connection: Connection, specific_object?: any): Promise<ActiveConnection>;
-        activate_with_settings(settings: any, specific_object?: any): Promise<ActiveConnection>;
-        disconnect(): Promise<void>;
-    }
+export interface EnrollmentService {
+    id: string;
+    name: string;
+    description?: string;
+    endpoint: EndpointConfig;
+    credentialsSchema: any; // JSON Schema Draft 7
+    scriptPath: string;
+}
 
-    interface Connection {
-        Settings: any;
-        Unsaved?: boolean;
-        Groups: Connection[];
-        Members: Connection[];
-        Interfaces: Interface[];
+export interface EndpointConfig {
+    url: string;
+    allowUserOverride?: boolean;
+}
 
-        copy_settings(): any;
-        apply_settings(settings: any): Promise<void>;
-        activate(dev: Device | null, specific_object?: any): Promise<ActiveConnection>;
-        delete_(): Promise<void>;
-    }
+export interface LedConfig {
+    enabled?: boolean;
+    tool?: string;
+    states?: Record<LedState, string>;
+}
 
-    interface ActiveConnection {
-        Connection: Connection;
-        Ip4Config: Ipv4Config | null;
-        Ip6Config: Ipv6Config | null;
-        Group?: Device;
+export type LedState = 'ready' | 'in-progress' | 'applying' | 'success' | 'error' | 'off';
 
-        deactivate(): Promise<void>;
-    }
+// ========== Runtime State Types (OnboardingSession) ==========
 
-    interface Ipv4Config {
-        Addresses: string[][];
-        Nameservers?: string[];
-    }
+export interface OnboardingSession {
+    hostname: HostnameState;
+    networkInterface: NetworkInterfaceState;
+    networkAddress: NetworkAddressState;
+    networkServices: NetworkServicesState;
+    enrollment: EnrollmentState;
+    wizardStep: number;
+}
 
-    interface Ipv6Config {
-        Addresses: string[][];
-        Nameservers?: string[];
-    }
+export interface HostnameState {
+    value: string;
+    dhcpHostname?: string;
+}
 
-    export interface NetworkManagerModel extends cockpit.EventSource<NetworkManagerEvents> {
-        client: cockpit.DBusClient;
-        preinit: Promise<void>;
-        curtain?: string;
-        operationInProgress?: boolean;
-        ready?: boolean;
+export interface NetworkInterfaceState {
+    selectedInterface: string | null;
+    interfaceType: 'ethernet' | 'wifi' | null;
+    wifiSsid: string | null;
+    wifiPassword: string | null;
+    wifiSecurity: 'none' | 'wep' | 'wpa' | null;
+    vlanId: number | null;
+}
 
-        set_curtain(state: string): void;
-        set_operation_in_progress(value: boolean): void;
-        list_interfaces(): Interface[];
-        find_interface(name: string): Interface | null;
-        get_manager(): any;
-        get_settings(): any;
-        synchronize(): Promise<void>;
-        close(): void;
-    }
+export interface NetworkAddressState {
+    ipv4: IPv4Config;
+    ipv6: IPv6Config;
+}
 
-    export function NetworkManagerModel(): NetworkManagerModel;
-    export function show_unexpected_error(error: any): void;
-    export function connection_settings(c: any): any;
-    export function device_state_text(dev: any): string;
-    export function is_managed(dev: any): boolean;
-    export function render_active_connection(dev: any, arg1: boolean, arg2: boolean): any;
+export interface IPv4Config {
+    method: 'auto' | 'static' | 'disabled';
+    address: string | null;
+    subnetMask: string | null;
+    gateway: string | null;
+    autoDns: boolean;
+    primaryDns: string | null;
+    secondaryDns: string | null;
+}
+
+export interface IPv6Config {
+    method: 'auto' | 'static' | 'disabled';
+    address: string | null; // with /prefix
+    gateway: string | null;
+    autoDns: boolean;
+    primaryDns: string | null;
+    secondaryDns: string | null;
+}
+
+export interface NetworkServicesState {
+    ntp: NtpConfig;
+    proxy: ProxyConfig;
+}
+
+export interface NtpConfig {
+    autoConfig: boolean;
+    servers: string[];
+}
+
+export interface ProxyConfig {
+    enabled: boolean;
+    hostname: string | null;
+    port: number | null;
+    username: string | null;
+    password: string | null;
+}
+
+export interface EnrollmentState {
+    selectedServices: string[];
+    credentials: Record<string, any>;
+    endpoints: Record<string, string>;
+}
+
+// ========== System Integration Types ==========
+
+export interface NetworkInterface {
+    name: string;
+    type: 'ethernet' | 'wifi' | 'other';
+    macAddress: string;
+    state: number;
+    ipv4Address: string | null;
+    ipv6Address: string | null;
+    connection: any | null;
+}
+
+export interface WifiNetwork {
+    ssid: string;
+    strength: number;
+    security: 'none' | 'wep' | 'wpa';
+    frequency: number;
+}
+
+export interface ApplyResult {
+    success: boolean;
+    results: string[];
+    errors?: Error[];
+}
+
+// ========== Enrollment Script Result ==========
+
+export interface EnrollmentResult {
+    exitCode: number;
+    stdout: string;
+    stderr: string;
+    deviceUrl?: string; // Parsed from stdout "DEVICE_URL: ..."
 }

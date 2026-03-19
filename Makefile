@@ -28,11 +28,14 @@ all: $(DIST_TEST)
 # a new project, use the latest release, and update it from time to time
 COCKPIT_REPO_FILES = \
 	pkg/lib \
+	pkg/networkmanager/interfaces.js \
+	pkg/networkmanager/networking.scss \
+	pkg/networkmanager/utils.js \
 	test/common \
 	$(NULL)
 
 COCKPIT_REPO_URL = https://github.com/cockpit-project/cockpit.git
-COCKPIT_REPO_COMMIT = 7e2d5cb7375346241c9390b8b7c189da290759b2 # 345 + 15 commits
+COCKPIT_REPO_COMMIT = 00f46a53197e480489378f6a130f1520bbc93c32 # 350 release
 
 $(COCKPIT_REPO_FILES): $(COCKPIT_REPO_STAMP)
 COCKPIT_REPO_TREE = '$(strip $(COCKPIT_REPO_COMMIT))^{tree}'
@@ -40,6 +43,8 @@ $(COCKPIT_REPO_STAMP): Makefile
 	@git rev-list --quiet --objects $(COCKPIT_REPO_TREE) -- 2>/dev/null || \
 	    git fetch --no-tags --no-write-fetch-head --depth=1 $(COCKPIT_REPO_URL) $(COCKPIT_REPO_COMMIT)
 	git archive $(COCKPIT_REPO_TREE) -- $(COCKPIT_REPO_FILES) | tar x
+	# patch to exclude .md files from being considered scripts
+	sed -i -e "s#| sort -z | uniq -z#& | grep -z -v '\\\.md\$$'#" test/common/static-code
 
 #
 # i18n
@@ -198,4 +203,32 @@ $(NODE_MODULES_TEST): package.json
 	env -u NODE_ENV npm install --ignore-scripts
 	env -u NODE_ENV npm prune
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check vm print-vm
+help:
+	@echo "Development targets:"
+	@echo "  all              Build the project (default)"
+	@echo "  watch            Build and watch for changes"
+	@echo "  clean            Remove build artifacts"
+	@echo "  codecheck        Run static analysis (ESLint, Stylelint)"
+	@echo ""
+	@echo "Install targets:"
+	@echo "  install          Install to PREFIX (default /usr/local)"
+	@echo "  devel-install    Symlink dist/ into ~/.local/share/cockpit for development"
+	@echo "  devel-uninstall  Remove the development symlink"
+	@echo ""
+	@echo "Packaging targets:"
+	@echo "  dist             Create release tarball"
+	@echo "  srpm             Build source RPM"
+	@echo "  rpm              Build binary RPM"
+	@echo "  node-cache       Create node_modules cache tarball"
+	@echo "  print-version    Print the current version"
+	@echo ""
+	@echo "Testing targets:"
+	@echo "  check            Run browser integration tests"
+	@echo "  prepare-check    Set up test VM and dependencies without running tests"
+	@echo "  vm               Build a test VM image"
+	@echo "  print-vm         Print the test VM image path"
+	@echo ""
+	@echo "i18n targets:"
+	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
+
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check vm print-vm help

@@ -1,57 +1,23 @@
 import React, { useState } from 'react';
 
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
+import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { TextInputGroup, TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
-import { Stack, StackItem, Flex, FlexItem, ValidatedOptions } from '@patternfly/react-core';
+import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
+import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { useModelContext } from '../model-context';
-
-// NTP server validation function
-const validateNtpServer = (server: string): string | null => {
-    if (!server.trim()) return 'NTP server is required';
-
-    // Try IPv4 validation first
-    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-    const ipv4Match = server.match(ipv4Regex);
-    if (ipv4Match) {
-        const octets = ipv4Match.slice(1).map(Number);
-        for (const octet of octets) {
-            if (octet < 0 || octet > 255) {
-                return 'Invalid IPv4 address';
-            }
-        }
-        return null; // Valid IPv4
-    }
-
-    // Try IPv6 validation
-    const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$|^::$|^::1$|^([0-9a-fA-F]{0,4}:){1,6}:$|^:([0-9a-fA-F]{0,4}:){1,6}$/;
-    if (ipv6Regex.test(server)) {
-        return null; // Valid IPv6
-    }
-
-    // Hostname validation (similar to hostname page but more lenient)
-    if (server.length > 253) return 'Hostname must be 253 characters or less';
-
-    const labels = server.split('.');
-    for (const label of labels) {
-        if (label.length === 0) return 'Hostname cannot have empty labels';
-        if (label.length > 63) return 'Each hostname label must be 63 characters or less';
-
-        // More lenient hostname validation for NTP servers
-        if (!/^[a-zA-Z0-9]/.test(label)) return 'Each hostname label must start with an alphanumeric character';
-        if (!/[a-zA-Z0-9]$/.test(label)) return 'Each hostname label must end with an alphanumeric character';
-        if (!/^[a-zA-Z0-9.-]+$/.test(label)) return 'Hostname can only contain letters, numbers, dots, and hyphens';
-    }
-
-    return null;
-};
+import { validateHostnameOrIP, validatePort } from '../validation';
 
 export const NetworkServicesPage: React.FunctionComponent = () => {
     const { model, updateNestedModel } = useModelContext();
     const [ntpServerInput, setNtpServerInput] = useState<string>('');
-    const [validationError, setValidationError] = useState<string | null>(null);
+    const [ntpValidationError, setNtpValidationError] = useState<string | null>(null);
+    const [proxyHostnameError, setProxyHostnameError] = useState<string | null>(null);
+    const [proxyPortError, setProxyPortError] = useState<string | null>(null);
 
     const setAutoNtp = (autoConfig: boolean) => {
         updateNestedModel('networkServices', 'ntp', { autoConfig });
@@ -59,30 +25,69 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
 
     const handleNtpServerInputChange = (value: string) => {
         setNtpServerInput(value);
-        const error = validateNtpServer(value);
-        setValidationError(error);
+        // Only validate if the input is not empty, since this field is optional
+        // (user only needs to fill it if they want to add a server)
+        const error = value.trim() ? validateHostnameOrIP(value, false) : null;
+        setNtpValidationError(error);
     };
 
     const addNtpServer = () => {
         const trimmedInput = ntpServerInput.trim();
-        const error = validateNtpServer(trimmedInput);
 
-        if (error) {
-            setValidationError(error);
+        // Don't add if input is empty
+        if (!trimmedInput) {
             return;
         }
 
-        if (trimmedInput && !model.networkServices.ntp.servers.includes(trimmedInput)) {
+        const error = validateHostnameOrIP(trimmedInput, false);
+
+        if (error) {
+            setNtpValidationError(error);
+            return;
+        }
+
+        if (!model.networkServices.ntp.servers.includes(trimmedInput)) {
             const newServers = [...model.networkServices.ntp.servers, trimmedInput];
             updateNestedModel('networkServices', 'ntp', { servers: newServers.sort() });
             setNtpServerInput('');
-            setValidationError(null);
+            setNtpValidationError(null);
         }
     };
 
     const removeNtpServer = (serverToRemove: string) => {
         const newServers = model.networkServices.ntp.servers.filter(server => server !== serverToRemove);
         updateNestedModel('networkServices', 'ntp', { servers: newServers });
+    };
+
+    // Proxy configuration handlers
+    const setProxyEnabled = (enabled: boolean) => {
+        updateNestedModel('networkServices', 'proxy', { enabled });
+        if (!enabled) {
+            // Clear validation errors when disabling proxy
+            setProxyHostnameError(null);
+            setProxyPortError(null);
+        }
+    };
+
+    const handleProxyHostnameChange = (value: string) => {
+        updateNestedModel('networkServices', 'proxy', { hostname: value || null });
+        const error = validateHostnameOrIP(value, false);
+        setProxyHostnameError(error);
+    };
+
+    const handleProxyPortChange = (value: string) => {
+        const port = value ? parseInt(value, 10) : null;
+        updateNestedModel('networkServices', 'proxy', { port });
+        const error = validatePort(port, false);
+        setProxyPortError(error);
+    };
+
+    const handleProxyUsernameChange = (value: string) => {
+        updateNestedModel('networkServices', 'proxy', { username: value || null });
+    };
+
+    const handleProxyPasswordChange = (value: string) => {
+        updateNestedModel('networkServices', 'proxy', { password: value || null });
     };
 
     return (
@@ -103,22 +108,28 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                             <FormGroup label="NTP Server Hostname">
                                 <Flex>
                                     <FlexItem flex={{ default: 'flex_1' }}>
-                                        <TextInputGroup validated={validationError ? ValidatedOptions.error : (ntpServerInput && !validationError ? ValidatedOptions.success : ValidatedOptions.warning)}>
+                                        <TextInputGroup
+                                            {...(ntpValidationError
+                                                ? { validated: ValidatedOptions.error }
+                                                : ntpServerInput.trim()
+                                                    ? { validated: ValidatedOptions.success }
+                                                    : {})}
+                                        >
                                             <TextInputGroupMain
                                                 id="ntp-server-input"
                                                 value={ntpServerInput}
                                                 onChange={(_, value) => handleNtpServerInputChange(value)}
                                                 placeholder="pool.ntp.org"
-                                                onKeyPress={(e) => {
+                                                onKeyDown={(e) => {
                                                     if (e.key === 'Enter') {
                                                         addNtpServer();
                                                     }
                                                 }}
                                             />
                                         </TextInputGroup>
-                                        {validationError && (
+                                        {ntpValidationError && (
                                             <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
-                                                {validationError}
+                                                {ntpValidationError}
                                             </div>
                                         )}
                                     </FlexItem>
@@ -126,7 +137,7 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                         <Button
                                             variant="secondary"
                                             onClick={addNtpServer}
-                                            isDisabled={!ntpServerInput.trim() || !!validationError}
+                                            isDisabled={!ntpServerInput.trim() || !!ntpValidationError}
                                         >
                                             Add
                                         </Button>
@@ -136,7 +147,7 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                         </StackItem>
                         <StackItem>
                             <p>Configured NTP Servers:</p>
-                            <Table aria-label="NTP servers table">
+                            <Table aria-label="NTP servers table" variant="compact">
                                 <Thead>
                                     <Tr>
                                         <Th>Server</Th>
@@ -168,6 +179,80 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                     )}
                                 </Tbody>
                             </Table>
+                        </StackItem>
+                    </Stack>
+                </StackItem>
+            )}
+
+            <StackItem style={{ marginTop: '2rem' }}>
+                <p>Configure HTTP proxy (optional):</p>
+                <Checkbox
+                    id="proxy-enabled"
+                    label="Use HTTP proxy"
+                    isChecked={model.networkServices.proxy.enabled}
+                    onChange={(_, checked) => setProxyEnabled(checked)}
+                />
+            </StackItem>
+
+            {model.networkServices.proxy.enabled && (
+                <StackItem style={{ marginLeft: '1.5rem' }}>
+                    <Stack hasGutter>
+                        <StackItem>
+                            <FormGroup label="Proxy Hostname" isRequired>
+                                <TextInput
+                                    id="proxy-hostname-input"
+                                    value={model.networkServices.proxy.hostname || ''}
+                                    onChange={(_, value) => handleProxyHostnameChange(value)}
+                                    placeholder="proxy.example.com"
+                                    validated={proxyHostnameError ? ValidatedOptions.error : (model.networkServices.proxy.hostname ? ValidatedOptions.success : ValidatedOptions.default)}
+                                />
+                                {proxyHostnameError && (
+                                    <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
+                                        {proxyHostnameError}
+                                    </div>
+                                )}
+                            </FormGroup>
+                        </StackItem>
+
+                        <StackItem>
+                            <FormGroup label="Proxy Port" isRequired>
+                                <TextInput
+                                    id="proxy-port-input"
+                                    type="number"
+                                    value={model.networkServices.proxy.port?.toString() || ''}
+                                    onChange={(_, value) => handleProxyPortChange(value)}
+                                    placeholder="8080"
+                                    validated={proxyPortError ? ValidatedOptions.error : (model.networkServices.proxy.port ? ValidatedOptions.success : ValidatedOptions.default)}
+                                />
+                                {proxyPortError && (
+                                    <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
+                                        {proxyPortError}
+                                    </div>
+                                )}
+                            </FormGroup>
+                        </StackItem>
+
+                        <StackItem>
+                            <FormGroup label="Proxy Username (optional)">
+                                <TextInput
+                                    id="proxy-username-input"
+                                    value={model.networkServices.proxy.username || ''}
+                                    onChange={(_, value) => handleProxyUsernameChange(value)}
+                                    placeholder="username"
+                                />
+                            </FormGroup>
+                        </StackItem>
+
+                        <StackItem>
+                            <FormGroup label="Proxy Password (optional)">
+                                <TextInput
+                                    id="proxy-password-input"
+                                    type="password"
+                                    value={model.networkServices.proxy.password || ''}
+                                    onChange={(_, value) => handleProxyPasswordChange(value)}
+                                    placeholder="password"
+                                />
+                            </FormGroup>
                         </StackItem>
                     </Stack>
                 </StackItem>

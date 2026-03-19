@@ -1,0 +1,37 @@
+# Cockpit System Onboarding - Minimal sudo privileges for onboarding user
+#
+# IMPORTANT: This file grants passwordless sudo for specific system configuration commands.
+# Remove this file after onboarding is complete if plugin is configured to run once.
+#
+# This file should be installed to /etc/sudoers.d/cockpit-system-onboarding with mode 0440.
+
+# Hostname configuration
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/hostnamectl set-hostname *
+
+# Network configuration via NetworkManager CLI (fallback)
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/nmcli *
+
+# Time and NTP configuration
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/timedatectl *
+
+# Service restart (NetworkManager, time sync services)
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart NetworkManager
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart chronyd
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart systemd-timesyncd
+
+# Network interface management (for WiFi AP setup and fallback operations)
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/ip link set * up
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/ip link set * down
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/ip addr add * dev *
+
+# Cleanup script (executed after successful onboarding)
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh
+
+# Enrollment scripts (user-provided)
+# These paths allow enrollment scripts to run with elevated privileges
+onboarding ALL=(ALL) NOPASSWD: /home/onboarding/.config/cockpit/system-onboarding.d/*.sh
+onboarding ALL=(ALL) NOPASSWD: /etc/cockpit/system-onboarding.d/*.sh
+
+# LED control tool (if configured)
+onboarding ALL=(ALL) NOPASSWD: /usr/local/bin/led-control *
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/led-control *

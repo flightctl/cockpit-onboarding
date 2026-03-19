@@ -1,11 +1,19 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { systemConfigurationService } from './system-config.js';
-import { Interface } from './interfaces.js';
-import { ip4_prefix_from_text } from './utils.js';
+import { Interface } from '../pkg/networkmanager/interfaces.js';
+import {
+    HostnameState,
+    NetworkInterfaceState,
+    NetworkAddressState,
+    NetworkServicesState,
+    EnrollmentState,
+} from './types';
 
+// NetworkAddressConfig - internal type for compatibility with existing code
+// Uses string instead of string | null for backward compatibility
 interface NetworkAddressConfig {
   ipv4: {
-    method: 'dhcp' | 'static';
+    method: 'dhcp' | 'static' | 'auto' | 'disabled';
     address: string;
     subnetMask: string;
     gateway: string;
@@ -14,7 +22,7 @@ interface NetworkAddressConfig {
     secondaryDns: string;
   };
   ipv6: {
-    method: 'dhcp' | 'static' | 'disabled';
+    method: 'dhcp' | 'static' | 'auto' | 'disabled';
     address: string;
     gateway: string;
     autoDns: boolean;
@@ -24,48 +32,30 @@ interface NetworkAddressConfig {
 }
 
 export interface Model {
-  hostname: {
-    value: string;
-    dhcpHostname: string;
-  };
-  networkInterface: {
-    selectedInterface: string | null;
-    useVlan: boolean;
-    vlanId: number | null;
-  };
-  networkAddress: NetworkAddressConfig;
-  // Store original interface configurations for quick switching
+  hostname: HostnameState;
+  networkInterface: NetworkInterfaceState;
+  networkAddress: NetworkAddressState;
+  // Store original interface configurations for quick switching (internal format)
   originalNetworkConfigs: { [interfaceName: string]: NetworkAddressConfig };
-  // Store user-modified configurations per interface
+  // Store user-modified configurations per interface (internal format)
   userNetworkConfigs: { [interfaceName: string]: NetworkAddressConfig };
-  networkServices: {
-    ntp: {
-      autoConfig: boolean;
-      servers: string[];
-    };
-  };
-  enrollment: {
-    url: string;
-    skipTlsVerification: boolean;
-    authMethod: 'username-password' | 'token';
-    username: string;
-    password: string;
-    token: string;
-  };
+  networkServices: NetworkServicesState;
+  enrollment: EnrollmentState;
   enrollmentProgress: {
     currentStep: number; // 0-3
     stepStates: ('pending' | 'running' | 'success' | 'error')[];
     logs: string[]; // execution logs
-    isRunning: boolean; // overall execution state
+    executionState: 'idle' | 'running' | 'success' | 'failed'; // overall execution state
     canCancel: boolean; // whether cancellation is possible
     overallProgress: number; // 0-100 percentage
   };
+  wizardStep: number;
 }
 
-// Default network address configuration
+// Default network address configuration (internal format)
 const defaultNetworkConfig: NetworkAddressConfig = {
     ipv4: {
-        method: 'dhcp',
+        method: 'auto',
         address: '',
         subnetMask: '',
         gateway: '',
@@ -74,7 +64,7 @@ const defaultNetworkConfig: NetworkAddressConfig = {
         secondaryDns: '',
     },
     ipv6: {
-        method: 'disabled',
+        method: 'auto',
         address: '',
         gateway: '',
         autoDns: true,
@@ -91,10 +81,31 @@ const initialModel: Model = {
     },
     networkInterface: {
         selectedInterface: null,
-        vlanId: 1,
-        useVlan: false,
+        interfaceType: null,
+        wifiSsid: null,
+        wifiPassword: null,
+        wifiSecurity: null,
+        vlanId: null,
     },
-    networkAddress: { ...defaultNetworkConfig },
+    networkAddress: {
+        ipv4: {
+            method: 'auto',
+            address: null,
+            subnetMask: null,
+            gateway: null,
+            autoDns: true,
+            primaryDns: null,
+            secondaryDns: null,
+        },
+        ipv6: {
+            method: 'auto',
+            address: null,
+            gateway: null,
+            autoDns: true,
+            primaryDns: null,
+            secondaryDns: null,
+        },
+    },
     originalNetworkConfigs: {},
     userNetworkConfigs: {},
     networkServices: {
@@ -102,27 +113,33 @@ const initialModel: Model = {
             autoConfig: true,
             servers: [],
         },
+        proxy: {
+            enabled: false,
+            hostname: null,
+            port: null,
+            username: null,
+            password: null,
+        },
     },
     enrollment: {
-        url: '',
-        skipTlsVerification: false,
-        authMethod: 'username-password',
-        username: '',
-        password: '',
-        token: '',
+        selectedServices: [],
+        credentials: {},
+        endpoints: {},
     },
     enrollmentProgress: {
         currentStep: 0,
         stepStates: ['pending', 'pending', 'pending', 'pending'],
         logs: [],
-        isRunning: false,
+        executionState: 'idle',
         canCancel: false,
         overallProgress: 0,
     },
+    wizardStep: 1,
 };
 
 // Context type combining existing NetworkManager model and application model
 interface ModelContextType {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   networkManager?: any; // Keep existing NetworkManager model
   model: Model;
   isInitialized: boolean;
@@ -136,10 +153,62 @@ interface ModelContextType {
   saveCurrentNetworkConfig: () => void;
   parseIpv6Address: (addressWithPrefix: string) => { address: string; prefix: number };
   formatIpv6Address: (address: string, prefix: number) => string;
+  cancelEnrollmentRef: React.MutableRefObject<(() => void) | null>;
 }
 
 // Create context
 export const ModelContext = createContext<ModelContextType | undefined>(undefined);
+
+// Helper to convert NetworkAddressState to NetworkAddressConfig (for internal use)
+const stateToConfig = (state: NetworkAddressState): NetworkAddressConfig => {
+    return {
+        ipv4: {
+            method: state.ipv4.method,
+            address: state.ipv4.address ?? '',
+            subnetMask: state.ipv4.subnetMask ?? '',
+            gateway: state.ipv4.gateway ?? '',
+            autoDns: state.ipv4.autoDns,
+            primaryDns: state.ipv4.primaryDns ?? '',
+            secondaryDns: state.ipv4.secondaryDns ?? '',
+        },
+        ipv6: {
+            method: state.ipv6.method,
+            address: state.ipv6.address ?? '',
+            gateway: state.ipv6.gateway ?? '',
+            autoDns: state.ipv6.autoDns,
+            primaryDns: state.ipv6.primaryDns ?? '',
+            secondaryDns: state.ipv6.secondaryDns ?? '',
+        },
+    };
+};
+
+// Helper to convert NetworkAddressConfig to NetworkAddressState
+const configToState = (config: NetworkAddressConfig): NetworkAddressState => {
+    // Map 'dhcp' to 'auto' for type compatibility with NetworkAddressState
+    const mapMethod = (method: 'dhcp' | 'static' | 'auto' | 'disabled'): 'auto' | 'static' | 'disabled' => {
+        return method === 'dhcp' ? 'auto' : method;
+    };
+
+    return {
+        ipv4: {
+            method: mapMethod(config.ipv4.method),
+            address: config.ipv4.address || null,
+            subnetMask: config.ipv4.subnetMask || null,
+            gateway: config.ipv4.gateway || null,
+            autoDns: config.ipv4.autoDns,
+            primaryDns: config.ipv4.primaryDns || null,
+            secondaryDns: config.ipv4.secondaryDns || null,
+        },
+        ipv6: {
+            method: mapMethod(config.ipv6.method),
+            address: config.ipv6.address || null,
+            gateway: config.ipv6.gateway || null,
+            autoDns: config.ipv6.autoDns,
+            primaryDns: config.ipv6.primaryDns || null,
+            secondaryDns: config.ipv6.secondaryDns || null,
+        },
+    };
+};
 
 // Helper function to convert prefix length to subnet mask
 const prefixToSubnetMask = (prefix: number): string => {
@@ -188,12 +257,15 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     const activeConnection = iface.Device.ActiveConnection;
 
     // IPv4 configuration
-    const ipv4Method = iface.MainConnection?.Settings?.ipv4?.method || 'dhcp';
-    const ipv4ConnectionDns = iface.MainConnection?.Settings?.ipv4?.dns || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ipv4Method = (iface.MainConnection?.Settings as any)?.ipv4?.method || 'dhcp';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ipv4ConnectionDns = (iface.MainConnection?.Settings as any)?.ipv4?.dns || [];
 
-    if (activeConnection.Ip4Config && activeConnection.Ip4Config.Addresses.length > 0) {
+    if (activeConnection.Ip4Config && activeConnection.Ip4Config.Addresses && activeConnection.Ip4Config.Addresses.length > 0) {
         const address = activeConnection.Ip4Config.Addresses[0];
         // Get DNS servers from active config (includes DHCP-provided DNS) and connection settings
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const activeDns = (activeConnection.Ip4Config as any).Nameservers || [];
         const hasStaticDns = ipv4ConnectionDns.length > 0;
         const dnsServers = hasStaticDns ? ipv4ConnectionDns : activeDns;
@@ -220,12 +292,15 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     }
 
     // IPv6 configuration
-    const ipv6Method = iface.MainConnection?.Settings?.ipv6?.method || 'dhcp';
-    const ipv6ConnectionDns = iface.MainConnection?.Settings?.ipv6?.dns || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ipv6Method = (iface.MainConnection?.Settings as any)?.ipv6?.method || 'dhcp';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ipv6ConnectionDns = (iface.MainConnection?.Settings as any)?.ipv6?.dns || [];
 
-    if (activeConnection.Ip6Config && activeConnection.Ip6Config.Addresses.length > 0) {
+    if (activeConnection.Ip6Config && activeConnection.Ip6Config.Addresses && activeConnection.Ip6Config.Addresses.length > 0) {
         const address = activeConnection.Ip6Config.Addresses[0];
         // Get DNS servers from active config (includes DHCP-provided DNS) and connection settings
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const activeDns = (activeConnection.Ip6Config as any).Nameservers || [];
         const hasStaticDns = ipv6ConnectionDns.length > 0;
         const dnsServers = hasStaticDns ? ipv6ConnectionDns : activeDns;
@@ -254,16 +329,18 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
 };
 
 // Provider component
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const ModelProvider: React.FunctionComponent<{ children: ReactNode; networkManager?: any }> = ({ children, networkManager }) => {
     const [model, setModel] = useState<Model>(initialModel);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
+    const cancelEnrollmentRef = useRef<(() => void) | null>(null);
 
     const updateModel = (section: keyof Model, updates: Partial<Model[keyof Model]>) => {
         setModel(prev => ({
             ...prev,
             [section]: {
-                ...prev[section],
-                ...updates,
+                ...(prev[section] as object),
+                ...(updates as object),
             },
         }));
     };
@@ -274,12 +351,15 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
         updates: Partial<Model[T][K]>
     ) => {
         setModel(prev => {
+            const prevSection = prev[section];
+            const prevSubsection = prevSection[subsection];
+
             const newModel = {
                 ...prev,
                 [section]: {
-                    ...prev[section],
+                    ...(prevSection as object),
                     [subsection]: {
-                        ...prev[section][subsection],
+                        ...(prevSubsection as object),
                         ...updates,
                     },
                 },
@@ -289,7 +369,7 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
             if (section === 'networkAddress' && prev.networkInterface.selectedInterface) {
                 newModel.userNetworkConfigs = {
                     ...prev.userNetworkConfigs,
-                    [prev.networkInterface.selectedInterface]: { ...newModel.networkAddress }
+                    [prev.networkInterface.selectedInterface]: stateToConfig(newModel.networkAddress)
                 };
             }
 
@@ -305,7 +385,7 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
                 ...prev,
                 userNetworkConfigs: {
                     ...prev.userNetworkConfigs,
-                    [currentSelectedInterface]: { ...prev.networkAddress }
+                    [currentSelectedInterface]: stateToConfig(prev.networkAddress)
                 }
             }));
         }
@@ -317,7 +397,7 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
 
         setModel(prev => ({
             ...prev,
-            networkAddress: { ...configToUse }
+            networkAddress: configToState(configToUse)
         }));
     };
 
@@ -328,14 +408,22 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
                 ...prev,
                 userNetworkConfigs: {
                     ...prev.userNetworkConfigs,
-                    [currentSelectedInterface]: { ...prev.networkAddress }
+                    [currentSelectedInterface]: stateToConfig(prev.networkAddress)
                 }
             }));
         }
     };
 
     const initializeFromSystem = async () => {
-        if (!networkManager || !networkManager.ready) {
+        if (!networkManager) {
+            console.warn('Cannot initialize: networkManager is not available');
+            setIsInitialized(true);
+            return;
+        }
+
+        if (!networkManager.ready) {
+            console.warn('Cannot initialize: networkManager is not ready');
+            setIsInitialized(true);
             return;
         }
 
@@ -354,18 +442,30 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
                 ? originalConfigs[systemInfo.defaultInterface]
                 : defaultNetworkConfig;
 
+            // Determine the best default hostname
+            // Use DHCP hostname if static hostname is not set or is localhost
+            let defaultHostname = systemInfo.hostname;
+            if (!defaultHostname || defaultHostname === 'localhost' || defaultHostname === 'localhost.localdomain') {
+                defaultHostname = systemInfo.dhcpHostname || defaultHostname;
+            }
+
+            // Determine the interface type for the default interface
+            const defaultInterface = interfaces.find(iface => iface.Name === systemInfo.defaultInterface);
+            const defaultInterfaceType = defaultInterface?.Device?.DeviceType === '802-11-wireless' ? 'wifi' : 'ethernet';
+
             // Update model with system information
             setModel(prev => ({
                 ...prev,
                 hostname: {
-                    value: systemInfo.hostname,
+                    value: defaultHostname,
                     dhcpHostname: systemInfo.dhcpHostname
                 },
                 networkInterface: {
                     ...prev.networkInterface,
-                    selectedInterface: systemInfo.defaultInterface
+                    selectedInterface: systemInfo.defaultInterface,
+                    interfaceType: systemInfo.defaultInterface ? defaultInterfaceType : null
                 },
-                networkAddress: { ...defaultConfig },
+                networkAddress: configToState(defaultConfig),
                 originalNetworkConfigs: originalConfigs,
                 userNetworkConfigs: {},
                 networkServices: {
@@ -373,22 +473,34 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
                         ...prev.networkServices.ntp,
                         servers: systemInfo.ntpServers,
                         autoConfig: systemInfo.ntpServers.length === 0
+                    },
+                    proxy: {
+                        ...prev.networkServices.proxy
                     }
                 }
             }));
 
             setIsInitialized(true);
         } catch (error) {
-            console.warn('Failed to initialize model from system:', error);
+            console.error('Failed to initialize model from system:', error);
             setIsInitialized(true); // Still mark as initialized even if some parts failed
         }
     };
 
     useEffect(() => {
-        if (networkManager && networkManager.ready && !isInitialized) {
-            initializeFromSystem();
+        if (networkManager && !isInitialized) {
+            // If networkManager exists, attempt initialization regardless of ready state
+            // This handles cases where ready might be false or undefined
+            if (networkManager.ready) {
+                initializeFromSystem();
+            } else {
+                // If not ready, still mark as initialized to prevent infinite loading
+                // The wizard will work with default/empty values
+                setIsInitialized(true);
+            }
         }
-    }, [networkManager, networkManager?.ready, isInitialized, initializeFromSystem]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [networkManager, networkManager?.ready, isInitialized]);
 
     useEffect(() => {
     // Cleanup system info service on unmount
@@ -407,7 +519,8 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
             switchToInterfaceConfig,
             saveCurrentNetworkConfig,
             parseIpv6Address,
-            formatIpv6Address
+            formatIpv6Address,
+            cancelEnrollmentRef
         }}
         >
             {children}

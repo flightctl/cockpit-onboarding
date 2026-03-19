@@ -1,8 +1,13 @@
 import React from 'react';
 import cockpit from 'cockpit';
 
-import { Stack, StackItem, DescriptionList, DescriptionListGroup, DescriptionListTerm, DescriptionListDescription } from '@patternfly/react-core';
+import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { DescriptionList, DescriptionListGroup, DescriptionListTerm, DescriptionListDescription } from "@patternfly/react-core/dist/esm/components/DescriptionList/index.js";
+import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
+import { useWizardContext } from "@patternfly/react-core/dist/esm/components/Wizard/index.js";
+import { PencilAltIcon } from '@patternfly/react-icons';
 import { useModelContext } from '../model-context';
+import { useConfig } from '../app';
 
 const _ = cockpit.gettext;
 
@@ -12,56 +17,101 @@ interface ReviewPageProps {
 
 export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnrollmentScripts }) => {
     const { model } = useModelContext();
+    const { config } = useConfig();
+    const { goToStepById } = useWizardContext();
 
     return (
         <Stack hasGutter>
             <StackItem>
                 <p>
                     {hasEnrollmentScripts
-                        ? _('Please review your configuration below. Click "Enroll" to apply these settings and complete the system onboarding.')
-                        : _('Please review your configuration below. Click "Apply" to apply these settings to the system.')}
+                        ? _("Please review your configuration below. Click \"Enroll\" to apply these settings and complete the system onboarding.")
+                        : _("Please review your configuration below. Click \"Apply\" to apply these settings to the system.")}
                 </p>
             </StackItem>
 
             <StackItem>
                 <DescriptionList isHorizontal>
-                    {/* System */}
+                    {/* Hostname Section */}
                     <DescriptionListGroup>
-                        <DescriptionListTerm><p>System</p></DescriptionListTerm>
-                        <DescriptionListDescription><p /></DescriptionListDescription>
-                    </DescriptionListGroup>
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>Hostname</DescriptionListTerm>
+                        <DescriptionListTerm>{_("Hostname")}</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.hostname.value || '(empty)'}
+                            {model.hostname.value || _("(empty)")}
+                            <Button
+                                variant="link"
+                                icon={<PencilAltIcon />}
+                                onClick={() => goToStepById('wizard-step-1')}
+                                aria-label={_("Edit hostname")}
+                            />
                         </DescriptionListDescription>
                     </DescriptionListGroup>
 
-                    {/* Network Interface */}
+                    {/* Network Interface Section */}
                     <DescriptionListGroup>
-                        <DescriptionListTerm><p>Network Interface</p></DescriptionListTerm>
-                        <DescriptionListDescription><p /></DescriptionListDescription>
-                    </DescriptionListGroup>
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>Interface</DescriptionListTerm>
+                        <DescriptionListTerm>{_("Interface")}</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.networkInterface.selectedInterface || '(not selected)'}
+                            {model.networkInterface.selectedInterface || _("(not selected)")}
+                            <Button
+                                variant="link"
+                                icon={<PencilAltIcon />}
+                                onClick={() => goToStepById('wizard-step-2')}
+                                aria-label={_("Edit network interface")}
+                            />
                         </DescriptionListDescription>
                     </DescriptionListGroup>
-                    {model.networkInterface.useVlan && (
+                    {model.networkInterface.interfaceType === 'wifi' && (
+                        <>
+                            <DescriptionListGroup>
+                                <DescriptionListTerm>{_("WiFi SSID")}</DescriptionListTerm>
+                                <DescriptionListDescription>
+                                    {model.networkInterface.wifiSsid || _("(empty)")}
+                                    <Button
+                                        variant="link"
+                                        icon={<PencilAltIcon />}
+                                        onClick={() => goToStepById('wizard-step-2')}
+                                        aria-label={_("Edit network interface")}
+                                    />
+                                </DescriptionListDescription>
+                            </DescriptionListGroup>
+                            <DescriptionListGroup>
+                                <DescriptionListTerm>{_("WiFi Security")}</DescriptionListTerm>
+                                <DescriptionListDescription>
+                                    {model.networkInterface.wifiSecurity === 'none' && _("None")}
+                                    {model.networkInterface.wifiSecurity === 'wep' && _("WEP")}
+                                    {model.networkInterface.wifiSecurity === 'wpa' && _("WPA/WPA2")}
+                                    {!model.networkInterface.wifiSecurity && _("(not set)")}
+                                </DescriptionListDescription>
+                            </DescriptionListGroup>
+                        </>
+                    )}
+                    {model.networkInterface.vlanId !== null && (
                         <DescriptionListGroup>
-                            <DescriptionListTerm>VLAN ID</DescriptionListTerm>
+                            <DescriptionListTerm>{_("VLAN ID")}</DescriptionListTerm>
                             <DescriptionListDescription>
                                 {model.networkInterface.vlanId}
+                                <Button
+                                variant="link"
+                                icon={<PencilAltIcon />}
+                                onClick={() => goToStepById('wizard-step-2')}
+                                aria-label={_("Edit network interface")}
+                                />
                             </DescriptionListDescription>
                         </DescriptionListGroup>
                     )}
 
-                    {/* IPv4 Configuration */}
+                    {/* Network Address Section */}
                     <DescriptionListGroup>
-                        <DescriptionListTerm><p>IPv4 Configuration</p></DescriptionListTerm>
+                        <DescriptionListTerm>{_("IPv4 Configuration")}</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.networkAddress.ipv4.method === 'dhcp' ? 'DHCPv4' : 'static'}
+                            {model.networkAddress.ipv4.method === 'auto' && _("Automatic (DHCP)")}
+                            {model.networkAddress.ipv4.method === 'static' && _("Static")}
+                            {model.networkAddress.ipv4.method === 'disabled' && _("Disabled")}
+                            <Button
+                                variant="link"
+                                icon={<PencilAltIcon />}
+                                onClick={() => goToStepById('wizard-step-3')}
+                                aria-label={_("Edit network address")}
+                            />
                         </DescriptionListDescription>
                     </DescriptionListGroup>
                     {model.networkAddress.ipv4.method === 'static' && (
@@ -89,9 +139,11 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                     <DescriptionListGroup>
                         <DescriptionListTerm>DNS servers</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.networkAddress.ipv4.autoDns ? (
-                                'auto'
-                            ) : (
+                            {model.networkAddress.ipv4.autoDns
+? (
+                                _("Automatic")
+                            )
+: (
     <>
         {model.networkAddress.ipv4.primaryDns && (
         <div>{model.networkAddress.ipv4.primaryDns}</div>
@@ -107,13 +159,18 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                         </DescriptionListDescription>
                     </DescriptionListGroup>
 
-                    {/* IPv4 Configuration */}
                     <DescriptionListGroup>
-                        <DescriptionListTerm><p>IPv6 Configuration</p></DescriptionListTerm>
+                        <DescriptionListTerm>{_("IPv6 Configuration")}</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.networkAddress.ipv6.method === 'dhcp' && 'DHCPv6'}
-                            {model.networkAddress.ipv6.method === 'static' && 'static'}
-                            {model.networkAddress.ipv6.method === 'disabled' && 'disabled'}
+                            {model.networkAddress.ipv6.method === 'auto' && _("Automatic (DHCP)")}
+                            {model.networkAddress.ipv6.method === 'static' && _("Static")}
+                            {model.networkAddress.ipv6.method === 'disabled' && _("Disabled")}
+                            <Button
+                                variant="link"
+                                icon={<PencilAltIcon />}
+                                onClick={() => goToStepById('wizard-step-3')}
+                                aria-label={_("Edit network address")}
+                            />
                         </DescriptionListDescription>
                     </DescriptionListGroup>
                     {model.networkAddress.ipv6.method === 'static' && (
@@ -136,9 +193,11 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                         <DescriptionListGroup>
                             <DescriptionListTerm>DNS servers</DescriptionListTerm>
                             <DescriptionListDescription>
-                                {model.networkAddress.ipv6.autoDns ? (
-                                    'auto'
-                                ) : (
+                                {model.networkAddress.ipv6.autoDns
+? (
+                                    _("Automatic")
+                                )
+: (
     <>
         {model.networkAddress.ipv6.primaryDns && (
         <div>{model.networkAddress.ipv6.primaryDns}</div>
@@ -155,73 +214,118 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                         </DescriptionListGroup>
                     )}
 
-                    {/* Network Services */}
+                    {/* Network Services Section */}
                     <DescriptionListGroup>
-                        <DescriptionListTerm><p>Network Services</p></DescriptionListTerm>
-                        <DescriptionListDescription><p /></DescriptionListDescription>
-                    </DescriptionListGroup>
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>NTP servers</DescriptionListTerm>
+                        <DescriptionListTerm>{_("NTP Servers")}</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.networkServices.ntp.autoConfig ? (
-                                'auto'
-                            ) : (
-                                model.networkServices.ntp.servers.length > 0 ? (
+                            {model.networkServices.ntp.autoConfig
+                                ? _("Automatic")
+                                : (model.networkServices.ntp.servers.length > 0
+                                    ? (
                                     model.networkServices.ntp.servers.map((server, index) => (
                                         <div key={index}>{server}</div>
                                     ))
-                                ) : (
-                                    <span>(empty)</span>
+                                )
+: (
+    <span>{_("(empty)")}</span>
                                 )
                             )}
+                            <Button
+                                variant="link"
+                                icon={<PencilAltIcon />}
+                                onClick={() => goToStepById('wizard-step-4')}
+                                aria-label={_("Edit network services")}
+                            />
+                        </DescriptionListDescription>
+                    </DescriptionListGroup>
+                    <DescriptionListGroup>
+                        <DescriptionListTerm>{_("HTTP Proxy")}</DescriptionListTerm>
+                        <DescriptionListDescription>
+                            {model.networkServices.proxy.enabled
+                                ? (
+                                    <>
+                                        {model.networkServices.proxy.hostname && model.networkServices.proxy.port
+                                        ? `${model.networkServices.proxy.hostname}:${model.networkServices.proxy.port}`
+                                        : _("(incomplete configuration)")}
+                                        {model.networkServices.proxy.username && (
+                                        <div>{_("Username: ")} {model.networkServices.proxy.username}</div>
+                                    )}
+                                    </>
+                            )
+: _("Not configured")}
+                            <Button
+                                variant="link"
+                                icon={<PencilAltIcon />}
+                                onClick={() => goToStepById('wizard-step-4')}
+                                aria-label={_("Edit network services")}
+                            />
                         </DescriptionListDescription>
                     </DescriptionListGroup>
 
                     {hasEnrollmentScripts && (
                         <>
                             {/* Enrollment Section */}
-                            <DescriptionListGroup>
-                                <DescriptionListTerm><p>{_('Enrollment')}</p></DescriptionListTerm>
-                                <DescriptionListDescription><p /></DescriptionListDescription>
-                            </DescriptionListGroup>
-                            <DescriptionListGroup>
-                                <DescriptionListTerm>{_('Server')}</DescriptionListTerm>
-                                <DescriptionListDescription>
-                                    {model.enrollment.url || _('(empty)')}
-                                </DescriptionListDescription>
-                            </DescriptionListGroup>
-                            {model.enrollment.url && model.enrollment.url.startsWith('https://') && (
-                                <DescriptionListGroup>
-                                    <DescriptionListTerm>{_('TLS Verification')}</DescriptionListTerm>
-                                    <DescriptionListDescription>
-                                        {model.enrollment.skipTlsVerification ? _('disabled (insecure)') : _('enabled')}
-                                    </DescriptionListDescription>
-                                </DescriptionListGroup>
-                            )}
-                            {model.enrollment.authMethod === 'username-password' && (
-                                <>
-                                    <DescriptionListGroup>
-                                        <DescriptionListTerm>{_('Username')}</DescriptionListTerm>
+                            {config?.enrollmentServices?.map(service => {
+                                const isSelected = model.enrollment.selectedServices.includes(service.id);
+
+                                if (!isSelected) {
+                                    // Service not selected - show "Skip enrollment"
+                                    return (
+                                        <DescriptionListGroup key={service.id}>
+                                            <DescriptionListTerm>{service.name}</DescriptionListTerm>
+                                            <DescriptionListDescription>
+                                                {_("Skip enrollment")}
+                                                <Button
+                                                    variant="link"
+                                                    icon={<PencilAltIcon />}
+                                                    onClick={() => goToStepById('wizard-step-5')}
+                                                    aria-label={_("Edit enrollment services")}
+                                                />
+                                            </DescriptionListDescription>
+                                        </DescriptionListGroup>
+                                    );
+                                }
+
+                                // Service selected - show "Enroll using" with endpoint and credentials
+                                const endpoint = model.enrollment.endpoints[service.id] || service.endpoint.url;
+                                const credentials = model.enrollment.credentials[service.id] || {};
+
+                                return (
+                                    <DescriptionListGroup key={service.id}>
+                                        <DescriptionListTerm>{service.name}</DescriptionListTerm>
                                         <DescriptionListDescription>
-                                            {model.enrollment.username || _('(empty)')}
+                                            <div>
+                                                {_("Enroll in ")} {endpoint}
+                                            </div>
+                                            {Object.keys(credentials).length > 0 && (
+                                                <div>
+                                                    {Object.entries(credentials).map(([key, value]) => {
+                                                        // Hide password/token fields
+                                                        const isSecret = key.toLowerCase().includes('password') ||
+                                                                       key.toLowerCase().includes('token') ||
+                                                                       key.toLowerCase().includes('key');
+                                                        const displayValue = isSecret && value
+                                                            ? '•'.repeat(8)
+                                                            : String(value || _("(empty)"));
+
+                                                        return (
+                                                            <div key={key}>
+                                                                {key}: {displayValue}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                            <Button
+                                                variant="link"
+                                                icon={<PencilAltIcon />}
+                                                onClick={() => goToStepById('wizard-step-5')}
+                                                aria-label={_("Edit enrollment services")}
+                                            />
                                         </DescriptionListDescription>
                                     </DescriptionListGroup>
-                                    <DescriptionListGroup>
-                                        <DescriptionListTerm>{_('Password')}</DescriptionListTerm>
-                                        <DescriptionListDescription>
-                                            {model.enrollment.password ? '*'.repeat(model.enrollment.password.length) : _('(empty)')}
-                                        </DescriptionListDescription>
-                                    </DescriptionListGroup>
-                                </>
-                            )}
-                            {model.enrollment.authMethod === 'token' && (
-                                <DescriptionListGroup>
-                                    <DescriptionListTerm>{_('Token')}</DescriptionListTerm>
-                                    <DescriptionListDescription>
-                                        {model.enrollment.token || _('(empty)')}
-                                    </DescriptionListDescription>
-                                </DescriptionListGroup>
-                            )}
+                                );
+                            })}
                         </>
                     )}
                 </DescriptionList>

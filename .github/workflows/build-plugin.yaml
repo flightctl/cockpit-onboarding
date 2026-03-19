@@ -1,0 +1,40 @@
+name: Plugin Build
+
+on:
+  push:
+    branches: [main, "**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build RPM
+    runs-on: ubuntu-latest
+    container:
+      image: quay.io/centos/centos:stream9
+    steps:
+      - name: Install build dependencies
+        run: |
+          dnf module enable -y nodejs:20
+          dnf install -y git make rpm-build nodejs npm gettext \
+            libappstream-glib systemd-rpm-macros
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fix git ownership
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Build RPM
+        run: make rpm
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cockpit-system-onboarding-rpm
+          path: "*.rpm"

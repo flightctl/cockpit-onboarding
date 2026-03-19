@@ -5,8 +5,10 @@
 #  - patterns to match files in subdirs
 
 # general patterns
+*.log
 *.pyc
 *.rpm
+.env*
 
 # toplevel (/...)
 /Test*.html
@@ -17,10 +19,13 @@
 /*.whl
 /bots
 /cockpit-*.tar.xz
-/cockpit-navigator.spec
+/cockpit-system-onboarding.spec
+/coverage/
 /dist/
 /package-lock.json
-/pkg/
+/pkg/*
+# Exception: TypeScript definitions created by this project
+!/pkg/networkmanager/interfaces.d.ts
 /node_modules/
 /tmp/
 /tools/

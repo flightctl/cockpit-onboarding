@@ -19,20 +19,21 @@
 
 import cockpit from 'cockpit';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useEvent, useObject } from "hooks";
 
 import * as service from 'service.js';
-import { NetworkManagerModel, Interface } from './interfaces.js';
+import { NetworkManagerModel, Interface } from '../pkg/networkmanager/interfaces.js';
 
 import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
-import { ModelProvider } from './model-context';
+import { ModelProvider, useModelContext } from './model-context';
+import { loadConfig } from './config-loader';
+import { SystemOnboardingConfig } from './types';
 
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist/esm/components/Page/index.js";
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
-import { Flex } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
-import { Wizard, WizardStep } from '@patternfly/react-core';
+import { Wizard, WizardStep } from "@patternfly/react-core/dist/esm/components/Wizard/index.js";
 
 import { HostnamePage } from './wizard/HostnamePage.tsx';
 import { NetworkInterfacePage } from './wizard/NetworkInterfacePage.tsx';
@@ -41,12 +42,40 @@ import { NetworkServicesPage } from './wizard/NetworkServicesPage.tsx';
 import { EnrollmentPage } from './wizard/EnrollmentPage.tsx';
 import { ReviewPage } from './wizard/ReviewPage.tsx';
 import { EnrollmentProgressPage } from './wizard/EnrollmentProgressPage.tsx';
+import {
+    validateHostnameStep,
+    validateNetworkInterfaceStep,
+    validateNetworkAddressStep,
+    validateNetworkServicesStep,
+    validateEnrollmentStep,
+} from './wizard/step-validation';
 
 import { WithDialogs } from "dialogs.jsx";
 
 const _ = cockpit.gettext;
 
+// Configuration context to provide loaded configuration throughout the app
+interface ConfigContextType {
+    config: SystemOnboardingConfig | null;
+    isConfigLoaded: boolean;
+    configError: string | null;
+}
+
+const ConfigContext = createContext<ConfigContextType>({
+    config: null,
+    isConfigLoaded: false,
+    configError: null,
+});
+
+export const useConfig = () => useContext(ConfigContext);
+
 export const Application = () => {
+    const [config, setConfig] = useState<SystemOnboardingConfig | null>(null);
+    const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+    const [configError, setConfigError] = useState<string | null>(null);
+    const [onboardingComplete, setOnboardingComplete] = useState(false);
+    const [checkingMarker, setCheckingMarker] = useState(true);
+
     const nmService = useObject(() => service.proxy("NetworkManager"),
                                 null,
                                 []);
@@ -55,11 +84,81 @@ export const Application = () => {
     const networkManager = useObject(() => new NetworkManagerModel(), null, []);
     useEvent(networkManager, "changed");
 
-    const nmRunning_ref = useRef(undefined);
-    useEvent(networkManager.client, "owner", (event, owner) => { nmRunning_ref.current = owner !== null });
+    const nmRunning_ref = useRef<boolean | undefined>(undefined);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useEvent(networkManager.client as any, "owner", (_event, owner) => { nmRunning_ref.current = owner !== null });
 
-    if (networkManager.ready === undefined)
+    // Check for onboarding completion marker file
+    useEffect(() => {
+        const markerPath = '/var/lib/cockpit-system-onboarding/.onboarding-complete';
+        const markerFile = cockpit.file(markerPath);
+
+        markerFile.read()
+                .then((content) => {
+                    // File exists with content - onboarding is complete
+                    // read() returns null when file doesn't exist
+                    if (content !== null) {
+                        setOnboardingComplete(true);
+                        console.log('Onboarding already complete (marker file exists)');
+                    } else {
+                        setOnboardingComplete(false);
+                        console.log('Marker file does not exist - onboarding not complete');
+                    }
+                })
+                .catch((error) => {
+                    // Error reading file (permissions, etc.) - assume not complete
+                    console.log('Error checking marker file:', error);
+                    setOnboardingComplete(false);
+                })
+                .finally(() => {
+                    setCheckingMarker(false);
+                    markerFile.close();
+                });
+    }, []);
+
+    // Load configuration on mount
+    useEffect(() => {
+        loadConfig()
+                .then(loadedConfig => {
+                    setConfig(loadedConfig);
+                    setIsConfigLoaded(true);
+                    console.log('Configuration loaded successfully:', loadedConfig);
+                })
+                .catch(error => {
+                    console.error('Failed to load configuration:', error);
+                    setConfigError(error.message || 'Unknown error loading configuration');
+                    setIsConfigLoaded(true); // Mark as loaded even on error to show error state
+                });
+    }, []);
+
+    // Show loading while checking marker file or loading configuration
+    if (checkingMarker || !isConfigLoaded || networkManager.ready === undefined)
         return <EmptyStatePanel loading />;
+
+    // Show message if onboarding is already complete
+    if (onboardingComplete) {
+        return (
+            <div id="system-onboarding-already-complete">
+                <EmptyStatePanel
+                    title={_("Onboarding complete")}
+                    paragraph={_("System onboarding has already been completed on this device.")}
+                />
+            </div>
+        );
+    }
+
+    // Show error if configuration failed to load
+    if (configError) {
+        return (
+            <div id="system-onboarding-config-error">
+                <EmptyStatePanel
+                    icon={ExclamationCircleIcon}
+                    title={_("Configuration error")}
+                    paragraph={configError}
+                />
+            </div>
+        );
+    }
 
     if (!nmRunning_ref.current) {
         if (nmService.enabled) {
@@ -69,7 +168,7 @@ export const Application = () => {
 icon={ ExclamationCircleIcon }
                                      title={ _("NetworkManager is not running") }
                                      action={nmService.exists ? _("Start service") : null}
-                                     onAction={ nmService.start }
+                                     onAction={ () => nmService.start() }
                                      secondary={
                                          <Button
 component="a"
@@ -85,7 +184,8 @@ component="a"
         } else if (!nmService.exists) {
             return (
                 <div id="networking-nm-not-found">
-                    <EmptyStatePanel icon={ ExclamationCircleIcon }
+                    <EmptyStatePanel
+icon={ ExclamationCircleIcon }
                                      title={ _("NetworkManager is not installed") }
                     />
 
@@ -94,7 +194,8 @@ component="a"
         } else {
             return (
                 <div id="networking-nm-disabled">
-                    <EmptyStatePanel icon={ ExclamationCircleIcon }
+                    <EmptyStatePanel
+icon={ ExclamationCircleIcon }
                                      title={ _("Network devices and graphs require NetworkManager") }
                                      action={nmService.exists ? _("Enable service") : null}
                                      onAction={() => {
@@ -110,75 +211,199 @@ component="a"
 
     const interfaces = networkManager.list_interfaces();
 
-    /* At this point NM is running and the model is ready */
+    /* At this point NM is running, the model is ready, and configuration is loaded */
     return (
-        <ModelProvider networkManager={networkManager}>
-            <WithDialogs key="1">
-                <SystemOnboardingWizard operationInProgress={networkManager.operationInProgress} interfaces={interfaces} />
-            </WithDialogs>
-        </ModelProvider>
+        <ConfigContext.Provider value={{ config, isConfigLoaded, configError }}>
+            <ModelProvider networkManager={networkManager}>
+                <WithDialogs key="1">
+                    <SystemOnboardingWizardWrapper interfaces={interfaces} />
+                </WithDialogs>
+            </ModelProvider>
+        </ConfigContext.Provider>
     );
 };
 
-interface SystemOnboardingWizardProps {
-    operationInProgress?: boolean;
-    interfaces: Interface[];
-}
+// Wrapper to wait for model initialization before showing wizard
+const SystemOnboardingWizardWrapper: React.FunctionComponent<{ interfaces: Interface[] }> = ({ interfaces }) => {
+    const { isInitialized } = useModelContext();
 
-const checkEnrollmentScripts = async (): Promise<boolean> => {
-    try {
-        // Use shell to expand $HOME environment variable
-        const proc = cockpit.spawn(['sh', '-c', 'find "$HOME/.config/cockpit/system-onboarding.d/" -name "*.sh" -type f -executable 2>/dev/null || true']);
-        const output = await proc;
-        const scripts = output.trim().split('\n')
-.filter(line => line.length > 0);
-        return scripts.length > 0;
-    } catch {
-        console.log('No enrollment scripts found or directory does not exist');
-        return false;
-    }
-};
-
-export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({ operationInProgress, interfaces }) => {
-    const [hasEnrollmentScripts, setHasEnrollmentScripts] = useState<boolean | null>(null);
-
-    useEffect(() => {
-        checkEnrollmentScripts().then(setHasEnrollmentScripts);
-    }, []);
-
-    // Show loading while checking for scripts
-    if (hasEnrollmentScripts === null) {
+    // Wait for model to be initialized with system data before showing wizard
+    if (!isInitialized) {
         return <EmptyStatePanel loading />;
     }
 
-    const reviewButtonText = hasEnrollmentScripts ? _('Enroll') : _('Apply');
-    const finalStepName = hasEnrollmentScripts ? _('Apply and enroll') : _('Apply configuration');
+    return <SystemOnboardingWizard interfaces={interfaces} />;
+};
+
+interface SystemOnboardingWizardProps {
+    interfaces: Interface[];
+}
+
+export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({ interfaces }) => {
+    const { config } = useConfig();
+    const { model, cancelEnrollmentRef } = useModelContext();
+    const [currentStepIndex, setCurrentStepIndex] = useState(1);
+    const [maxReachedStep, setMaxReachedStep] = useState(1);
+
+    // Check if enrollment services are configured (controls whether step 5 is shown)
+    const hasEnrollmentServices = Boolean(config && config.enrollmentServices && config.enrollmentServices.length > 0);
+    // Check if the user actually selected any enrollment services
+    const hasSelectedEnrollments = hasEnrollmentServices && model.enrollment.selectedServices.length > 0;
+
+    const reviewButtonText = hasSelectedEnrollments ? _("Enroll") : _("Apply");
+    const finalStepName = hasSelectedEnrollments ? _("Apply and enroll") : _("Apply configuration");
+
+    // Compute validation state for each step
+    const isHostnameValid = validateHostnameStep(model);
+    const isNetworkInterfaceValid = validateNetworkInterfaceStep(model);
+    const isNetworkAddressValid = validateNetworkAddressStep(model);
+    const isNetworkServicesValid = validateNetworkServicesStep(model);
+    const isEnrollmentValid = validateEnrollmentStep(model, config?.enrollmentServices);
+
+    // Map step index to validation state
+    const stepValidations = [
+        isHostnameValid, // step 1
+        isNetworkInterfaceValid, // step 2
+        isNetworkAddressValid, // step 3
+        isNetworkServicesValid, // step 4
+        isEnrollmentValid, // step 5 (if enrollment enabled)
+        true, // review step - always valid
+        true, // progress step - always valid
+    ];
+
+    // Handle step navigation - using PatternFly Wizard's correct signature
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+    const handleStepChange = (_event: any, currentStep: any, _prevStep: any) => {
+        const stepId = typeof currentStep.id === 'string' ? currentStep.id : '';
+        const stepNumber = parseInt(stepId.split('-').pop() || '1', 10);
+
+        setCurrentStepIndex(stepNumber);
+
+        // Update max reached step if user progresses forward with valid data
+        if (stepNumber > maxReachedStep && stepValidations[currentStepIndex - 1]) {
+            setMaxReachedStep(stepNumber);
+        }
+    };
+
+    // Determine which steps should be disabled
+    // Users can only navigate to steps they've reached or the next step if current is valid
+    const canNavigateToStep = (stepNumber: number): boolean => {
+        // Can always go to steps we've already reached
+        if (stepNumber <= maxReachedStep) {
+            return false; // not disabled
+        }
+
+        // Can go to the next step only if current step is valid
+        if (stepNumber === maxReachedStep + 1 && stepValidations[maxReachedStep - 1]) {
+            return false; // not disabled
+        }
+
+        // Cannot skip ahead
+        return true; // disabled
+    };
+
+    // Dynamic footer configuration for EnrollmentProgressPage
+    const enrollmentExecutionState = model.enrollmentProgress.executionState;
+    const getProgressPageFooter = () => {
+        if (enrollmentExecutionState === 'running') {
+            // While running: disable Back, enable Next as "Cancel"
+            return {
+                isBackDisabled: true,
+                isNextDisabled: false,
+                nextButtonText: _("Cancel"),
+                onNext: () => {
+                    if (cancelEnrollmentRef.current) {
+                        cancelEnrollmentRef.current();
+                    }
+                },
+                isCancelHidden: true
+            };
+        } else if (enrollmentExecutionState === 'success') {
+            // On success: disable Back, enable Next as "Finish"
+            return {
+                isBackDisabled: true,
+                isNextDisabled: false,
+                nextButtonText: _("Finish"),
+                isCancelHidden: true
+            };
+        } else if (enrollmentExecutionState === 'failed') {
+            // On failure: enable Back, disable Next
+            return {
+                isBackDisabled: false,
+                isNextDisabled: true,
+                nextButtonText: _("Finish"),
+                isCancelHidden: true
+            };
+        } else {
+            // Default/idle state
+            return {
+                isBackDisabled: true,
+                nextButtonText: _("Finish"),
+                isCancelHidden: true
+            };
+        }
+    };
 
     return (
-        <Page className='no-masthead-sidebar' isContentFilled={true} id="system-onboarding-wizard">
+        <Page className='no-masthead-sidebar' isContentFilled id="system-onboarding-wizard">
             <PageSection hasBodyWrapper={false} type={PageSectionTypes.wizard} padding={{ default: 'noPadding' }} aria-label="Wizard container">
-                <Wizard>
-                    <WizardStep name={_('Hostname')} id="wizard-step-1">
+                <Wizard onStepChange={handleStepChange}>
+                    <WizardStep
+                        name={_("Hostname")}
+                        id="wizard-step-1"
+                        footer={{ isNextDisabled: !isHostnameValid, isCancelHidden: true }}
+                        isDisabled={canNavigateToStep(1)}
+                    >
                         <HostnamePage />
                     </WizardStep>
-                    <WizardStep name={_('Network interface')} id="wizard-step-2">
-                        <NetworkInterfacePage operationInProgress={operationInProgress} interfaces={interfaces} />
+                    <WizardStep
+                        name={_("Network interface")}
+                        id="wizard-step-2"
+                        footer={{ isNextDisabled: !isNetworkInterfaceValid, isCancelHidden: true }}
+                        isDisabled={canNavigateToStep(2)}
+                    >
+                        <NetworkInterfacePage interfaces={interfaces} />
                     </WizardStep>
-                    <WizardStep name={_('Network address')} id="wizard-step-3">
+                    <WizardStep
+                        name={_("Network address")}
+                        id="wizard-step-3"
+                        footer={{ isNextDisabled: !isNetworkAddressValid, isCancelHidden: true }}
+                        isDisabled={canNavigateToStep(3)}
+                    >
                         <NetworkAddressPage />
                     </WizardStep>
-                    <WizardStep name={_('Network services')} id="wizard-step-4">
+                    <WizardStep
+                        name={_("Network services")}
+                        id="wizard-step-4"
+                        footer={{ isNextDisabled: !isNetworkServicesValid, isCancelHidden: true }}
+                        isDisabled={canNavigateToStep(4)}
+                    >
                         <NetworkServicesPage />
                     </WizardStep>
-                    {hasEnrollmentScripts && (
-                        <WizardStep name={_('Enrollment server')} id="wizard-step-5">
+                    {hasEnrollmentServices && (
+                        <WizardStep
+                            name={_("Enrollment server")}
+                            id="wizard-step-5"
+                            footer={{ isNextDisabled: !isEnrollmentValid, isCancelHidden: true }}
+                            isDisabled={canNavigateToStep(5)}
+                        >
                             <EnrollmentPage />
                         </WizardStep>
                     )}
-                    <WizardStep name={_('Review')} id={hasEnrollmentScripts ? "wizard-step-6" : "wizard-step-5"} footer={{ nextButtonText: reviewButtonText }}>
-                        <ReviewPage hasEnrollmentScripts={hasEnrollmentScripts} />
+                    <WizardStep
+                        name={_("Review")}
+                        id={hasEnrollmentServices ? "wizard-step-6" : "wizard-step-5"}
+                        footer={{ nextButtonText: reviewButtonText, isCancelHidden: true }}
+                        isDisabled={canNavigateToStep(hasEnrollmentServices ? 6 : 5)}
+                    >
+                        <ReviewPage hasEnrollmentScripts={hasEnrollmentServices} />
                     </WizardStep>
-                    <WizardStep name={finalStepName} id={hasEnrollmentScripts ? "wizard-step-7" : "wizard-step-6"} footer={{ nextButtonText: _('Finish'), isBackDisabled: true }}>
+                    <WizardStep
+                        name={finalStepName}
+                        id={hasEnrollmentServices ? "wizard-step-7" : "wizard-step-6"}
+                        footer={getProgressPageFooter()}
+                        isDisabled={canNavigateToStep(hasEnrollmentServices ? 7 : 6)}
+                    >
                         <EnrollmentProgressPage />
                     </WizardStep>
                 </Wizard>
