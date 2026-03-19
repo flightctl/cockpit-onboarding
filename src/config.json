@@ -6,9 +6,9 @@
   "autoReboot": false,
   "network": {
     "wifiAp": {
-      "enabled": false,
+      "enabled": true,
       "ssidPrefix": "cockpit-",
-      "password": "onboarding"
+      "password": ""
     },
     "ethernet": {
       "enabled": true,
