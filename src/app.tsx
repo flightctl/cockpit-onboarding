@@ -319,11 +319,30 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                 isCancelHidden: true
             };
         } else if (enrollmentExecutionState === 'success') {
-            // On success: disable Back, enable Next as "Finish"
+            // On success: navigate to completion page immediately, then run cleanup
+            // after a short delay. Cleanup tears down the WiFi AP, so we must show
+            // the user feedback first before the connection drops.
+            const wantReboot = config?.autoReboot === true;
+            const cleanupScript = '/usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh';
+            const runCleanup = () =>
+                cockpit.spawn(['sudo', cleanupScript], { err: 'message' })
+                        .catch(error => console.warn('Cleanup failed:', error));
+            const handleFinish = () => {
+                // Marker file is already written — reload shows the "Onboarding complete" page
+                window.location.reload();
+                // Fire cleanup after a delay so the page has time to render
+                setTimeout(() => runCleanup(), 2000);
+            };
+            const handleFinishAndReboot = () => {
+                // Reboot triggers systemd ExecStop which runs cleanup automatically
+                cockpit.spawn(['sudo', 'shutdown', '-r', 'now'], { err: 'message' })
+                        .catch(error => console.error('Failed to trigger reboot:', error));
+            };
             return {
                 isBackDisabled: true,
                 isNextDisabled: false,
-                nextButtonText: _("Finish"),
+                nextButtonText: wantReboot ? _("Finish & Reboot") : _("Finish"),
+                onNext: wantReboot ? handleFinishAndReboot : handleFinish,
                 isCancelHidden: true
             };
         } else if (enrollmentExecutionState === 'failed') {

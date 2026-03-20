@@ -119,8 +119,8 @@ export class SystemConfigurationService {
                 return '';
             }
 
-            // Create NetworkManager D-Bus client with superuser access
-            const nmClient = cockpit.dbus('org.freedesktop.NetworkManager', { superuser: 'try' });
+            // Create NetworkManager D-Bus client (polkit rule authorizes the onboarding user)
+            const nmClient = cockpit.dbus('org.freedesktop.NetworkManager');
             // Ip4Config is actually a D-Bus path string, not the config object
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const ip4ConfigProxy = nmClient.proxy('org.freedesktop.NetworkManager.IP4Config', activeConnection.Ip4Config as any as string);
@@ -217,8 +217,8 @@ export class SystemConfigurationService {
         }
 
         try {
-            // Create D-Bus client for hostname1 service with superuser options
-            const hostnameClient = cockpit.dbus('org.freedesktop.hostname1', { superuser: 'try' });
+            // Create D-Bus client for hostname1 service (polkit rule authorizes the onboarding user)
+            const hostnameClient = cockpit.dbus('org.freedesktop.hostname1');
             const hostnameProxy = hostnameClient.proxy('org.freedesktop.hostname1', '/org/freedesktop/hostname1');
 
             // Wait for proxy to be ready
@@ -424,8 +424,8 @@ export class SystemConfigurationService {
         const results: string[] = [];
 
         try {
-            // Create timedate1 proxy for NTP configuration with superuser access
-            const timedateClient = cockpit.dbus('org.freedesktop.timedate1', { superuser: 'try' });
+            // Create timedate1 proxy for NTP configuration (polkit rule authorizes the onboarding user)
+            const timedateClient = cockpit.dbus('org.freedesktop.timedate1');
             const timedateProxy = timedateClient.proxy('org.freedesktop.timedate1', '/org/freedesktop/timedate1');
 
             // Wait for proxy to be ready
@@ -444,43 +444,28 @@ export class SystemConfigurationService {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (timedateProxy as any).call('SetNTP', [true, true]);
 
+            // Disable NTP before changing server config
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (timedateProxy as any).call('SetNTP', [false, true]);
+
+            // Write NTP config files via a helper script run with sudo.
+            // We can't use serverTime.js set_custom_ntp() because it uses
+            // { superuser: "require" } which needs Cockpit's superuser bridge.
+            const ntpScript = '/usr/libexec/cockpit-system-onboarding/configure-ntp.sh';
             if (autoConfig) {
+                await cockpit.spawn(['sudo', ntpScript, 'auto'], { err: 'message' });
                 results.push('NTP enabled with automatic server selection');
             } else if (servers.length > 0) {
-                // Initialize ServerTime if not already done
-                if (!this.serverTime) {
-                    this.serverTime = new ServerTime();
-                }
-
-                // Set custom NTP servers using the correct sequence from serverTime.js
-                try {
-                    // Step 1: Get current NTP configuration to determine backend
-                    const currentNtpConfig = await this.serverTime.get_custom_ntp();
-                    console.log('Current NTP config:', currentNtpConfig);
-
-                    // Step 2: Turn off NTP
-                    await this.serverTime.set_ntp(false);
-
-                    // Step 3: Set custom NTP configuration with proper backend
-                    const customNtpConfig = {
-                        backend: currentNtpConfig.backend, // Use existing backend (timesyncd or chronyd)
-                        enabled: true,
-                        servers: servers.filter(s => !!s) // Filter out empty servers
-                    };
-                    console.log('Setting NTP config:', customNtpConfig);
-                    await this.serverTime.set_custom_ntp(customNtpConfig);
-
-                    // Step 4: Turn NTP back on
-                    await this.serverTime.set_ntp(true);
-
-                    results.push(`NTP configured with custom servers (${currentNtpConfig.backend}): ${servers.join(', ')}`);
-                } catch (serverTimeError) {
-                    console.warn('Failed to set custom NTP servers via ServerTime:', serverTimeError);
-                    results.push(`NTP enabled (custom servers: ${servers.join(', ')} - configuration may have failed: ${String(serverTimeError)})`);
-                }
+                const filteredServers = servers.filter(s => !!s);
+                await cockpit.spawn(['sudo', ntpScript, 'set', ...filteredServers], { err: 'message' });
+                results.push(`NTP configured with custom servers: ${filteredServers.join(', ')}`);
             } else {
                 results.push('NTP enabled with default configuration');
             }
+
+            // Re-enable NTP
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (timedateProxy as any).call('SetNTP', [true, true]);
 
             timedateClient.close();
         } catch (error) {
@@ -570,8 +555,8 @@ export class SystemConfigurationService {
         security: 'none' | 'wep' | 'wpa';
     } | null> {
         try {
-            // Use superuser access to read connection secrets
-            const nmClient = cockpit.dbus('org.freedesktop.NetworkManager', { superuser: 'try' });
+            // Read connection secrets (polkit rule authorizes the onboarding user)
+            const nmClient = cockpit.dbus('org.freedesktop.NetworkManager');
             const nmManager = nmClient.proxy('org.freedesktop.NetworkManager', '/org/freedesktop/NetworkManager');
 
             // Wait for manager proxy to be ready
@@ -751,8 +736,8 @@ export class SystemConfigurationService {
             // Get device path from NetworkManager
             // We need to find the device path by querying NetworkManager for all devices
             // and finding the one with matching Interface property
-            // Use superuser access for WiFi scanning (requires elevated privileges)
-            const nmClient = cockpit.dbus('org.freedesktop.NetworkManager', { superuser: 'try' });
+            // WiFi scanning (polkit rule authorizes the onboarding user)
+            const nmClient = cockpit.dbus('org.freedesktop.NetworkManager');
             const nmManager = nmClient.proxy('org.freedesktop.NetworkManager', '/org/freedesktop/NetworkManager');
 
             // Wait for manager proxy to be ready

@@ -5,10 +5,6 @@
 #
 # This file should be installed to /etc/sudoers.d/cockpit-system-onboarding with mode 0440.
 
-# Cockpit privileged bridge - allows automatic administrative access in Cockpit
-# without requiring the user to click "Administrative access"
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/cockpit-bridge
-
 # Hostname configuration
 onboarding ALL=(ALL) NOPASSWD: /usr/bin/hostnamectl set-hostname *
 
@@ -27,6 +23,12 @@ onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart systemd-timesyncd
 onboarding ALL=(ALL) NOPASSWD: /usr/bin/ip link set * up
 onboarding ALL=(ALL) NOPASSWD: /usr/bin/ip link set * down
 onboarding ALL=(ALL) NOPASSWD: /usr/bin/ip addr add * dev *
+
+# Reboot after onboarding completes
+onboarding ALL=(ALL) NOPASSWD: /usr/sbin/shutdown -r now
+
+# NTP configuration helper
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/configure-ntp.sh *
 
 # Cleanup script (executed after successful onboarding)
 onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh

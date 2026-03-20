@@ -1,4 +1,6 @@
 import React from 'react';
+import cockpit from 'cockpit';
+const _ = cockpit.gettext;
 
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
@@ -90,7 +92,12 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
     state: 'State'
   };
 
-  const isIfaceSelectable = (iface: import('../../pkg/networkmanager/interfaces.js').Interface) => iface.Device && is_managed(iface.Device);
+  const isIfaceSelectable = (iface: import('../../pkg/networkmanager/interfaces.js').Interface) => {
+    if (!iface.Device) return false;
+    // Allow selecting WiFi interfaces even if unmanaged (e.g. used as AP during onboarding)
+    if (iface.Device.DeviceType === '802-11-wireless') return true;
+    return is_managed(iface.Device);
+  };
 
   // Initialize selection if not set
   React.useEffect(() => {
@@ -335,89 +342,138 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
     rate: 'Rate'
   };
 
+  const scanUnavailable = !isScanning && scanError !== null && networks.length === 0;
+
+  const handleSsidChange = (value: string) => {
+    updateModel('networkInterface', { wifiSsid: value, interfaceType: 'wifi' });
+  };
+
+  const handleSecurityChange = (security: 'none' | 'wep' | 'wpa') => {
+    updateModel('networkInterface', {
+      wifiSecurity: security,
+      wifiPassword: security === 'none' ? null : model.networkInterface.wifiPassword,
+    });
+  };
+
+  // Show password field when a secured network is selected (via scan or manual entry)
+  // Show password when security is not 'none' (null defaults to WPA, matching the radio state)
+  const showPassword = model.networkInterface.wifiSecurity !== 'none' &&
+    (scanUnavailable || selectedBssid !== null);
+
   return (
       <Stack hasGutter>
           <StackItem>
-              <p>Select a WiFi network to connect to:</p>
+              <p>{_("Select a WiFi network to connect to:")}</p>
           </StackItem>
 
-          {scanError && (
-          <StackItem>
-              <Alert variant="warning" title="WiFi scan failed" isInline>
-                  {scanError}
-              </Alert>
-          </StackItem>
-      )}
-
-          {isScanning
-? (
-    <StackItem>
-        <Spinner size="md" /> Scanning for WiFi networks...
-    </StackItem>
-      )
-: (
-    <>
-        <StackItem>
-            <Table aria-label="WiFi network selector" variant="compact">
-                <Thead>
-                    <Tr>
-                        <Th screenReaderText="Row select" />
-                        <Th>{columnNames.ssid}</Th>
-                        <Th>{columnNames.signal}</Th>
-                        <Th>{columnNames.security}</Th>
-                        <Th>{columnNames.channel}</Th>
-                        <Th>{columnNames.band}</Th>
-                        <Th>{columnNames.rate}</Th>
-                    </Tr>
-                </Thead>
-                <Tbody>
-                    {networks.map((network) => (
-                        <Tr key={network.bssid}>
-                            <Td>
-                                <Radio
-                                    id={`wifi-radio-${network.bssid}`}
-                                    name="wifi-network-select"
-                                    isChecked={selectedBssid === network.bssid}
-                                    onChange={() => handleNetworkSelection(network.bssid)}
-                                    aria-label={`Select ${network.ssid}`}
-                                />
-                            </Td>
-                            <Td dataLabel={columnNames.ssid}>{network.ssid}</Td>
-                            <Td dataLabel={columnNames.signal}>
-                                <span style={{ fontFamily: 'monospace', verticalAlign: 'bottom', lineHeight: '1' }}>
-                                    {getSignalIcon(network.strength)}
-                                </span>{' '}
-                                {network.strength}%
-                            </Td>
-                            <Td dataLabel={columnNames.security}>{network.security}</Td>
-                            <Td dataLabel={columnNames.channel}>{network.channel}</Td>
-                            <Td dataLabel={columnNames.band}>{network.band}</Td>
-                            <Td dataLabel={columnNames.rate}>{network.rate} Mbps</Td>
-                        </Tr>
-                    ))}
-                </Tbody>
-            </Table>
-            <Button variant="link" onClick={handleRescan} icon={<WifiIcon />}>
-                Rescan
-            </Button>
-        </StackItem>
-
-        {selectedBssid && model.networkInterface.wifiSecurity !== 'none' && (
-        <StackItem>
-            <FormGroup label="WiFi Password" isRequired fieldId="wifi-password">
-                <TextInput
-                  type="password"
-                  id="wifi-password"
-                  value={model.networkInterface.wifiPassword || ''}
-                  onChange={(_, value) => handlePasswordChange(value)}
-                  aria-label="WiFi password"
-                  placeholder="Enter WiFi password"
-                />
-            </FormGroup>
-        </StackItem>
+          {isScanning && (
+              <StackItem>
+                  <Spinner size="md" /> {_("Scanning for WiFi networks...")}
+              </StackItem>
           )}
-    </>
-      )}
+
+          {!isScanning && (
+              <>
+                  <StackItem>
+                      <Table aria-label="WiFi network selector" variant="compact">
+                          <Thead>
+                              <Tr>
+                                  <Th screenReaderText="Row select" />
+                                  <Th>{columnNames.ssid}</Th>
+                                  <Th>{columnNames.signal}</Th>
+                                  <Th>{columnNames.security}</Th>
+                                  <Th>{columnNames.channel}</Th>
+                                  <Th>{columnNames.band}</Th>
+                                  <Th>{columnNames.rate}</Th>
+                              </Tr>
+                          </Thead>
+                          <Tbody>
+                              {networks.map((network) => (
+                                  <Tr key={network.bssid}>
+                                      <Td>
+                                          <Radio
+                                              id={`wifi-radio-${network.bssid}`}
+                                              name="wifi-network-select"
+                                              isChecked={selectedBssid === network.bssid}
+                                              onChange={() => handleNetworkSelection(network.bssid)}
+                                              aria-label={`Select ${network.ssid}`}
+                                          />
+                                      </Td>
+                                      <Td dataLabel={columnNames.ssid}>{network.ssid}</Td>
+                                      <Td dataLabel={columnNames.signal}>
+                                          <span style={{ fontFamily: 'monospace', verticalAlign: 'bottom', lineHeight: '1' }}>
+                                              {getSignalIcon(network.strength)}
+                                          </span>{' '}
+                                          {network.strength}%
+                                      </Td>
+                                      <Td dataLabel={columnNames.security}>{network.security}</Td>
+                                      <Td dataLabel={columnNames.channel}>{network.channel}</Td>
+                                      <Td dataLabel={columnNames.band}>{network.band}</Td>
+                                      <Td dataLabel={columnNames.rate}>{network.rate} Mbps</Td>
+                                  </Tr>
+                              ))}
+                          </Tbody>
+                      </Table>
+                      <Button variant="link" onClick={handleRescan} icon={<WifiIcon />}>
+                          {_("Rescan")}
+                      </Button>
+                  </StackItem>
+
+                  {scanUnavailable && (
+                      <StackItem>
+                          <Alert variant="warning" title={_("WiFi scanning unavailable")} isInline>
+                              {_("WiFi scanning while in access point mode is unavailable on this hardware.")}
+                          </Alert>
+                      </StackItem>
+                  )}
+
+                  <StackItem>
+                      <FormGroup label={_("WiFi Network (SSID)")} isRequired fieldId="wifi-ssid">
+                          <TextInput
+                              id="wifi-ssid"
+                              value={model.networkInterface.wifiSsid || ''}
+                              onChange={(_, value) => handleSsidChange(value)}
+                              aria-label="WiFi SSID"
+                              placeholder={_("Enter network name")}
+                          />
+                      </FormGroup>
+                  </StackItem>
+                  <StackItem>
+                      <FormGroup label={_("Security")} fieldId="wifi-security">
+                          <div style={{ display: 'flex', gap: '1.5rem' }}>
+                              <Radio
+                                  id="wifi-security-wpa"
+                                  name="wifi-security"
+                                  label="WPA/WPA2/WPA3"
+                                  isChecked={model.networkInterface.wifiSecurity !== 'none'}
+                                  onChange={() => handleSecurityChange('wpa')}
+                              />
+                              <Radio
+                                  id="wifi-security-none"
+                                  name="wifi-security"
+                                  label={_("None (open)")}
+                                  isChecked={model.networkInterface.wifiSecurity === 'none'}
+                                  onChange={() => handleSecurityChange('none')}
+                              />
+                          </div>
+                      </FormGroup>
+                  </StackItem>
+                  {showPassword && (
+                      <StackItem>
+                          <FormGroup label={_("WiFi Password")} isRequired fieldId="wifi-password">
+                              <TextInput
+                                  type="password"
+                                  id="wifi-password"
+                                  value={model.networkInterface.wifiPassword || ''}
+                                  onChange={(_, value) => handlePasswordChange(value)}
+                                  aria-label="WiFi password"
+                                  placeholder={_("Enter WiFi password")}
+                              />
+                          </FormGroup>
+                      </StackItem>
+                  )}
+              </>
+          )}
       </Stack>
   );
 };

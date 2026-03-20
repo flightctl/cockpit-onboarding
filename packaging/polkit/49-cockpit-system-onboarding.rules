@@ -1,0 +1,30 @@
+// Polkit rules for cockpit-system-onboarding
+// Allows the onboarding user to configure hostname, network, and time
+// without interactive authentication.
+
+polkit.addRule(function(action, subject) {
+    if (subject.user !== "onboarding")
+        return polkit.Result.NOT_HANDLED;
+
+    // Hostname configuration (org.freedesktop.hostname1)
+    if (action.id === "org.freedesktop.hostname1.set-static-hostname" ||
+        action.id === "org.freedesktop.hostname1.set-hostname" ||
+        action.id === "org.freedesktop.hostname1.set-pretty-hostname" ||
+        action.id === "org.freedesktop.hostname1.set-machine-info") {
+        return polkit.Result.YES;
+    }
+
+    // Time/NTP configuration (org.freedesktop.timedate1)
+    if (action.id === "org.freedesktop.timedate1.set-time" ||
+        action.id === "org.freedesktop.timedate1.set-timezone" ||
+        action.id === "org.freedesktop.timedate1.set-ntp") {
+        return polkit.Result.YES;
+    }
+
+    // NetworkManager configuration
+    if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0) {
+        return polkit.Result.YES;
+    }
+
+    return polkit.Result.NOT_HANDLED;
+});

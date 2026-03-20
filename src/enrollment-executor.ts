@@ -128,12 +128,11 @@ export async function executeEnrollmentScript(
     let stderr = '';
 
     return new Promise((resolve, reject) => {
-        // Spawn the enrollment script
-        const process = cockpit.spawn([service.scriptPath], {
+        // Spawn the enrollment script via sudo (allowed by sudoers rules)
+        const process = cockpit.spawn(['sudo', service.scriptPath], {
             environ,
             err: 'message', // Capture stderr separately
             directory: '/home/onboarding', // Working directory per API contract
-            superuser: 'try', // Try to use sudo if available
         });
 
         // Set timeout
