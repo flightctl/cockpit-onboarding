@@ -18,7 +18,7 @@ load_config() {
 
     # Try user override first
     if [ -f "$USER_CONFIG" ]; then
-        value=$(jq -r "$key // empty" "$USER_CONFIG" 2>/dev/null)
+        value=$(jq -r "$key" "$USER_CONFIG" 2>/dev/null)
         if [ -n "$value" ] && [ "$value" != "null" ]; then
             echo "$value"
             return
@@ -27,7 +27,7 @@ load_config() {
 
     # Fall back to default config
     if [ -f "$DEFAULT_CONFIG" ]; then
-        value=$(jq -r "$key // empty" "$DEFAULT_CONFIG" 2>/dev/null)
+        value=$(jq -r "$key" "$DEFAULT_CONFIG" 2>/dev/null)
         if [ -n "$value" ] && [ "$value" != "null" ]; then
             echo "$value"
             return
@@ -74,11 +74,15 @@ if [ "$RUN_ONCE" = "true" ]; then
         echo "Disabled $SERVICE_NAME"
     fi
 
-    # Stop and disable all WiFi AP template instances
-    for unit in $(systemctl list-units --plain --no-legend 'cockpit-system-onboarding-wifi-ap@*.service' 2>/dev/null | awk '{print $1}'); do
-        systemctl stop "$unit" 2>/dev/null || true
-        systemctl disable "$unit" 2>/dev/null || true
-        echo "Disabled $unit"
+    # Stop and disable all WiFi AP, dnsmasq, and captive portal template instances
+    for pattern in 'cockpit-system-onboarding-wifi-ap@*.service' \
+                   'cockpit-system-onboarding-dnsmasq@*.service' \
+                   'cockpit-system-onboarding-captive-portal@*.service'; do
+        for unit in $(systemctl list-units --plain --no-legend "$pattern" 2>/dev/null | awk '{print $1}'); do
+            systemctl stop "$unit" 2>/dev/null || true
+            systemctl disable "$unit" 2>/dev/null || true
+            echo "Disabled $unit"
+        done
     done
 
     # Clean up runtime files (hostapd configs, env files)

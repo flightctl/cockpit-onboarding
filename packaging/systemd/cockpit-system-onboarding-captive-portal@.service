@@ -1,0 +1,10 @@
+[Unit]
+Description=Cockpit Onboarding Captive Portal on %i
+BindsTo=cockpit-system-onboarding-wifi-ap@%i.service
+After=cockpit-system-onboarding-dnsmasq@%i.service
+
+[Service]
+Type=simple
+EnvironmentFile=/run/cockpit-system-onboarding/wifi-ap.env
+ExecStart=/usr/bin/python3 /usr/libexec/cockpit-system-onboarding/captive-portal.py ${WIFI_AP_ADDRESS}
+Restart=no

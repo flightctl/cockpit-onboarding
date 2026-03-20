@@ -1,12 +1,17 @@
 [Unit]
 Description=Cockpit Onboarding WiFi AP on %i
 PartOf=cockpit-system-onboarding-setup.service
+Wants=cockpit-system-onboarding-dnsmasq@%i.service
+Wants=cockpit-system-onboarding-captive-portal@%i.service
 
 [Service]
 Type=simple
 EnvironmentFile=/run/cockpit-system-onboarding/wifi-ap.env
+ExecStartPre=-/usr/bin/nmcli device disconnect %i
 ExecStartPre=-/usr/bin/nmcli device set %i managed no
-ExecStartPre=/usr/sbin/ip link set %i up
+# NM brings the interface down asynchronously after releasing it;
+# wait for that to settle before bringing it back up for hostapd.
+ExecStartPre=/bin/bash -c 'sleep 2 && /usr/sbin/ip link set %i up && for i in $(seq 10); do [ "$(cat /sys/class/net/%i/operstate)" != "down" ] && exit 0; sleep 0.5; done; echo "WARNING: %i did not come up"'
 # Copy hostapd config to /run/hostapd/ for correct SELinux labeling.
 # hostapd runs in hostapd_t domain (via hostapd_exec_t transition) which can
 # only read hostapd_var_run_t files. /var/run/hostapd(/.*)? has that label;

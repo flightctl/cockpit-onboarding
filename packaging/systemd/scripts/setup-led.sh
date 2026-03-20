@@ -14,7 +14,7 @@ load_config() {
 
     # Try user override first
     if [ -f "$USER_CONFIG" ]; then
-        value=$(jq -r "$key // empty" "$USER_CONFIG" 2>/dev/null)
+        value=$(jq -r "$key" "$USER_CONFIG" 2>/dev/null)
         if [ -n "$value" ] && [ "$value" != "null" ]; then
             echo "$value"
             return
@@ -23,7 +23,7 @@ load_config() {
 
     # Fall back to default config
     if [ -f "$DEFAULT_CONFIG" ]; then
-        value=$(jq -r "$key // empty" "$DEFAULT_CONFIG" 2>/dev/null)
+        value=$(jq -r "$key" "$DEFAULT_CONFIG" 2>/dev/null)
         if [ -n "$value" ] && [ "$value" != "null" ]; then
             echo "$value"
             return

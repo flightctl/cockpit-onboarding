@@ -17,7 +17,7 @@ load_config() {
 
     # Try user override first
     if [ -f "$USER_CONFIG" ]; then
-        value=$(jq -r "$key // empty" "$USER_CONFIG" 2>/dev/null)
+        value=$(jq -r "$key" "$USER_CONFIG" 2>/dev/null)
         if [ -n "$value" ] && [ "$value" != "null" ]; then
             echo "$value"
             return
@@ -26,7 +26,7 @@ load_config() {
 
     # Fall back to default config
     if [ -f "$DEFAULT_CONFIG" ]; then
-        value=$(jq -r "$key // empty" "$DEFAULT_CONFIG" 2>/dev/null)
+        value=$(jq -r "$key" "$DEFAULT_CONFIG" 2>/dev/null)
         if [ -n "$value" ] && [ "$value" != "null" ]; then
             echo "$value"
             return
@@ -111,6 +111,20 @@ auth_algs=1
 EOF
     echo "WiFi AP configured as open network (no password)"
 fi
+
+# Generate dnsmasq configuration for DHCP on the AP network
+DNSMASQ_CONF="$RUNTIME_DIR/dnsmasq-${WIFI_INTERFACE}.conf"
+cat > "$DNSMASQ_CONF" <<EOF
+interface=${WIFI_INTERFACE}
+bind-interfaces
+dhcp-range=10.42.0.10,10.42.0.50,255.255.255.0,1h
+dhcp-option=3,${DEFAULT_AP_ADDRESS}
+dhcp-option=6,${DEFAULT_AP_ADDRESS}
+no-resolv
+no-hosts
+address=/#/${DEFAULT_AP_ADDRESS}
+EOF
+echo "Generated dnsmasq DHCP config"
 
 # Generate environment file for the systemd service
 cat > "$RUNTIME_DIR/wifi-ap.env" <<EOF
