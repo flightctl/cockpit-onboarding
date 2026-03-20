@@ -13,6 +13,7 @@ ExecStartPre=/usr/libexec/cockpit-system-onboarding/check-dependencies.sh
 ExecStart=/usr/libexec/cockpit-system-onboarding/create-onboarding-user.sh
 ExecStart=/usr/libexec/cockpit-system-onboarding/setup-network.sh
 ExecStart=/usr/libexec/cockpit-system-onboarding/setup-wifi-ap.sh
+ExecStart=/bin/systemctl enable --now cockpit.socket
 ExecStart=/usr/libexec/cockpit-system-onboarding/setup-led.sh
 StandardOutput=journal
 StandardError=journal
