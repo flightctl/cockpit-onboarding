@@ -319,11 +319,25 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                 isCancelHidden: true
             };
         } else if (enrollmentExecutionState === 'success') {
-            // On success: disable Back, enable Next as "Finish"
+            // On success: run cleanup, then either navigate to completion page or reboot
+            const wantReboot = config?.autoReboot === true;
+            const cleanupScript = '/usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh';
+            const runCleanup = () =>
+                cockpit.spawn(['sudo', cleanupScript], { err: 'message' })
+                        .catch(error => console.warn('Cleanup failed:', error));
+            const handleFinish = () => {
+                runCleanup().then(() => window.location.reload());
+            };
+            const handleFinishAndReboot = () => {
+                runCleanup()
+                        .then(() => cockpit.spawn(['sudo', 'shutdown', '-r', 'now'], { err: 'message' }))
+                        .catch(error => console.error('Failed to trigger reboot:', error));
+            };
             return {
                 isBackDisabled: true,
                 isNextDisabled: false,
-                nextButtonText: _("Finish"),
+                nextButtonText: wantReboot ? _("Finish & Reboot") : _("Finish"),
+                onNext: wantReboot ? handleFinishAndReboot : handleFinish,
                 isCancelHidden: true
             };
         } else if (enrollmentExecutionState === 'failed') {

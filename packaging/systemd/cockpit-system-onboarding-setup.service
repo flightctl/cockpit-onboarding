@@ -15,6 +15,7 @@ ExecStart=/usr/libexec/cockpit-system-onboarding/setup-network.sh
 ExecStart=/usr/libexec/cockpit-system-onboarding/setup-wifi-ap.sh
 ExecStart=/bin/systemctl enable --now cockpit.socket
 ExecStart=/usr/libexec/cockpit-system-onboarding/setup-led.sh
+ExecStop=/usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh
 StandardOutput=journal
 StandardError=journal
 

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import cockpit from 'cockpit';
 
 import { Progress } from "@patternfly/react-core/dist/esm/components/Progress/index.js";
-import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { List, ListItem } from "@patternfly/react-core/dist/esm/components/List/index.js";
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
@@ -45,8 +44,6 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
     const [enrollmentServices, setEnrollmentServices] = useState<EnrollmentService[]>([]);
     const [steps, setSteps] = useState<Step[]>([]);
     const [results, setResults] = useState<ResultItem[]>([]);
-    const [autoReboot, setAutoReboot] = useState(false);
-    const [rebootCountdown, setRebootCountdown] = useState<number | null>(null);
     const shouldCancelRef = React.useRef(false);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const runningProcessRef = React.useRef<any>(null);
@@ -78,7 +75,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             // Load configuration to get enrollment services and reboot settings
             const config = await loadConfig();
             const configuredServices = config.enrollmentServices || [];
-            setAutoReboot(config.autoReboot === true);
+
 
             // Filter to only include services that the user selected
             const selectedServiceIds = model.enrollment.selectedServices || [];
@@ -396,19 +393,9 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             return { success: false, output: outputs.join('\n') };
         }
 
-        // Run cleanup script if it exists (allowed via sudoers)
-        try {
-            const cleanupScript = '/usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh';
-            await cockpit.spawn(
-                ['sudo', cleanupScript],
-                { err: 'out' }
-            );
-            outputs.push('✓ Post-onboarding cleanup completed');
-        } catch (error) {
-            // Cleanup failures are non-fatal - the marker file is already created
-            console.warn('Cleanup script failed or not found:', error);
-            outputs.push('- Cleanup script not available or failed (non-critical)');
-        }
+        // Note: cleanup script is NOT called here because it stops the WiFi AP,
+        // which would disconnect the user before they see the results.
+        // Cleanup runs on reboot via the setup service's ExecStop, or on package removal.
 
         return { success: true, output: outputs.join('\n') };
     };
@@ -484,38 +471,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         updateModel('enrollmentProgress', { executionState: 'success' });
     };
 
-    // Trigger reboot
-    const handleReboot = () => {
-        cockpit.spawn(['sudo', 'shutdown', '-r', 'now'], { err: 'message' })
-                .catch(error => {
-                    console.error('Failed to trigger reboot:', error);
-                });
-    };
-
-    // Auto-reboot countdown after successful completion
-    useEffect(() => {
-        if (model.enrollmentProgress.executionState !== 'success' || !autoReboot) {
-            return;
-        }
-
-        // Start 10-second countdown before auto-reboot
-        const COUNTDOWN_SECONDS = 10;
-        setRebootCountdown(COUNTDOWN_SECONDS);
-
-        const interval = setInterval(() => {
-            setRebootCountdown(prev => {
-                if (prev === null || prev <= 1) {
-                    clearInterval(interval);
-                    handleReboot();
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
-        return () => clearInterval(interval);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [model.enrollmentProgress.executionState, autoReboot]);
+    // Note: cleanup and reboot/finish actions are handled by the wizard footer in app.tsx
 
     // Set up cancellation handler
     useEffect(() => {
@@ -623,34 +579,9 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                             </Alert>
                         )}
                         {executionState === 'success' && (
-                            <>
-                                <Alert variant="success" title={_("Enrollment completed successfully")}>
-                                    {_("Your system has been configured and enrolled successfully.")}
-                                </Alert>
-                                {autoReboot
-                                    ? (
-                                        <Alert variant="info" title={_("System will reboot automatically")} style={{ marginTop: '0.5rem' }}>
-                                            {rebootCountdown !== null && rebootCountdown > 0
-                                                ? _("Rebooting in {{seconds}} seconds...").replace('{{seconds}}', String(rebootCountdown))
-                                                : _("Rebooting now...")}
-                                        </Alert>
-                                    )
-                                    : (
-                                        <Alert
-                                            variant="info"
-                                            title={_("Reboot required")}
-                                            style={{ marginTop: '0.5rem' }}
-                                            actionLinks={
-                                                <Button variant="link" onClick={handleReboot}>
-                                                    {_("Reboot now")}
-                                                </Button>
-                                            }
-                                        >
-                                            {_("A system reboot is recommended to fully apply all configuration changes. You can reboot now or do it later from the system menu.")}
-                                        </Alert>
-                                    )}
-
-                            </>
+                            <Alert variant="success" title={_("Configuration completed successfully")}>
+                                {_("Your system has been configured successfully.")}
+                            </Alert>
                         )}
                     </CardBody>
                 </Card>
