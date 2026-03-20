@@ -33,10 +33,11 @@ onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/configure-
 # Cleanup script (executed after successful onboarding)
 onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh
 
-# Enrollment scripts (user-provided)
+# Enrollment scripts
 # These paths allow enrollment scripts to run with elevated privileges
-onboarding ALL=(ALL) NOPASSWD: /home/onboarding/.config/cockpit/system-onboarding.d/*.sh
+onboarding ALL=(ALL) NOPASSWD: /usr/share/cockpit/system-onboarding/system-onboarding.d/*.sh
 onboarding ALL=(ALL) NOPASSWD: /etc/cockpit/system-onboarding.d/*.sh
+onboarding ALL=(ALL) NOPASSWD: /home/onboarding/.config/cockpit/system-onboarding.d/*.sh
 
 # LED control tool (if configured)
 onboarding ALL=(ALL) NOPASSWD: /usr/local/bin/led-control *
