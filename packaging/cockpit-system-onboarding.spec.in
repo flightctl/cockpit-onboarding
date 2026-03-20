@@ -65,6 +65,7 @@ install -m 755 packaging/systemd/scripts/setup-network.sh %{buildroot}%{_libexec
 install -m 755 packaging/systemd/scripts/setup-led.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/setup-wifi-ap.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/cleanup-onboarding.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/configure-ntp.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/captive-portal.py %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 
 # Install sudoers configuration

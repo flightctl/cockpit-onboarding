@@ -27,6 +27,9 @@ onboarding ALL=(ALL) NOPASSWD: /usr/bin/ip addr add * dev *
 # Reboot after onboarding completes
 onboarding ALL=(ALL) NOPASSWD: /usr/sbin/shutdown -r now
 
+# NTP configuration helper
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/configure-ntp.sh *
+
 # Cleanup script (executed after successful onboarding)
 onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh
 

@@ -444,43 +444,28 @@ export class SystemConfigurationService {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (timedateProxy as any).call('SetNTP', [true, true]);
 
+            // Disable NTP before changing server config
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (timedateProxy as any).call('SetNTP', [false, true]);
+
+            // Write NTP config files via a helper script run with sudo.
+            // We can't use serverTime.js set_custom_ntp() because it uses
+            // { superuser: "require" } which needs Cockpit's superuser bridge.
+            const ntpScript = '/usr/libexec/cockpit-system-onboarding/configure-ntp.sh';
             if (autoConfig) {
+                await cockpit.spawn(['sudo', ntpScript, 'auto'], { err: 'message' });
                 results.push('NTP enabled with automatic server selection');
             } else if (servers.length > 0) {
-                // Initialize ServerTime if not already done
-                if (!this.serverTime) {
-                    this.serverTime = new ServerTime();
-                }
-
-                // Set custom NTP servers using the correct sequence from serverTime.js
-                try {
-                    // Step 1: Get current NTP configuration to determine backend
-                    const currentNtpConfig = await this.serverTime.get_custom_ntp();
-                    console.log('Current NTP config:', currentNtpConfig);
-
-                    // Step 2: Turn off NTP
-                    await this.serverTime.set_ntp(false);
-
-                    // Step 3: Set custom NTP configuration with proper backend
-                    const customNtpConfig = {
-                        backend: currentNtpConfig.backend, // Use existing backend (timesyncd or chronyd)
-                        enabled: true,
-                        servers: servers.filter(s => !!s) // Filter out empty servers
-                    };
-                    console.log('Setting NTP config:', customNtpConfig);
-                    await this.serverTime.set_custom_ntp(customNtpConfig);
-
-                    // Step 4: Turn NTP back on
-                    await this.serverTime.set_ntp(true);
-
-                    results.push(`NTP configured with custom servers (${currentNtpConfig.backend}): ${servers.join(', ')}`);
-                } catch (serverTimeError) {
-                    console.warn('Failed to set custom NTP servers via ServerTime:', serverTimeError);
-                    results.push(`NTP enabled (custom servers: ${servers.join(', ')} - configuration may have failed: ${String(serverTimeError)})`);
-                }
+                const filteredServers = servers.filter(s => !!s);
+                await cockpit.spawn(['sudo', ntpScript, 'set', ...filteredServers], { err: 'message' });
+                results.push(`NTP configured with custom servers: ${filteredServers.join(', ')}`);
             } else {
                 results.push('NTP enabled with default configuration');
             }
+
+            // Re-enable NTP
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (timedateProxy as any).call('SetNTP', [true, true]);
 
             timedateClient.close();
         } catch (error) {
