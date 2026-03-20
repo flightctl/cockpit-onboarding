@@ -380,14 +380,14 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                 hostname: model.hostname.value,
             });
 
-            // Create directory and marker file via sudo
+            // Create directory and marker file (state dir is owned by onboarding user)
             await cockpit.spawn(
                 ['mkdir', '-p', markerDir],
-                { superuser: 'require', err: 'message' }
+                { err: 'message' }
             );
             await cockpit.spawn(
                 ['bash', '-c', `echo '${markerContent.replace(/'/g, "'\\''")}' > ${markerPath}`],
-                { superuser: 'require', err: 'message' }
+                { err: 'message' }
             );
             outputs.push('✓ Onboarding completion marker created');
         } catch (error) {
@@ -396,12 +396,12 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             return { success: false, output: outputs.join('\n') };
         }
 
-        // Run cleanup script if it exists
+        // Run cleanup script if it exists (allowed via sudoers)
         try {
-            const cleanupScript = '/usr/share/cockpit/system-onboarding/scripts/cleanup-onboarding.sh';
+            const cleanupScript = '/usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh';
             await cockpit.spawn(
-                ['bash', cleanupScript],
-                { superuser: 'require', err: 'out' }
+                ['sudo', cleanupScript],
+                { err: 'out' }
             );
             outputs.push('✓ Post-onboarding cleanup completed');
         } catch (error) {
@@ -486,7 +486,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
 
     // Trigger reboot
     const handleReboot = () => {
-        cockpit.spawn(['shutdown', '-r', 'now'], { superuser: 'require', err: 'message' })
+        cockpit.spawn(['sudo', 'shutdown', '-r', 'now'], { err: 'message' })
                 .catch(error => {
                     console.error('Failed to trigger reboot:', error);
                 });

@@ -75,6 +75,9 @@ install -m 644 packaging/sudoers.d/cockpit-system-onboarding %{buildroot}%{_data
 mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/overrides
 install -m 644 packaging/overrides/*.override.json %{buildroot}%{_datadir}/cockpit/system-onboarding/overrides/
 
+# Install polkit rules
+install -m 644 packaging/polkit/49-cockpit-system-onboarding.rules %{buildroot}%{_datadir}/cockpit/system-onboarding/
+
 # Install example enrollment scripts
 mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d
 install -m 755 packaging/system-onboarding.d/*.sh %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d/
@@ -110,8 +113,9 @@ if [ $1 -eq 0 ]; then
         userdel -r onboarding >/dev/null 2>&1 || :
     fi
 
-    # Remove sudoers file
+    # Remove sudoers file and polkit rules
     rm -f /etc/sudoers.d/cockpit-system-onboarding || :
+    rm -f /etc/polkit-1/rules.d/49-cockpit-system-onboarding.rules || :
 
     # Remove state directory
     rm -rf /var/lib/cockpit-system-onboarding || :

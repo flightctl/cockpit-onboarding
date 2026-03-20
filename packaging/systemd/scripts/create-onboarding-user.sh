@@ -13,11 +13,21 @@ else
     echo "Onboarding user already exists"
 fi
 
+# Ensure state directory is writable by onboarding user (for completion marker)
+mkdir -p /var/lib/cockpit-system-onboarding
+chown onboarding:onboarding /var/lib/cockpit-system-onboarding
+
 # Install sudoers file for system configuration permissions
 if [ -f /usr/share/cockpit/system-onboarding/sudoers.conf ]; then
     cp /usr/share/cockpit/system-onboarding/sudoers.conf /etc/sudoers.d/cockpit-system-onboarding
     chmod 0440 /etc/sudoers.d/cockpit-system-onboarding
     echo "Installed sudoers configuration"
+fi
+
+# Install polkit rule for D-Bus service access (hostname, network, time)
+if [ -f /usr/share/cockpit/system-onboarding/49-cockpit-system-onboarding.rules ]; then
+    cp /usr/share/cockpit/system-onboarding/49-cockpit-system-onboarding.rules /etc/polkit-1/rules.d/
+    echo "Installed polkit rules"
 fi
 
 # Configure Cockpit to allow passwordless login for onboarding user
