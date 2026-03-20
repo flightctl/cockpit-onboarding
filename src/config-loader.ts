@@ -186,8 +186,12 @@ export function validateConfig(config: SystemOnboardingConfig): void {
             }
 
             if (wifiAp.password !== undefined) {
-                if (typeof wifiAp.password !== 'string' || wifiAp.password.length < 8 || wifiAp.password.length > 63) {
-                    throw new Error('WiFi AP password must be a string between 8 and 63 characters');
+                if (typeof wifiAp.password !== 'string') {
+                    throw new Error('WiFi AP password must be a string');
+                }
+                // Empty string means open network (no password); non-empty must be 8-63 chars (WPA2 requirement)
+                if (wifiAp.password.length > 0 && (wifiAp.password.length < 8 || wifiAp.password.length > 63)) {
+                    throw new Error('WiFi AP password must be empty (open network) or between 8 and 63 characters');
                 }
             }
         }

@@ -1,0 +1,14 @@
+[Unit]
+Description=Cockpit Onboarding DHCP/DNS on %i
+BindsTo=cockpit-system-onboarding-wifi-ap@%i.service
+After=cockpit-system-onboarding-wifi-ap@%i.service
+
+[Service]
+Type=simple
+# Copy dnsmasq config to /run/dnsmasq/ for correct SELinux labeling.
+# dnsmasq runs in dnsmasq_t domain which can only read dnsmasq_var_run_t
+# files. /var/run/dnsmasq.* has that label; /run/cockpit-system-onboarding/
+# files get generic var_run_t and are denied.
+ExecStartPre=/bin/bash -c 'mkdir -p /run/dnsmasq && cp /run/cockpit-system-onboarding/dnsmasq-%i.conf /run/dnsmasq/ && restorecon /run/dnsmasq/dnsmasq-%i.conf'
+ExecStart=/usr/sbin/dnsmasq --keep-in-foreground --conf-file=/run/dnsmasq/dnsmasq-%i.conf
+Restart=no

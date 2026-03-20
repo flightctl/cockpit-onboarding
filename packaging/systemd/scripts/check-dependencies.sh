@@ -36,7 +36,7 @@ check_command "nmcli" "NetworkManager" || true
 check_command "jq" "jq" || true
 
 # Check for Cockpit
-if [ ! -f /usr/libexec/cockpit-bridge ] && [ ! -f /usr/lib/cockpit-bridge ]; then
+if ! command -v cockpit-bridge >/dev/null 2>&1; then
     MISSING_DEPS+=("cockpit-bridge")
 fi
 

@@ -204,10 +204,11 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             const result = await systemConfigurationService.applySystemConfiguration(networkManager, model);
 
             const summary = result.success
-                ? '  Success.'
-                : '  Failed.';
+                ? ' Success.'
+                : ' Failed.';
 
-            const fullOutput = `${summary}\n\nDetails:\n${result.results.join('\n')}`;
+            const indentedResults = result.results.map(r => `  ${r}`).join('\n');
+            const fullOutput = `${summary}\n${indentedResults}`;
             onOutput?.(fullOutput);
 
             return {
@@ -231,12 +232,12 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
 
             // Approach 1: Use getent hosts to check DNS resolution
             try {
-                onOutput?.(`• Attempting to lookup ${testHost} from DNS... `);
+                onOutput?.(`• Attempting to lookup ${testHost} from DNS...`);
                 const dnsProc = cockpit.spawn(['getent', 'hosts', testHost], { err: 'ignore' });
                 runningProcessRef.current = dnsProc;
                 await dnsProc;
                 runningProcessRef.current = null;
-                onOutput?.(`  Success.\n`);
+                onOutput?.(` Success.`);
             } catch (dnsError) {
                 runningProcessRef.current = null;
 
@@ -250,26 +251,26 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                     }
                 }
 
-                const errorMsg = `  Failed ${errorDetail}.\n  Please check network configuration.`;
+                const errorMsg = ` Failed${errorDetail}.\n  Please check network configuration.`;
                 onOutput?.(errorMsg);
                 return { success: false, output: errorMsg };
             }
 
             // Approach 2: Use timeout command with ping for better control
             try {
-                onOutput?.(`• Pinging ${testHost} to check connectivity...\n`);
+                onOutput?.(`• Pinging ${testHost} to check connectivity...`);
                 const pingProc = cockpit.spawn(['timeout', '10', 'ping', '-c', '1', '-W', '5', testHost], { err: 'ignore' });
                 runningProcessRef.current = pingProc;
                 await pingProc;
                 runningProcessRef.current = null;
-                onOutput?.(`  Success.\n`);
+                onOutput?.(` Success.`);
                 return { success: true, output: "success" };
             } catch (pingError) {
                 runningProcessRef.current = null;
                 console.warn(`Ping failed for ${testHost}:`, pingError);
                 // Fall back to basic success if DNS worked
-                const warningMsg = 'failed.\n  However, pings may be simply blocked by firewall.\n';
-                onOutput?.(warningMsg + '\n');
+                const warningMsg = ` Failed.\n  However, pings may be simply blocked by firewall.`;
+                onOutput?.(warningMsg);
                 return { success: true, output: warningMsg };
             }
         } catch (error) {
@@ -656,7 +657,6 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             </StackItem>
 
             <StackItem>
-                <Title headingLevel="h3" size="md">{_("Details")}</Title>
                 {results.length > 0 && (
                     <pre style={{
                         fontFamily: 'monospace',

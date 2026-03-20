@@ -90,7 +90,7 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
     state: 'State'
   };
 
-  const isIfaceSelectable = (iface: import('../../pkg/networkmanager/interfaces.js').Interface) => is_managed(iface.Device); // Use proper NetworkManager logic
+  const isIfaceSelectable = (iface: import('../../pkg/networkmanager/interfaces.js').Interface) => iface.Device && is_managed(iface.Device);
 
   // Initialize selection if not set
   React.useEffect(() => {

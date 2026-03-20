@@ -310,14 +310,14 @@ export class SystemConfigurationService {
                     settings.ipv4.dns_data = [];
                 }
 
-                results.push(`IPv4 configured: ${model.networkAddress.ipv4.address}/${prefixLength}`);
+                results.push(`✓ IPv4 configured: ${model.networkAddress.ipv4.address}/${prefixLength}`);
             } else {
                 settings.ipv4.method = 'auto';
                 settings.ipv4.address_data = [];
                 settings.ipv4.gateway = '';
                 settings.ipv4.dns_data = [];
                 settings.ipv4.ignore_auto_dns = false;
-                results.push('IPv4 configured for DHCP');
+                results.push('✓ IPv4 configured for automatic (DHCP)');
             }
 
             // Configure IPv6
@@ -343,7 +343,7 @@ export class SystemConfigurationService {
                         prefix: String(prefix),
                     }];
                     settings.ipv6.gateway = model.networkAddress.ipv6.gateway || '';
-                    results.push(`IPv6 configured: ${address}/${prefix}`);
+                    results.push(`✓ IPv6 configured: ${address}/${prefix}`);
                 } else {
                     settings.ipv6.address_data = [];
                     settings.ipv6.gateway = '';
@@ -364,14 +364,14 @@ export class SystemConfigurationService {
                 settings.ipv6.address_data = [];
                 settings.ipv6.gateway = '';
                 settings.ipv6.dns_data = [];
-                results.push('IPv6 disabled');
+                results.push('✓ IPv6 disabled');
             } else {
                 settings.ipv6.method = 'auto';
                 settings.ipv6.address_data = [];
                 settings.ipv6.gateway = '';
                 settings.ipv6.dns_data = [];
                 settings.ipv6.ignore_auto_dns = false;
-                results.push('IPv6 configured for auto');
+                results.push('✓ IPv6 configured for automatic (DHCP)');
             }
 
             // Actually apply the network configuration using NetworkManager D-Bus
@@ -512,7 +512,7 @@ export class SystemConfigurationService {
         if (model.networkInterface.selectedInterface && networkManager) {
             try {
                 const networkResults = await this.applyNetworkConfiguration(networkManager, model);
-                networkResults.forEach(result => allResults.push(`✓ ${result}`));
+                networkResults.forEach(result => allResults.push(result));
             } catch (error) {
                 allResults.push(`✗ ${String(error)}`);
                 hasErrors = true;

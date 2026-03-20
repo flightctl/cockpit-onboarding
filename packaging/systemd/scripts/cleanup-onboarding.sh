@@ -18,7 +18,7 @@ load_config() {
 
     # Try user override first
     if [ -f "$USER_CONFIG" ]; then
-        value=$(jq -r "$key // empty" "$USER_CONFIG" 2>/dev/null)
+        value=$(jq -r "$key" "$USER_CONFIG" 2>/dev/null)
         if [ -n "$value" ] && [ "$value" != "null" ]; then
             echo "$value"
             return
@@ -27,7 +27,7 @@ load_config() {
 
     # Fall back to default config
     if [ -f "$DEFAULT_CONFIG" ]; then
-        value=$(jq -r "$key // empty" "$DEFAULT_CONFIG" 2>/dev/null)
+        value=$(jq -r "$key" "$DEFAULT_CONFIG" 2>/dev/null)
         if [ -n "$value" ] && [ "$value" != "null" ]; then
             echo "$value"
             return
@@ -59,6 +59,21 @@ if [ "$HIDE_MODULES" = "true" ]; then
     fi
 fi
 
+# Stop and disable all WiFi AP, dnsmasq, and captive portal template instances.
+# These are always cleaned up regardless of runOnce — the AP is only needed during onboarding.
+for pattern in 'cockpit-system-onboarding-wifi-ap@*.service' \
+               'cockpit-system-onboarding-dnsmasq@*.service' \
+               'cockpit-system-onboarding-captive-portal@*.service'; do
+    for unit in $(systemctl list-units --plain --no-legend "$pattern" 2>/dev/null | awk '{print $1}'); do
+        systemctl stop "$unit" 2>/dev/null || true
+        systemctl disable "$unit" 2>/dev/null || true
+        echo "Stopped and disabled $unit"
+    done
+done
+
+# Clean up runtime files (hostapd configs, env files)
+rm -rf /run/cockpit-system-onboarding 2>/dev/null || true
+
 # Remove sudoers configuration
 if [ -f /etc/sudoers.d/cockpit-system-onboarding ]; then
     rm -f /etc/sudoers.d/cockpit-system-onboarding
@@ -73,16 +88,6 @@ if [ "$RUN_ONCE" = "true" ]; then
         systemctl disable "$SERVICE_NAME" 2>/dev/null || true
         echo "Disabled $SERVICE_NAME"
     fi
-
-    # Stop and disable all WiFi AP template instances
-    for unit in $(systemctl list-units --plain --no-legend 'cockpit-system-onboarding-wifi-ap@*.service' 2>/dev/null | awk '{print $1}'); do
-        systemctl stop "$unit" 2>/dev/null || true
-        systemctl disable "$unit" 2>/dev/null || true
-        echo "Disabled $unit"
-    done
-
-    # Clean up runtime files (hostapd configs, env files)
-    rm -rf /run/cockpit-system-onboarding 2>/dev/null || true
 
     if [ "$KEEP_COCKPIT" = "true" ]; then
         # Keep Cockpit running but force password change on the onboarding user

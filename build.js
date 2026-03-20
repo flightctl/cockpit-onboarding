@@ -13,8 +13,13 @@ import { cockpitPoEsbuildPlugin } from './pkg/lib/cockpit-po-plugin.js';
 import { cockpitRsyncEsbuildPlugin } from './pkg/lib/cockpit-rsync-plugin.js';
 
 const production = process.env.NODE_ENV === 'production';
-const useWasm = os.arch() !== 'x64';
-const esbuild = (await import(useWasm ? 'esbuild-wasm' : 'esbuild')).default;
+// Prefer native esbuild; fall back to esbuild-wasm only if the native package fails to load
+let esbuild;
+try {
+    esbuild = (await import('esbuild')).default;
+} catch (e) {
+    esbuild = (await import('esbuild-wasm')).default;
+}
 
 const parser = (await import('argparse')).default.ArgumentParser();
 parser.add_argument('-r', '--rsync', { help: "rsync bundles to ssh target after build", metavar: "HOST" });
@@ -98,6 +103,7 @@ const context = await esbuild.context({
                 build.onEnd(() => {
                     fs.copyFileSync('./src/manifest.json', './dist/manifest.json');
                     fs.copyFileSync('./src/index.html', './dist/index.html');
+                    fs.copyFileSync('./src/config.json', './dist/config.json');
                 });
             }
         },

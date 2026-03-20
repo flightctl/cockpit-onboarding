@@ -1,191 +1,63 @@
-# Cockpit System Onboarding Wizard
+# Cockpit System Onboarding
 
-Scaffolding for a [Cockpit](https://cockpit-project.org/) module.
+[![License](https://img.shields.io/badge/License-LGPL%202.1-blue.svg)](https://opensource.org/licenses/LGPL-2.1)
 
-# Development dependencies
+A [Cockpit](https://cockpit-project.org/) module that provides a guided setup wizard for headless Linux devices.
 
-On Debian/Ubuntu:
+> [!NOTE]
+> This is an experimental project. Use at your own risk — no maintenance or support is guaranteed.
 
-    sudo apt install gettext nodejs npm make
+## Overview
 
-On Fedora:
+Headless devices — servers, edge nodes, embedded systems — often lack displays, keyboards, and pre-configured network access. Before they can onboard into management services like [Red Hat Insights](https://www.redhat.com/en/technologies/management/insights) or [Flight Control](https://flightctl.io/), they need network connectivity and credentials. The Cockpit System Onboarding plugin bridges that gap.
 
-    sudo dnf install gettext nodejs npm make
+Cockpit System Onboarding runs inside [Cockpit](https://cockpit-project.org/) on the device. You connect to it from a web browser on a remote machine and are presented with a step-by-step wizard that walks you through initial device setup. By default, the service disables itself once onboarding completes and is then inert.
 
+### Features
 
-# Getting and building the source
+- **Hostname configuration** — set the system hostname
+- **Network interface selection** — choose the onboarding network interface
+- **Network addressing** — configure IPv4/IPv6 addresses and DNS
+- **Network services** — set NTP server and network proxy
+- **Enrollment** — enroll into [Red Hat Insights](https://www.redhat.com/en/technologies/management/insights) or [Flight Control](https://github.com/flightctl/flightctl) via pluggable scripts
+- **WiFi AP provisioning** — optionally expose a temporary WiFi access point for initial connectivity
+- **Self-disabling** — once onboarding completes, the wizard and its services become inert
 
-These commands check out the source and build it into the `dist/` directory:
+## Installing
 
-```
-git clone https://github.com/cockpit-project/system-onboarding.git
-cd system-onboarding
-make
-```
+### On RPM-based distributions
 
-# Installing
+1. Install the latest RPM directly from [GitHub Releases](https://github.com/fzdarsky/cockpit-system-onboarding/releases):
 
-`make install` compiles and installs the package in `/usr/local/share/cockpit/`. The
-convenience targets `srpm` and `rpm` build the source and binary rpms,
-respectively. Both of these make use of the `dist` target, which is used
-to generate the distribution tarball. In `production` mode, source files are
-automatically minified and compressed. Set `NODE_ENV=production` if you want to
-duplicate this behavior.
+    ```sh
+    VERSION=$(curl -s https://api.github.com/repos/fzdarsky/cockpit-system-onboarding/releases/latest | jq -r .tag_name)
+    sudo dnf install -y "https://github.com/fzdarsky/cockpit-system-onboarding/releases/download/${VERSION}/cockpit-system-onboarding-${VERSION#v}-1.$(uname -m).rpm"
+    ```
 
-For development, you usually want to run your module straight out of the git
-tree. To do that, run `make devel-install`, which links your checkout to the
-location were cockpit-bridge looks for packages. If you prefer to do
-this manually:
+2. Enable the onboarding setup service:
 
-```
-mkdir -p ~/.local/share/cockpit
-ln -s `pwd`/dist ~/.local/share/cockpit/system-onboarding
-```
+    ```sh
+    sudo systemctl enable --now cockpit-system-onboarding-setup.service
+    ```
 
-After changing the code and running `make` again, reload the Cockpit page in
-your browser.
+3. If provisioning over WiFi, install the additional dependencies:
 
-You can also use
-[watch mode](https://esbuild.github.io/api/#watch) to
-automatically update the bundle on every code change with
+    ```sh
+    sudo dnf install -y hostapd dnsmasq
+    ```
 
-    ./build.js -w
+4. Access the wizard at `https://<device-ip>:9090` in your browser. Log in as user `onboarding` without password.
 
-or
+### From source
 
-    make watch
+See [DEVELOPERS.md](DEVELOPERS.md) for build instructions and development setup.
 
-When developing against a virtual machine, watch mode can also automatically upload
-the code changes by setting the `RSYNC` environment variable to
-the remote hostname.
+## How It Works
 
-    RSYNC=c make watch
+On first boot the setup service creates a temporary `onboarding` user, optionally starts a WiFi access point, and enables the Cockpit web console. The operator connects to Cockpit, steps through the wizard pages (hostname, network, enrollment), and clicks "Apply". Once complete, the cleanup script removes the temporary user, tears down the WiFi AP, and marks onboarding as finished — the service will not run again.
 
-When developing against a remote host as a normal user, `RSYNC_DEVEL` can be
-set to upload code changes to `~/.local/share/cockpit/` instead of
-`/usr/local`.
+Enrollment is handled by drop-in shell scripts in `/usr/share/cockpit/system-onboarding/system-onboarding.d/`. The package ships example scripts for Flight Control and Red Hat Insights; add your own to support other management platforms.
 
-    RSYNC_DEVEL=example.com make watch
+## License
 
-To "uninstall" the locally installed version, run `make devel-uninstall`, or
-remove manually the symlink:
-
-    rm ~/.local/share/cockpit/system-onboarding
-
-# Running eslint
-
-Cockpit System Onboarding uses [ESLint](https://eslint.org/) to automatically check
-JavaScript/TypeScript code style in `.js[x]` and `.ts[x]` files.
-
-eslint is executed as part of `test/static-code`, aka. `make codecheck`.
-
-For developer convenience, the ESLint can be started explicitly by:
-
-    npm run eslint
-
-Violations of some rules can be fixed automatically by:
-
-    npm run eslint:fix
-
-Rules configuration can be found in the `.eslintrc.json` file.
-
-## Running stylelint
-
-Cockpit uses [Stylelint](https://stylelint.io/) to automatically check CSS code
-style in `.css` and `scss` files.
-
-styleint is executed as part of `test/static-code`, aka. `make codecheck`.
-
-For developer convenience, the Stylelint can be started explicitly by:
-
-    npm run stylelint
-
-Violations of some rules can be fixed automatically by:
-
-    npm run stylelint:fix
-
-Rules configuration can be found in the `.stylelintrc.json` file.
-
-# Running tests locally
-
-Run `make check` to build an RPM, install it into a standard Cockpit test VM
-(centos-9-stream by default), and run the test/check-application integration test on
-it. This uses Cockpit's Chrome DevTools Protocol based browser tests, through a
-Python API abstraction. Note that this API is not guaranteed to be stable, so
-if you run into failures and don't want to adjust tests, consider checking out
-Cockpit's test/common from a tag instead of main (see the `test/common`
-target in `Makefile`).
-
-After the test VM is prepared, you can manually run the test without rebuilding
-the VM, possibly with extra options for tracing and halting on test failures
-(for interactive debugging):
-
-    TEST_OS=centos-9-stream test/check-application -tvs
-
-It is possible to setup the test environment without running the tests:
-
-    TEST_OS=centos-9-stream make prepare-check
-
-You can also run the test against a different Cockpit image, for example:
-
-    TEST_OS=fedora-40 make check
-
-# Running tests in CI
-
-These tests can be run in [Cirrus CI](https://cirrus-ci.org/), on their free
-[Linux Containers](https://cirrus-ci.org/guide/linux/) environment which
-explicitly supports `/dev/kvm`. Please see [Quick
-Start](https://cirrus-ci.org/guide/quick-start/) how to set up Cirrus CI for
-your project after forking from system-onboarding.
-
-The included [.cirrus.yml](./.cirrus.yml) runs the integration tests for two
-operating systems (Fedora and CentOS 8). Note that if/once your project grows
-bigger, or gets frequent changes, you may need to move to a paid account, or
-different infrastructure with more capacity.
-
-Tests also run in [Packit](https://packit.dev/) for all currently supported
-Fedora releases; see the [packit.yaml](./packit.yaml) control file. You need to
-[enable Packit-as-a-service](https://packit.dev/docs/packit-service/) in your GitHub project to use this.
-To run the tests in the exact same way for upstream pull requests and for
-[Fedora package update gating](https://docs.fedoraproject.org/en-US/ci/), the
-tests are wrapped in the [FMF metadata format](https://github.com/teemtee/fmf)
-for using with the [tmt test management tool](https://docs.fedoraproject.org/en-US/ci/tmt/).
-Note that Packit tests can *not* run their own virtual machine images, thus
-they only run [@nondestructive tests](https://github.com/cockpit-project/cockpit/blob/main/test/common/testlib.py).
-
-# Automated release
-
-Once your cloned project is ready for a release, you should consider automating
-that. The intention is that the only manual step for releasing a project is to create
-a signed tag for the version number, which includes a summary of the noteworthy
-changes:
-
-```
-123
-
-- this new feature
-- fix bug #123
-```
-
-Pushing the release tag triggers the [release.yml](.github/workflows/release.yml.disabled)
-[GitHub action](https://github.com/features/actions) workflow. This creates the
-official release tarball and publishes as upstream release to GitHub. The
-workflow is disabled by default -- to use it, edit the file as per the comment
-at the top, and rename it to just `*.yml`.
-
-The Fedora and COPR releases are done with [Packit](https://packit.dev/),
-see the [packit.yaml](./packit.yaml) control file.
-
-# Automated maintenance
-
-It is important to keep your [NPM modules](./package.json) up to date, to keep
-up with security updates and bug fixes. This happens with
-[dependabot](https://github.com/dependabot),
-see [configuration file](.github/dependabot.yml).
-
-# Further reading
-
- * The [System Onboarding announcement](https://cockpit-project.org/blog/cockpit-system-onboarding.html)
-   blog post explains the rationale for this project.
- * [Cockpit Deployment and Developer documentation](https://cockpit-project.org/guide/latest/)
- * [Make your project easily discoverable](https://cockpit-project.org/blog/making-a-cockpit-application.html)
+LGPL 2.1 — see [LICENSE](LICENSE).
