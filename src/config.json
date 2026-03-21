@@ -15,7 +15,57 @@
       "staticIp": "192.168.100.1"
     }
   },
-  "enrollmentServices": [],
+  "enrollmentServices": [
+    {
+      "id": "insights",
+      "name": "Red Hat Insights",
+      "description": "Register this system with Red Hat Insights for monitoring and management",
+      "endpoint": {
+        "url": "https://api.access.redhat.com",
+        "allowUserOverride": false
+      },
+      "credentialsSchema": {
+        "type": "object",
+        "properties": {
+          "organizationId": { "type": "string", "title": "Organization ID" },
+          "activationKey": { "type": "string", "title": "Activation key" },
+          "disableRemoteManagement": { "type": "boolean", "title": "Disable remote management (use when Flight Control manages the device)" }
+        },
+        "required": ["organizationId", "activationKey"]
+      },
+      "scriptPath": "/usr/share/cockpit/system-onboarding/system-onboarding.d/insights-enroll.sh"
+    },
+    {
+      "id": "flightctl",
+      "name": "Flight Control",
+      "description": "Enroll this device into Flight Control fleet management",
+      "endpoint": {
+        "url": "",
+        "allowUserOverride": true
+      },
+      "credentialsSchema": {
+        "type": "object",
+        "oneOf": [
+          {
+            "title": "Token",
+            "properties": {
+              "token": { "type": "string", "title": "Token", "format": "password" }
+            },
+            "required": ["token"]
+          },
+          {
+            "title": "Username & password",
+            "properties": {
+              "username": { "type": "string", "title": "Username" },
+              "password": { "type": "string", "title": "Password", "format": "password" }
+            },
+            "required": ["username", "password"]
+          }
+        ]
+      },
+      "scriptPath": "/usr/share/cockpit/system-onboarding/system-onboarding.d/flightctl-enroll.sh"
+    }
+  ],
   "led": {
     "enabled": false,
     "states": {

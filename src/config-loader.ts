@@ -144,11 +144,12 @@ export function validateConfig(config: SystemOnboardingConfig): void {
                 throw new Error(`Enrollment service '${service.id}': 'endpoint' is required and must be an object`);
             }
 
-            if (!service.endpoint.url || typeof service.endpoint.url !== 'string') {
-                throw new Error(`Enrollment service '${service.id}': endpoint.url is required and must be a string`);
+            if (typeof service.endpoint.url !== 'string') {
+                throw new Error(`Enrollment service '${service.id}': endpoint.url must be a string`);
             }
 
-            if (!/^https?:\/\//.test(service.endpoint.url)) {
+            // Empty URL is allowed when allowUserOverride is true (user provides it)
+            if (service.endpoint.url && !/^https?:\/\//.test(service.endpoint.url)) {
                 throw new Error(`Enrollment service '${service.id}': endpoint.url must start with http:// or https://`);
             }
 
@@ -160,8 +161,11 @@ export function validateConfig(config: SystemOnboardingConfig): void {
                 throw new Error(`Enrollment service '${service.id}': credentialsSchema.type must be 'object'`);
             }
 
-            if (!service.credentialsSchema.properties || typeof service.credentialsSchema.properties !== 'object') {
-                throw new Error(`Enrollment service '${service.id}': credentialsSchema.properties is required and must be an object`);
+            // credentialsSchema must have either top-level properties or oneOf variants
+            const hasProperties = service.credentialsSchema.properties && typeof service.credentialsSchema.properties === 'object';
+            const hasOneOf = Array.isArray(service.credentialsSchema.oneOf) && service.credentialsSchema.oneOf.length > 0;
+            if (!hasProperties && !hasOneOf) {
+                throw new Error(`Enrollment service '${service.id}': credentialsSchema must have 'properties' or 'oneOf'`);
             }
 
             if (!service.scriptPath || typeof service.scriptPath !== 'string') {

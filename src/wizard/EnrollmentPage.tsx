@@ -9,6 +9,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { FormGroup, FormHelperText } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
+import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { Card, CardBody, CardTitle } from "@patternfly/react-core/dist/esm/components/Card/index.js";
 import { Alert, AlertVariant } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
@@ -25,100 +26,99 @@ import type { EnrollmentService } from '../types';
  * Renders a form based on a JSON Schema (Draft 7) using PatternFly components.
  * Supports: string, number, boolean types with validation.
  */
+interface FieldSchema {
+    type: string;
+    title?: string;
+    format?: string;
+    minimum?: number;
+    maximum?: number;
+    minLength?: number;
+    maxLength?: number;
+}
+
+interface SchemaVariant {
+    title?: string;
+    properties: Record<string, FieldSchema>;
+    required?: string[];
+}
+
 interface JsonSchemaFormProps {
     schema: {
         type: string;
-        properties: Record<string, {
-            type: string;
-            title?: string;
-            format?: string;
-            minimum?: number;
-            maximum?: number;
-            minLength?: number;
-            maxLength?: number;
-        }>;
+        properties?: Record<string, FieldSchema>;
         required?: string[];
+        oneOf?: SchemaVariant[];
     };
     formData: Record<string, unknown>;
     onChange: (formData: Record<string, unknown>) => void;
 }
 
-const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onChange }) => {
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [touched, setTouched] = useState<Record<string, boolean>>({});
-
-    const handleFieldChange = (fieldName: string, value: unknown) => {
-        const newFormData = { ...formData, [fieldName]: value };
-        onChange(newFormData);
-
-        // Mark field as touched
-        setTouched(prev => ({ ...prev, [fieldName]: true }));
-
-        // Validate field
-        const fieldSchema = schema.properties[fieldName];
-        const error = validateField(fieldName, value, fieldSchema, schema.required || []);
-        setErrors(prev => ({ ...prev, [fieldName]: error || '' }));
-    };
-
-    const validateField = (
-        fieldName: string,
-        value: unknown,
-        fieldSchema: { type: string; minLength?: number; maxLength?: number; minimum?: number; maximum?: number },
-        required: string[]
-    ): string | null => {
-        // Check required
-        if (required.includes(fieldName)) {
-            if (value === undefined || value === null || value === '') {
-                return 'This field is required';
-            }
+/**
+ * Validate a single field against its schema and required list.
+ */
+function validateField(
+    fieldName: string,
+    value: unknown,
+    fieldSchema: FieldSchema,
+    required: string[]
+): string | null {
+    if (required.includes(fieldName)) {
+        if (value === undefined || value === null || value === '') {
+            return 'This field is required';
         }
+    }
 
-        // Type-specific validation
-        if (value !== undefined && value !== null && value !== '') {
-            switch (fieldSchema.type) {
-            case 'string': {
-                const strValue = String(value);
-                if (fieldSchema.minLength && strValue.length < fieldSchema.minLength) {
-                    return `Minimum length is ${fieldSchema.minLength}`;
-                }
-                if (fieldSchema.maxLength && strValue.length > fieldSchema.maxLength) {
-                    return `Maximum length is ${fieldSchema.maxLength}`;
-                }
-                break;
+    if (value !== undefined && value !== null && value !== '') {
+        switch (fieldSchema.type) {
+        case 'string': {
+            const strValue = String(value);
+            if (fieldSchema.minLength && strValue.length < fieldSchema.minLength) {
+                return `Minimum length is ${fieldSchema.minLength}`;
             }
-            case 'number': {
-                const numValue = Number(value);
-                if (isNaN(numValue)) {
-                    return 'Must be a valid number';
-                }
-                if (fieldSchema.minimum !== undefined && numValue < fieldSchema.minimum) {
-                    return `Minimum value is ${fieldSchema.minimum}`;
-                }
-                if (fieldSchema.maximum !== undefined && numValue > fieldSchema.maximum) {
-                    return `Maximum value is ${fieldSchema.maximum}`;
-                }
-                break;
+            if (fieldSchema.maxLength && strValue.length > fieldSchema.maxLength) {
+                return `Maximum length is ${fieldSchema.maxLength}`;
             }
-            }
+            break;
         }
+        case 'number': {
+            const numValue = Number(value);
+            if (isNaN(numValue)) {
+                return 'Must be a valid number';
+            }
+            if (fieldSchema.minimum !== undefined && numValue < fieldSchema.minimum) {
+                return `Minimum value is ${fieldSchema.minimum}`;
+            }
+            if (fieldSchema.maximum !== undefined && numValue > fieldSchema.maximum) {
+                return `Maximum value is ${fieldSchema.maximum}`;
+            }
+            break;
+        }
+        }
+    }
 
-        return null;
-    };
+    return null;
+}
 
+/**
+ * Renders fields for a flat set of properties.
+ */
+const SchemaFields: React.FC<{
+    properties: Record<string, FieldSchema>;
+    required: string[];
+    formData: Record<string, unknown>;
+    onFieldChange: (fieldName: string, value: unknown) => void;
+    errors: Record<string, string>;
+    touched: Record<string, boolean>;
+}> = ({ properties, required, formData, onFieldChange, errors, touched }) => {
     return (
-        <Stack hasGutter>
-            {Object.entries(schema.properties).map(([fieldName, fieldSchema]) => {
-                const isRequired = schema.required?.includes(fieldName) || false;
+        <>
+            {Object.entries(properties).map(([fieldName, fieldSchema]) => {
+                const isRequired = required.includes(fieldName);
                 const label = fieldSchema.title || fieldName;
                 const value = formData[fieldName];
                 const error = errors[fieldName];
-
                 const showError = touched[fieldName] && error;
-                // Determine validation state:
-                // - Show error if there's an error
-                // - Show success if there's a valid value
-                // - Show warning if required and empty
-                // - Show default otherwise
+
                 const validationState = error
                     ? ValidatedOptions.error
                     : (value && String(value).trim())
@@ -136,7 +136,7 @@ const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onCha
                                     id={`field-${fieldName}`}
                                     type={fieldSchema.format === 'password' ? 'password' : 'text'}
                                     value={String(value || '')}
-                                    onChange={(_event, val) => handleFieldChange(fieldName, val)}
+                                    onChange={(_event, val) => onFieldChange(fieldName, val)}
                                     validated={validationState}
                                     isRequired={isRequired}
                                 />
@@ -159,7 +159,7 @@ const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onCha
                                     id={`field-${fieldName}`}
                                     type="number"
                                     value={String(value || '')}
-                                    onChange={(_event, val) => handleFieldChange(fieldName, Number(val))}
+                                    onChange={(_event, val) => onFieldChange(fieldName, Number(val))}
                                     validated={validationState}
                                     isRequired={isRequired}
                                 />
@@ -181,7 +181,7 @@ const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onCha
                                 id={`field-${fieldName}`}
                                 label={label}
                                 isChecked={Boolean(value)}
-                                onChange={(_event, checked) => handleFieldChange(fieldName, checked)}
+                                onChange={(_event, checked) => onFieldChange(fieldName, checked)}
                             />
                         </StackItem>
                     );
@@ -194,6 +194,84 @@ const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onCha
                     );
                 }
             })}
+        </>
+    );
+};
+
+const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onChange }) => {
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+    // Track which oneOf variant is selected (stored as _variantIndex in formData)
+    const selectedVariant = typeof formData._variantIndex === 'number' ? formData._variantIndex as number : 0;
+
+    // Resolve the active properties and required fields
+    const { activeProperties, activeRequired } = useMemo(() => {
+        if (schema.oneOf && schema.oneOf.length > 0) {
+            const variant = schema.oneOf[selectedVariant] || schema.oneOf[0];
+            return {
+                activeProperties: variant.properties,
+                activeRequired: variant.required || [],
+            };
+        }
+        return {
+            activeProperties: schema.properties || {},
+            activeRequired: schema.required || [],
+        };
+    }, [schema, selectedVariant]);
+
+    const handleFieldChange = (fieldName: string, value: unknown) => {
+        const newFormData = { ...formData, [fieldName]: value };
+        onChange(newFormData);
+
+        setTouched(prev => ({ ...prev, [fieldName]: true }));
+
+        const fieldSchema = activeProperties[fieldName];
+        if (fieldSchema) {
+            const error = validateField(fieldName, value, fieldSchema, activeRequired);
+            setErrors(prev => ({ ...prev, [fieldName]: error || '' }));
+        }
+    };
+
+    const handleVariantChange = (variantIndex: number) => {
+        // Clear form data when switching variants, preserving only the variant index
+        onChange({ _variantIndex: variantIndex });
+        setErrors({});
+        setTouched({});
+    };
+
+    return (
+        <Stack hasGutter>
+            {/* Render radio buttons when schema has oneOf */}
+            {schema.oneOf && schema.oneOf.length > 0 && (
+                <StackItem>
+                    <FormGroup label="Authentication method">
+                        <Stack>
+                            {schema.oneOf.map((variant, index) => (
+                                <StackItem key={index}>
+                                    <Radio
+                                        id={`variant-${index}`}
+                                        name="auth-method"
+                                        label={variant.title || `Option ${index + 1}`}
+                                        isChecked={selectedVariant === index}
+                                        onChange={() => handleVariantChange(index)}
+                                    />
+                                </StackItem>
+                            ))}
+                        </Stack>
+                    </FormGroup>
+                </StackItem>
+            )}
+
+            {/* Render fields for the active variant */}
+            <SchemaFields
+                properties={activeProperties}
+                required={activeRequired}
+                formData={formData}
+                onFieldChange={handleFieldChange}
+                errors={errors}
+                touched={touched}
+            />
         </Stack>
     );
 };

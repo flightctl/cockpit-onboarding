@@ -196,8 +196,17 @@ export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[])
             return false;
         }
 
-        // Check all required fields are filled
-        const required = service.credentialsSchema?.required || [];
+        // Check all required fields are filled.
+        // For oneOf schemas, resolve the active variant's required fields.
+        const credSchema = service.credentialsSchema;
+        let required: string[] = [];
+        if (credSchema?.oneOf && credSchema.oneOf.length > 0) {
+            const variantIndex = typeof serviceCreds._variantIndex === 'number' ? serviceCreds._variantIndex : 0;
+            const variant = credSchema.oneOf[variantIndex] || credSchema.oneOf[0];
+            required = variant.required || [];
+        } else {
+            required = credSchema?.required || [];
+        }
         for (const fieldName of required) {
             const value = serviceCreds[fieldName];
             if (value === undefined || value === null || value === '') {

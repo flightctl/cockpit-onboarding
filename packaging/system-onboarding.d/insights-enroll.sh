@@ -1,84 +1,78 @@
 #!/bin/bash
-# Example enrollment script for demonstration purposes
+# insights-enroll.sh - Enroll device with Red Hat Insights via rhc connect
 #
-# This script demonstrates the enrollment API contract and can be used
-# as a template for creating custom enrollment scripts.
+# Cockpit System Onboarding enrollment script.
+# Reads credentials from ENROLLMENT_CREDENTIALS_JSON environment variable.
 #
-# Environment variables provided by the plugin:
-# - ENROLLMENT_SERVICE_ID: Service identifier
-# - ENROLLMENT_SERVICE_NAME: Human-readable service name
-# - ENROLLMENT_ENDPOINT: Service endpoint URL
-# - ENROLLMENT_CREDENTIALS_JSON: JSON-encoded credentials
-# - ENROLLMENT_HOSTNAME: System hostname
-# - ENROLLMENT_INTERFACE: Primary network interface
+# Expected credential fields (from credentialsSchema):
+#   organizationId          (required) - Red Hat organization ID
+#   activationKey           (required) - Activation key for registration
+#   disableRemoteManagement (optional) - Boolean; disable Insights remote management
+#                                        (use when Flight Control manages the device)
+#
+# See: specs/001-system-onboarding/contracts/enrollment-api.md
+set -euo pipefail
 
-set -e  # Exit on error
-set -u  # Exit on undefined variable
-set -o pipefail  # Exit on pipe failure
+# Load enrollment parameters from JSON file (passed as $1 by the executor).
+# sudo sanitizes the environment, so env vars set via cockpit.spawn's environ
+# option won't reach this script. Parameters are passed via a temp file instead.
+if [ -n "${1:-}" ] && [ -f "$1" ]; then
+    ENROLLMENT_SERVICE_ID=$(jq -r '.ENROLLMENT_SERVICE_ID' "$1")
+    ENROLLMENT_SERVICE_NAME=$(jq -r '.ENROLLMENT_SERVICE_NAME' "$1")
+    ENROLLMENT_ENDPOINT=$(jq -r '.ENROLLMENT_ENDPOINT' "$1")
+    ENROLLMENT_CREDENTIALS_JSON=$(jq -r '.ENROLLMENT_CREDENTIALS_JSON' "$1")
+    ENROLLMENT_HOSTNAME=$(jq -r '.ENROLLMENT_HOSTNAME' "$1")
+    ENROLLMENT_INTERFACE=$(jq -r '.ENROLLMENT_INTERFACE' "$1")
+    export ENROLLMENT_SERVICE_ID ENROLLMENT_SERVICE_NAME ENROLLMENT_ENDPOINT
+    export ENROLLMENT_CREDENTIALS_JSON ENROLLMENT_HOSTNAME ENROLLMENT_INTERFACE
+    rm -f "$1"
+fi
 
-# Read configuration from environment
-SERVICE_ID="${ENROLLMENT_SERVICE_ID}"
-SERVICE_NAME="${ENROLLMENT_SERVICE_NAME}"
-ENDPOINT="${ENROLLMENT_ENDPOINT}"
-CREDENTIALS_JSON="${ENROLLMENT_CREDENTIALS_JSON}"
-HOSTNAME="${ENROLLMENT_HOSTNAME}"
-INTERFACE="${ENROLLMENT_INTERFACE}"
+# Verify required tools
+for cmd in jq rhc; do
+    if ! command -v "$cmd" &>/dev/null; then
+        echo "Error: '$cmd' is not installed" >&2
+        exit 1
+    fi
+done
 
-# Parse credentials from JSON
-if ! command -v jq &> /dev/null; then
-    echo "✗ Error: jq is required but not installed" >&2
+# Parse credentials from environment
+ORG_ID=$(echo "$ENROLLMENT_CREDENTIALS_JSON" | jq -r '.organizationId // empty') || {
+    echo "Error: failed to parse organizationId from credentials" >&2
+    exit 2
+}
+
+ACTIVATION_KEY=$(echo "$ENROLLMENT_CREDENTIALS_JSON" | jq -r '.activationKey // empty') || {
+    echo "Error: failed to parse activationKey from credentials" >&2
+    exit 2
+}
+
+DISABLE_MGMT=$(echo "$ENROLLMENT_CREDENTIALS_JSON" | jq -r '.disableRemoteManagement // false')
+
+# Validate required fields
+if [ -z "$ORG_ID" ] || [ -z "$ACTIVATION_KEY" ]; then
+    echo "Error: organizationId and activationKey are required" >&2
+    exit 2
+fi
+
+# Build rhc connect command
+echo "Registering with Red Hat Insights..."
+RHC_ARGS=(connect --organization "$ORG_ID" --activation-key "$ACTIVATION_KEY")
+
+if [ "$DISABLE_MGMT" = "true" ]; then
+    if rhc connect --help 2>&1 | grep -q -- '--disable-feature'; then
+        RHC_ARGS+=(--disable-feature remote-management)
+        echo "Remote management will be disabled (managed by Flight Control)"
+    else
+        echo "Warning: --disable-feature not supported by this version of rhc, skipping" >&2
+    fi
+fi
+
+# Execute enrollment
+rhc "${RHC_ARGS[@]}" || {
+    echo "Error: rhc connect failed" >&2
     exit 1
-fi
+}
 
-ORGANIZATION_ID=$(echo "$CREDENTIALS_JSON" | jq -r '.organizationId // empty')
-ACTIVATION_KEY=$(echo "$CREDENTIALS_JSON" | jq -r '.activationKey // empty')
-
-# Validate required credentials
-if [ -z "$ORGANIZATION_ID" ] || [ -z "$ACTIVATION_KEY" ]; then
-    echo "✗ Error: Missing required credentials (organizationId or activationKey)" >&2
-    exit 2  # Invalid credentials
-fi
-
-# Example: Simulate enrollment process
-echo "Enrolling device into $SERVICE_NAME..."
-echo "Endpoint: $ENDPOINT"
-echo "Hostname: $HOSTNAME"
-echo "Interface: $INTERFACE"
-
-# Step 1: Validate connection
-echo "Validating connection to enrollment service..."
-if ! curl --silent --fail --max-time 10 "$ENDPOINT/health" >/dev/null 2>&1; then
-    echo "✗ Service unavailable at $ENDPOINT" >&2
-    exit 3  # Service unavailable
-fi
-
-# Step 2: Authenticate (simulated)
-echo "Authenticating with service..."
-sleep 1  # Simulate API call
-
-# In a real script, you would call the service API here
-# Example:
-# RESPONSE=$(curl -X POST "$ENDPOINT/api/enroll" \
-#     --header "Content-Type: application/json" \
-#     --data "{\"username\":\"$USERNAME\",\"password\":\"$PASSWORD\",\"hostname\":\"$HOSTNAME\"}")
-#
-# Check authentication
-# if ! echo "$RESPONSE" | jq -e '.success' >/dev/null 2>&1; then
-#     echo "✗ Authentication failed" >&2
-#     exit 2  # Invalid credentials
-# fi
-
-# Step 3: Enroll device (simulated)
-echo "Enrolling device..."
-sleep 1  # Simulate API call
-
-# Generate a simulated device ID
-DEVICE_ID="${HOSTNAME}-$(date +%s)"
-
-echo "✓ Successfully enrolled into $SERVICE_NAME"
-echo "✓ Device ID: $DEVICE_ID"
-
-# Output device URL for plugin to display as hyperlink
-echo "DEVICE_URL: ${ENDPOINT}/devices/${DEVICE_ID}"
-
+echo "Successfully enrolled with Red Hat Insights"
 exit 0

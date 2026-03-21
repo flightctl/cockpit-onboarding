@@ -108,12 +108,13 @@ if [ "$RUN_ONCE" = "true" ]; then
         # Remove Cockpit configuration changes made during setup
         # Only remove AllowUnencrypted if we added it
         if [ -f /etc/cockpit/cockpit.conf ]; then
-            # Remove the AllowUnencrypted and LoginTo lines we added
+            # Remove the lines we added
             sed -i '/^AllowUnencrypted = true$/d' /etc/cockpit/cockpit.conf 2>/dev/null || true
             sed -i '/^LoginTo = false$/d' /etc/cockpit/cockpit.conf 2>/dev/null || true
-            # Remove empty [WebService] section if it's now empty
-            # (only if the next line is empty or another section header)
-            sed -i '/^\[WebService\]$/{N;/^\[WebService\]\n$/d}' /etc/cockpit/cockpit.conf 2>/dev/null || true
+            # Remove file if only section headers and whitespace remain
+            if ! grep -qE '^[^[\s]' /etc/cockpit/cockpit.conf 2>/dev/null; then
+                rm -f /etc/cockpit/cockpit.conf
+            fi
             echo "Cleaned up Cockpit configuration"
         fi
     fi

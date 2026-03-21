@@ -4,7 +4,6 @@ Documentation=https://github.com/cockpit-project/cockpit-system-onboarding
 After=network-online.target
 Wants=network-online.target
 ConditionPathExists=!/var/lib/cockpit-system-onboarding/.onboarding-complete
-ConditionPathExists=/etc/cockpit/system-onboarding/config.json
 
 [Service]
 Type=oneshot
