@@ -36,22 +36,22 @@ interface EnrollmentExecutionParams {
 }
 
 /**
- * Build environment variables for enrollment script execution
+ * Build enrollment parameters as a JSON object for passing to scripts
  *
  * @param params - Enrollment execution parameters
- * @returns Array of environment variable strings in KEY=VALUE format
+ * @returns JSON object with enrollment parameters
  */
-function buildEnvironmentVariables(params: EnrollmentExecutionParams): string[] {
+function buildEnrollmentParams(params: EnrollmentExecutionParams): Record<string, string> {
     const { service, credentials, endpoint, hostname, networkInterface } = params;
 
-    return [
-        `ENROLLMENT_SERVICE_ID=${service.id}`,
-        `ENROLLMENT_SERVICE_NAME=${service.name}`,
-        `ENROLLMENT_ENDPOINT=${endpoint}`,
-        `ENROLLMENT_CREDENTIALS_JSON=${JSON.stringify(credentials)}`,
-        `ENROLLMENT_HOSTNAME=${hostname}`,
-        `ENROLLMENT_INTERFACE=${networkInterface}`,
-    ];
+    return {
+        ENROLLMENT_SERVICE_ID: service.id,
+        ENROLLMENT_SERVICE_NAME: service.name,
+        ENROLLMENT_ENDPOINT: endpoint,
+        ENROLLMENT_CREDENTIALS_JSON: JSON.stringify(Object.fromEntries(Object.entries(credentials).filter(([k]) => k !== '_variantIndex'))),
+        ENROLLMENT_HOSTNAME: hostname,
+        ENROLLMENT_INTERFACE: networkInterface,
+    };
 }
 
 /**
@@ -120,19 +120,23 @@ export async function executeEnrollmentScript(
 ): Promise<EnrollmentExecutionResult> {
     const { service } = params;
 
-    // Build environment variables
-    const environ = buildEnvironmentVariables(params);
+    // Write enrollment parameters to a temp file. We need sudo for
+    // privileged operations, but sudo sanitizes the environment, so
+    // env vars set via cockpit.spawn's `environ` won't reach the script.
+    // Passing parameters via file avoids this.
+    const enrollParams = buildEnrollmentParams(params);
+    const paramsFile = `/tmp/.enrollment-${service.id}-${Date.now()}.json`;
+    await cockpit.file(paramsFile).replace(JSON.stringify(enrollParams));
 
     // Accumulated output
     let stdout = '';
     let stderr = '';
 
     return new Promise((resolve, reject) => {
-        // Spawn the enrollment script via sudo (allowed by sudoers rules)
-        const process = cockpit.spawn(['sudo', service.scriptPath], {
-            environ,
+        // Spawn the enrollment script via sudo (allowed by sudoers rules).
+        // The params file path is passed as the first argument.
+        const process = cockpit.spawn(['sudo', service.scriptPath, paramsFile], {
             err: 'message', // Capture stderr separately
-            directory: '/home/onboarding', // Working directory per API contract
         });
 
         // Set timeout

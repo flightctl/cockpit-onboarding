@@ -13,6 +13,21 @@
 # See: specs/001-system-onboarding/contracts/enrollment-api.md
 set -euo pipefail
 
+# Load enrollment parameters from JSON file (passed as $1 by the executor).
+# sudo sanitizes the environment, so env vars set via cockpit.spawn's environ
+# option won't reach this script. Parameters are passed via a temp file instead.
+if [ -n "${1:-}" ] && [ -f "$1" ]; then
+    ENROLLMENT_SERVICE_ID=$(jq -r '.ENROLLMENT_SERVICE_ID' "$1")
+    ENROLLMENT_SERVICE_NAME=$(jq -r '.ENROLLMENT_SERVICE_NAME' "$1")
+    ENROLLMENT_ENDPOINT=$(jq -r '.ENROLLMENT_ENDPOINT' "$1")
+    ENROLLMENT_CREDENTIALS_JSON=$(jq -r '.ENROLLMENT_CREDENTIALS_JSON' "$1")
+    ENROLLMENT_HOSTNAME=$(jq -r '.ENROLLMENT_HOSTNAME' "$1")
+    ENROLLMENT_INTERFACE=$(jq -r '.ENROLLMENT_INTERFACE' "$1")
+    export ENROLLMENT_SERVICE_ID ENROLLMENT_SERVICE_NAME ENROLLMENT_ENDPOINT
+    export ENROLLMENT_CREDENTIALS_JSON ENROLLMENT_HOSTNAME ENROLLMENT_INTERFACE
+    rm -f "$1"
+fi
+
 # Verify required tools
 for cmd in jq rhc; do
     if ! command -v "$cmd" &>/dev/null; then

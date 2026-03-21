@@ -40,11 +40,15 @@ LoginTo = false
 EOF
     echo "Created Cockpit configuration"
 else
-    # Append if not already present
+    # Add settings if not already present
     if ! grep -q "AllowUnencrypted" /etc/cockpit/cockpit.conf; then
-        echo "[WebService]" >> /etc/cockpit/cockpit.conf
-        echo "AllowUnencrypted = true" >> /etc/cockpit/cockpit.conf
-        echo "LoginTo = false" >> /etc/cockpit/cockpit.conf
+        if grep -q '^\[WebService\]' /etc/cockpit/cockpit.conf; then
+            # Insert under existing [WebService] section
+            sed -i '/^\[WebService\]/a AllowUnencrypted = true\nLoginTo = false' /etc/cockpit/cockpit.conf
+        else
+            # No [WebService] section exists, append one
+            printf '\n[WebService]\nAllowUnencrypted = true\nLoginTo = false\n' >> /etc/cockpit/cockpit.conf
+        fi
         echo "Updated Cockpit configuration"
     fi
 fi

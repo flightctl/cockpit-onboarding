@@ -171,8 +171,8 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                             // Get endpoint (user override or default)
                             const endpoint = model.enrollment.endpoints[serviceId] || service.endpoint.url;
 
-                            // Get credentials
-                            const credentials = model.enrollment.credentials[serviceId] || {};
+                            // Get credentials, stripping internal _variantIndex used by oneOf form
+                            const { _variantIndex: _, ...credentials } = model.enrollment.credentials[serviceId] || {};
                             const credentialsJson = JSON.stringify(credentials);
 
                             return await executeEnrollmentScript(
@@ -291,18 +291,23 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
 
             onOutput?.(`Executing enrollment script for ${serviceName}...\n`);
 
-            const environ = [
-                `ENROLLMENT_SERVICE_ID=${serviceId}`,
-                `ENROLLMENT_SERVICE_NAME=${serviceName}`,
-                `ENROLLMENT_ENDPOINT=${endpoint}`,
-                `ENROLLMENT_CREDENTIALS_JSON=${credentialsJson}`,
-                `ENROLLMENT_HOSTNAME=${model.hostname.value}`,
-                `ENROLLMENT_INTERFACE=${model.networkInterface.selectedInterface || ''}`,
-            ];
+            // Write enrollment parameters to a temp file. We need sudo for
+            // privileged operations, but sudo sanitizes the environment, so
+            // env vars set via cockpit.spawn's `environ` won't reach the
+            // script. Passing parameters via file avoids this.
+            const enrollParams = {
+                ENROLLMENT_SERVICE_ID: serviceId,
+                ENROLLMENT_SERVICE_NAME: serviceName,
+                ENROLLMENT_ENDPOINT: endpoint,
+                ENROLLMENT_CREDENTIALS_JSON: credentialsJson,
+                ENROLLMENT_HOSTNAME: model.hostname.value,
+                ENROLLMENT_INTERFACE: model.networkInterface.selectedInterface || '',
+            };
+            const paramsFile = `/tmp/.enrollment-${serviceId}-${Date.now()}.json`;
+            await cockpit.file(paramsFile).replace(JSON.stringify(enrollParams));
 
-            const proc = cockpit.spawn(['/bin/bash', scriptPath], {
+            const proc = cockpit.spawn(['sudo', scriptPath, paramsFile], {
                 err: 'out',
-                environ
             });
             runningProcessRef.current = proc;
 

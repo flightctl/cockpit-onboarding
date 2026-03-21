@@ -299,7 +299,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                             </div>
                                             {Object.keys(credentials).length > 0 && (
                                                 <div>
-                                                    {Object.entries(credentials).map(([key, value]) => {
+                                                    {Object.entries(credentials).filter(([key]) => !key.startsWith('_')).map(([key, value]) => {
                                                         // Hide password/token fields
                                                         const isSecret = key.toLowerCase().includes('password') ||
                                                                        key.toLowerCase().includes('token') ||
