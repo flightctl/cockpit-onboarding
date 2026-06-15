@@ -1,6 +1,5 @@
 import React from 'react';
 import cockpit from 'cockpit';
-const _ = cockpit.gettext;
 
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
@@ -12,14 +11,17 @@ import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/inde
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { WifiIcon } from '@patternfly/react-icons';
+import { WifiIcon, ConnectedIcon, DisconnectedIcon } from '@patternfly/react-icons';
+import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
 import { useModelContext } from '../model-context';
-import { systemConfigurationService } from '../system-config.js';
-
+import { getSetupInterface } from '../services/network';
+import { getCurrentWifiConnection, scanWifiNetworks } from '../services/wifi';
 import {
     device_state_text,
     is_managed,
 } from '../../pkg/networkmanager/interfaces.js';
+
+const _ = cockpit.gettext;
 
 interface NetworkInterfacePageProps {
     interfaces: import('../../pkg/networkmanager/interfaces.js').Interface[];
@@ -55,12 +57,32 @@ export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageP
     );
     const isWifiSelected = selectedIface?.Device?.DeviceType === '802-11-wireless';
 
+    const setupInterface = getSetupInterface(interfaces);
+    const isSetupInterface = setupInterface !== null && model.networkInterface.selectedInterface === setupInterface;
+
+    const isEthernetNoCable = selectedIface?.Device?.DeviceType === 'ethernet' &&
+        selectedIface?.Device?.Carrier === false;
+
     return (
         <Stack hasGutter>
             <StackItem>
                 <p>Choose a network interface to use for onboarding:</p>
                 <NetworkInterfaceSelector interfaces={filteredInterfaces} />
             </StackItem>
+            {isEthernetNoCable && !isSetupInterface && (
+                <StackItem>
+                    <Alert variant="warning" isInline title={_("No cable detected on selected interface")}>
+                        {_("The selected ethernet interface does not have a cable connected. Plug in a network cable before proceeding, or select a different interface.")}
+                    </Alert>
+                </StackItem>
+            )}
+            {isSetupInterface && (
+                <StackItem>
+                    <Alert variant="warning" isInline title={_("You are currently connected through this interface")}>
+                        {_("Applying network changes to this interface will sever your browser connection. The configuration and enrollment process will continue in the background — if enrollment fails, changes will be rolled back automatically and you can reconnect to retry.")}
+                    </Alert>
+                </StackItem>
+            )}
             {isWifiSelected && selectedIface && (
                 <StackItem>
                     <NetworkWifiSelector
@@ -94,7 +116,6 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
 
   const isIfaceSelectable = (iface: import('../../pkg/networkmanager/interfaces.js').Interface) => {
     if (!iface.Device) return false;
-    // Allow selecting WiFi interfaces even if unmanaged (e.g. used as AP during onboarding)
     if (iface.Device.DeviceType === '802-11-wireless') return true;
     return is_managed(iface.Device);
   };
@@ -168,7 +189,16 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
                 : iface.Device?.IdModel || iface.Device?.IdVendor || 'N/A'}
                       </Td>
                       <Td dataLabel={columnNames.speed}>{iface.Device?.Speed ? `${iface.Device.Speed} Mbps` : 'N/A'}</Td>
-                      <Td dataLabel={columnNames.state}>{device_state_text(iface.Device)}</Td>
+                      <Td dataLabel={columnNames.state}>
+                          {device_state_text(iface.Device)}
+                          {iface.Device?.DeviceType === 'ethernet' && (
+                              <span style={{ marginLeft: '0.5rem' }}>
+                                  {iface.Device.Carrier
+                                      ? <Label isCompact status="success" icon={<ConnectedIcon />}>{_("Cable connected")}</Label>
+                                      : <Label isCompact status="warning" icon={<DisconnectedIcon />}>{_("No cable detected")}</Label>}
+                              </span>
+                          )}
+                      </Td>
                   </Tr>
         ))}
           </Tbody>
@@ -212,7 +242,7 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
       // First, get current connection if any
       let current = null;
       try {
-        current = await systemConfigurationService.getCurrentWifiConnection(interfaceName);
+        current = await getCurrentWifiConnection(interfaceName);
         currentConnectionRef.current = current;
       } catch (error) {
         console.error('Failed to get current WiFi connection:', error);
@@ -222,7 +252,7 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
       setIsScanning(true);
       setScanError(null);
       try {
-        const scannedNetworks = await systemConfigurationService.scanWifiNetworks(interfaceName);
+        const scannedNetworks = await scanWifiNetworks(interfaceName);
         setNetworks(scannedNetworks);
 
         // If we have a current connection and it's in the scanned list, pre-select it
@@ -315,7 +345,7 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
     setIsScanning(true);
     setScanError(null);
     try {
-      const scannedNetworks = await systemConfigurationService.scanWifiNetworks(interfaceName);
+      const scannedNetworks = await scanWifiNetworks(interfaceName);
       setNetworks(scannedNetworks);
     } catch (error) {
       console.error('WiFi scan failed:', error);
@@ -480,13 +510,13 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
 
 export const NetworkVlanSelector: React.FunctionComponent = () => {
   const { model, updateModel } = useModelContext();
+  const [vlanError, setVlanError] = React.useState<string | null>(null);
 
   const setUseVlan = (useVlan: boolean) => {
+    setVlanError(null);
     if (useVlan) {
-      // Enable VLAN with default ID of 1
       updateModel('networkInterface', { vlanId: 1 });
     } else {
-      // Disable VLAN by setting to null
       updateModel('networkInterface', { vlanId: null });
     }
   };
@@ -496,19 +526,25 @@ export const NetworkVlanSelector: React.FunctionComponent = () => {
   };
 
   const onVlanIdChange = (event: React.FormEvent<HTMLInputElement>) => {
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    if (!isNaN(value) && value >= 1 && value <= 4094) {
-      setVlanId(value);
+    const raw = (event.target as HTMLInputElement).value;
+    const value = parseInt(raw, 10);
+    if (isNaN(value) || value < 1 || value > 4094) {
+      setVlanError(_("VLAN ID must be between 1 and 4094"));
+      return;
     }
+    setVlanError(null);
+    setVlanId(value);
   };
 
   const onVlanIdMinus = () => {
+    setVlanError(null);
     if (model.networkInterface.vlanId && model.networkInterface.vlanId > 1) {
       setVlanId(model.networkInterface.vlanId - 1);
     }
   };
 
   const onVlanIdPlus = () => {
+    setVlanError(null);
     if (model.networkInterface.vlanId && model.networkInterface.vlanId < 4094) {
       setVlanId(model.networkInterface.vlanId + 1);
     }
@@ -536,7 +572,13 @@ export const NetworkVlanSelector: React.FunctionComponent = () => {
             inputName="vlan-id"
             inputAriaLabel="VLAN ID"
             widthChars={5}
+            validated={vlanError ? 'error' : 'default'}
               />
+              {vlanError && (
+                  <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
+                      {vlanError}
+                  </div>
+              )}
           </div>
       )}
       </div>
