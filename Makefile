@@ -1,7 +1,7 @@
 # extract name from package.json
 PACKAGE_NAME := $(shell awk '/"name":/ {gsub(/[",]/, "", $$2); print $$2}' package.json)
 RPM_NAME := cockpit-$(PACKAGE_NAME)
-VERSION := $(shell T=$$(git describe --tags 2>/dev/null | sed 's/^v//') || T=1; echo $$T | tr '-' '.')
+VERSION := $(shell T=$$(git describe --tags 2>/dev/null | sed 's/^v//'); [ -z "$$T" ] && T=0.0.1; echo $$T | tr '-' '.')
 ifeq ($(TEST_OS),)
 TEST_OS = centos-9-stream
 endif
@@ -98,6 +98,7 @@ watch: $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP)
 clean:
 	rm -rf dist/
 	rm -f $(SPEC) packaging/arch/PKGBUILD
+	rm -f $(TARFILE) $(NODE_CACHE)
 	rm -f po/LINGUAS
 
 install: $(DIST_TEST) po/LINGUAS
@@ -149,7 +150,9 @@ srpm: $(TARFILE) $(NODE_CACHE) $(SPEC)
 	  $(SPEC)
 
 # convenience target for developers
-rpm: $(TARFILE) $(NODE_CACHE) $(SPEC)
+rpm: $(SPEC)
+	rm -f $(TARFILE)
+	$(MAKE) $(TARFILE) $(NODE_CACHE)
 	mkdir -p "`pwd`/output"
 	mkdir -p "`pwd`/rpmbuild"
 	rpmbuild -bb \
@@ -161,8 +164,8 @@ rpm: $(TARFILE) $(NODE_CACHE) $(SPEC)
 	  --define "_buildrootdir `pwd`/build" \
 	  $(SPEC)
 	find `pwd`/output -name '*.rpm' -printf '%f\n' -exec mv {} . \;
-	rm -r "`pwd`/rpmbuild"
-	rm -r "`pwd`/output" "`pwd`/build"
+	rm -rf "`pwd`/rpmbuild"
+	rm -rf "`pwd`/output" "`pwd`/build"
 
 # build a VM with locally built distro pkgs installed
 # disable networking, VM images have mock/pbuilder with the common build dependencies pre-installed
@@ -203,6 +206,13 @@ $(NODE_MODULES_TEST): package.json
 	env -u NODE_ENV npm install --ignore-scripts
 	env -u NODE_ENV npm prune
 
+# Fedora test VM with WiFi simulation (mac80211_hwsim)
+deploy-test-vm:
+	hack/deploy-test-vm.sh
+
+clean-test-vm:
+	hack/clean-test-vm.sh
+
 help:
 	@echo "Development targets:"
 	@echo "  all              Build the project (default)"
@@ -228,7 +238,11 @@ help:
 	@echo "  vm               Build a test VM image"
 	@echo "  print-vm         Print the test VM image path"
 	@echo ""
+	@echo "VM targets:"
+	@echo "  deploy-test-vm   Create a Fedora test VM with WiFi simulation"
+	@echo "  clean-test-vm    Destroy the test VM and clean up"
+	@echo ""
 	@echo "i18n targets:"
 	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check vm print-vm help
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check vm print-vm deploy-test-vm clean-test-vm help

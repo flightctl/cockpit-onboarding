@@ -27,6 +27,12 @@ BuildRequires: libappstream-glib-devel
 %endif
 
 Requires: cockpit
+Requires: cockpit-ws
+Requires: cockpit-bridge
+Requires: jq
+
+Recommends: hostapd
+Recommends: dnsmasq
 
 %{NPM_PROVIDES}
 
@@ -57,8 +63,13 @@ install -m 644 packaging/systemd/cockpit-system-onboarding-wifi-ap@.service %{bu
 install -m 644 packaging/systemd/cockpit-system-onboarding-dnsmasq@.service %{buildroot}%{_unitdir}/
 install -m 644 packaging/systemd/cockpit-system-onboarding-captive-portal@.service %{buildroot}%{_unitdir}/
 
+# Install flightctl-agent startup gate drop-in
+mkdir -p %{buildroot}%{_unitdir}/flightctl-agent.service.d
+install -m 644 packaging/systemd/onboarding-gate.conf %{buildroot}%{_unitdir}/flightctl-agent.service.d/
+
 # Install setup scripts
 mkdir -p %{buildroot}%{_libexecdir}/cockpit-system-onboarding
+install -m 644 packaging/systemd/scripts/common.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/check-dependencies.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/create-onboarding-user.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/setup-network.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
@@ -66,7 +77,15 @@ install -m 755 packaging/systemd/scripts/setup-led.sh %{buildroot}%{_libexecdir}
 install -m 755 packaging/systemd/scripts/setup-wifi-ap.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/cleanup-onboarding.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/configure-ntp.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/apply-labels.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/captive-portal.py %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/apply-and-enroll.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/run-apply-enroll.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/apply-proxy.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/finalize-onboarding.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/watchdog-rollback.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/check-network.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/run-watchdog.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 
 # Install sudoers configuration
 mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding
@@ -83,6 +102,11 @@ install -m 644 packaging/polkit/49-cockpit-system-onboarding.rules %{buildroot}%
 mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d
 install -m 755 packaging/system-onboarding.d/*.sh %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d/
 
+# Install branding override (distro-agnostic, takes priority over all distro dirs)
+mkdir -p %{buildroot}%{_sysconfdir}/cockpit/branding
+install -m 644 packaging/branding/branding.css %{buildroot}%{_sysconfdir}/cockpit/branding/
+install -m 644 packaging/branding/favicon.ico %{buildroot}%{_sysconfdir}/cockpit/branding/
+
 # Create state directory
 mkdir -p %{buildroot}%{_localstatedir}/lib/cockpit-system-onboarding
 
@@ -96,6 +120,9 @@ appstream-util validate-relax --nonet %{buildroot}/%{_datadir}/metainfo/*
 # Enable the onboarding setup service on first boot
 %systemd_post cockpit-system-onboarding-setup.service
 
+# Reload systemd to pick up the flightctl-agent gate drop-in
+systemctl daemon-reload >/dev/null 2>&1 || :
+
 # Only enable if not already run (marker file doesn't exist)
 if [ ! -f /var/lib/cockpit-system-onboarding/.onboarding-complete ]; then
     systemctl enable cockpit-system-onboarding-setup.service >/dev/null 2>&1 || :
@@ -104,12 +131,47 @@ fi
 %preun
 %systemd_preun cockpit-system-onboarding-setup.service
 
+# Remove the flightctl-agent gate drop-in on package removal
+if [ $1 -eq 0 ]; then
+    rm -f %{_unitdir}/flightctl-agent.service.d/onboarding-gate.conf || :
+    rmdir %{_unitdir}/flightctl-agent.service.d 2>/dev/null || :
+    systemctl daemon-reload >/dev/null 2>&1 || :
+fi
+
 %postun
 %systemd_postun cockpit-system-onboarding-setup.service
 
-# Clean up onboarding user and configuration if package is being removed
+# Full cleanup when the package is being removed (not upgraded)
 if [ $1 -eq 0 ]; then
-    # Remove onboarding user if it exists
+    # Stop and disable WiFi AP, dnsmasq, and captive portal template instances
+    for pattern in 'cockpit-system-onboarding-wifi-ap@*.service' \
+                   'cockpit-system-onboarding-dnsmasq@*.service' \
+                   'cockpit-system-onboarding-captive-portal@*.service'; do
+        for unit in $(systemctl list-units --plain --no-legend "$pattern" 2>/dev/null | awk '{print $1}'); do
+            systemctl stop "$unit" 2>/dev/null || :
+            systemctl disable "$unit" 2>/dev/null || :
+        done
+    done
+
+    # Stop the connectivity watchdog
+    systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || :
+    systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || :
+
+    # Remove the dedicated firewalld zone
+    if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
+        if firewall-cmd --permanent --info-zone=cockpit-onboarding-ap >/dev/null 2>&1; then
+            firewall-cmd --permanent --delete-zone=cockpit-onboarding-ap 2>/dev/null || :
+            firewall-cmd --reload 2>/dev/null || :
+        fi
+    fi
+
+    # Remove SSH denial for onboarding user
+    if [ -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf ]; then
+        rm -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf || :
+        systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null || :
+    fi
+
+    # Remove onboarding user
     if id onboarding >/dev/null 2>&1; then
         userdel -r onboarding >/dev/null 2>&1 || :
     fi
@@ -118,7 +180,18 @@ if [ $1 -eq 0 ]; then
     rm -f /etc/sudoers.d/cockpit-system-onboarding || :
     rm -f /etc/polkit-1/rules.d/49-cockpit-system-onboarding.rules || :
 
-    # Remove state directory
+    # Clean up Cockpit configuration changes made during setup
+    if [ -f /etc/cockpit/cockpit.conf ]; then
+        sed -i '/^AllowUnencrypted = true$/d' /etc/cockpit/cockpit.conf 2>/dev/null || :
+        sed -i '/^LoginTo = false$/d' /etc/cockpit/cockpit.conf 2>/dev/null || :
+        if ! grep -qE '^[^[\s]' /etc/cockpit/cockpit.conf 2>/dev/null; then
+            rm -f /etc/cockpit/cockpit.conf || :
+        fi
+    fi
+    rm -rf /etc/cockpit/system-onboarding || :
+
+    # Remove runtime and state files
+    rm -rf /run/cockpit-system-onboarding || :
     rm -rf /var/lib/cockpit-system-onboarding || :
 fi
 
@@ -131,7 +204,12 @@ fi
 %{_unitdir}/cockpit-system-onboarding-wifi-ap@.service
 %{_unitdir}/cockpit-system-onboarding-dnsmasq@.service
 %{_unitdir}/cockpit-system-onboarding-captive-portal@.service
+%dir %{_unitdir}/flightctl-agent.service.d
+%{_unitdir}/flightctl-agent.service.d/onboarding-gate.conf
 %{_libexecdir}/cockpit-system-onboarding/
+%dir %{_sysconfdir}/cockpit/branding
+%{_sysconfdir}/cockpit/branding/branding.css
+%{_sysconfdir}/cockpit/branding/favicon.ico
 %dir %{_localstatedir}/lib/cockpit-system-onboarding
 
 %changelog
