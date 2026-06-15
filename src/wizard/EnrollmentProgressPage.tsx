@@ -7,13 +7,22 @@ import { List, ListItem } from "@patternfly/react-core/dist/esm/components/List/
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 import { Card, CardBody } from "@patternfly/react-core/dist/esm/components/Card/index.js";
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
-import { CheckCircleIcon, ExclamationCircleIcon, InProgressIcon } from '@patternfly/react-icons';
+import { CheckCircleIcon, ExclamationCircleIcon, InProgressIcon, OutlinedClockIcon } from '@patternfly/react-icons';
 import { useModelContext } from '../model-context';
 import { systemConfigurationService } from '../system-config';
 import { loadConfig } from '../config-loader';
+import { getSetupInterface, applyNetworkConfiguration, rollbackNetworkConfiguration } from '../services/network';
+import { evaluateSkipConditions, SkipResult } from '../services/skip-conditions';
+import { writeAttemptedMarker } from '../attempted-marker';
+import { SCRIPT_RUN_APPLY_ENROLL } from '../paths';
+import { armWatchdog } from '../services/watchdog';
+import { testNetworkConnectivity, verifyServiceConnectivity, CancellationSignal } from '../services/connectivity';
+import { buildEnrollmentParams, executeEnrollmentScript, finalizeEnrollment } from '../services/enrollment';
+import { createSecureTempFile } from '../services/spawn-helpers';
+import { Interface } from '../../pkg/networkmanager/interfaces.js';
 import { EnrollmentService } from '../types';
 
-type StepStatus = 'pending' | 'running' | 'success' | 'failed' | 'warning';
+type StepStatus = 'pending' | 'running' | 'success' | 'failed' | 'warning' | 'delegated';
 
 interface Step {
     id: string;
@@ -42,17 +51,20 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
     const { model, updateModel, networkManager, cancelEnrollmentRef } = useModelContext();
     const [hasStarted, setHasStarted] = useState(false);
     const [enrollmentServices, setEnrollmentServices] = useState<EnrollmentService[]>([]);
+    const [skipResults, setSkipResults] = useState<Record<string, SkipResult>>({});
     const [steps, setSteps] = useState<Step[]>([]);
     const [results, setResults] = useState<ResultItem[]>([]);
+    const [singleNic, setSingleNic] = useState(false);
+    const networkAppliedRef = React.useRef(false);
     const shouldCancelRef = React.useRef(false);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const runningProcessRef = React.useRef<any>(null);
+    const signalRef = React.useRef<CancellationSignal>({ cancelled: false });
 
     const getStepIcon = (status: StepStatus) => {
         switch (status) {
             case 'pending': return null;
             case 'running': return <InProgressIcon className="pf-v6-u-animation-spin" />;
             case 'success': return <CheckCircleIcon color="var(--pf-v6-global--success-color--100)" />;
+            case 'delegated': return <OutlinedClockIcon color="var(--pf-v6-global--info-color--100)" />;
             case 'failed':
             case 'warning': return <ExclamationCircleIcon color="var(--pf-v6-global--danger-color--100)" />;
             default: return null;
@@ -65,6 +77,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             case 'failed':
             case 'warning': return 'var(--pf-v6-global--danger-color--100)';
             case 'running': return 'var(--pf-v6-global--primary-color--100)';
+            case 'delegated': return 'var(--pf-v6-global--info-color--100)';
             default: return 'inherit';
         }
     };
@@ -76,7 +89,6 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             const config = await loadConfig();
             const configuredServices = config.enrollmentServices || [];
 
-
             // Filter to only include services that the user selected
             const selectedServiceIds = model.enrollment.selectedServices || [];
             const servicesToEnroll = configuredServices.filter(service =>
@@ -84,6 +96,13 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             );
 
             setEnrollmentServices(servicesToEnroll);
+
+            // Evaluate skipWhen conditions for each service
+            const skipMap: Record<string, SkipResult> = {};
+            for (const service of servicesToEnroll) {
+                skipMap[service.id] = await evaluateSkipConditions(service.skipWhen);
+            }
+            setSkipResults(skipMap);
 
             // Create initial steps
             const initialSteps: Step[] = [
@@ -101,11 +120,30 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                 }
             ];
 
-            // Add enrollment service steps
+            // Add enrollment service steps (respecting skipWhen results)
             servicesToEnroll.forEach((service) => {
+                const skip = skipMap[service.id];
+
+                if (skip?.action === 'skip') {
+                    return;
+                }
+
+                if (skip?.action === 'connectivityOnly') {
+                    initialSteps.push({
+                        id: `enroll-${service.id}`,
+                        name: _("Verifying connectivity to {{serviceName}}").replace('{{serviceName}}', service.name),
+                        status: 'pending',
+                        isBuiltIn: false
+                    });
+                    return;
+                }
+
+                const isUsingExisting = model.enrollment.useExisting?.[service.id] ?? false;
                 initialSteps.push({
                     id: `enroll-${service.id}`,
-                    name: _("Enrolling into {{serviceName}}").replace('{{serviceName}}', service.name),
+                    name: isUsingExisting
+                        ? _("Restarting {{serviceName}} agent").replace('{{serviceName}}', service.name)
+                        : _("Enrolling into {{serviceName}}").replace('{{serviceName}}', service.name),
                     status: 'pending',
                     isBuiltIn: false
                 });
@@ -161,26 +199,24 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                 case 'test-connectivity':
                     return await testConnectivity(onOutput);
                 case 'finalize':
-                    return await finalizeEnrollment();
+                    return await finalizeEnrollment(model.hostname.value);
                 default:
                     // Handle enrollment service execution
                     if (stepId.startsWith('enroll-')) {
                         const serviceId = stepId.replace('enroll-', '');
                         const service = enrollmentServices.find(s => s.id === serviceId);
                         if (service) {
-                            // Get endpoint (user override or default)
-                            const endpoint = model.enrollment.endpoints[serviceId] || service.endpoint.url;
+                            const skip = skipResults[serviceId];
+                            if (skip?.action === 'connectivityOnly') {
+                                const endpoint = model.enrollment.endpoints[serviceId] || service.endpoint.url;
+                                return await verifyServiceConnectivity(service, endpoint, skip, signalRef.current, onOutput);
+                            }
 
-                            // Get credentials, stripping internal _variantIndex used by oneOf form
-                            const { _variantIndex: _, ...credentials } = model.enrollment.credentials[serviceId] || {};
-                            const credentialsJson = JSON.stringify(credentials);
-
+                            const params = buildEnrollmentParams(model, service);
                             return await executeEnrollmentScript(
                                 service.scriptPath,
-                                service.id,
-                                service.name,
-                                endpoint,
-                                credentialsJson,
+                                params,
+                                signalRef.current,
                                 onOutput
                             );
                         }
@@ -197,8 +233,13 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         try {
             onOutput?.('• Applying configuration updates...');
 
-            // Use SystemConfigurationService to apply all configuration
             const result = await systemConfigurationService.applySystemConfiguration(networkManager, model);
+
+            if (result.singleNic) {
+                setSingleNic(true);
+            }
+            networkAppliedRef.current = true;
+            updateModel('networkInterface', { wifiPassword: null });
 
             const summary = result.success
                 ? ' Success.'
@@ -207,6 +248,10 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             const indentedResults = result.results.map(r => `  ${r}`).join('\n');
             const fullOutput = `${summary}\n${indentedResults}`;
             onOutput?.(fullOutput);
+
+            if (result.singleNic) {
+                onOutput?.(_('\n  Note: Network changes applied on the interface serving this browser session. Connection may be interrupted.'));
+            }
 
             return {
                 success: result.success,
@@ -223,207 +268,162 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
     };
 
     const testConnectivity = async (onOutput?: (output: string) => void): Promise<{ success: boolean; output: string }> => {
-        // Test basic network connectivity
-        try {
-            const testHost = 'www.google.com';
-
-            // Approach 1: Use getent hosts to check DNS resolution
-            try {
-                onOutput?.(`• Attempting to lookup ${testHost} from DNS...`);
-                const dnsProc = cockpit.spawn(['getent', 'hosts', testHost], { err: 'ignore' });
-                runningProcessRef.current = dnsProc;
-                await dnsProc;
-                runningProcessRef.current = null;
-                onOutput?.(` Success.`);
-            } catch (dnsError) {
-                runningProcessRef.current = null;
-
-                // Extract error details
-                let errorDetail = '';
-                if (dnsError && typeof dnsError === 'object') {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const err = dnsError as any;
-                    if (err.exit_status !== undefined) {
-                        errorDetail = ` (exit status ${err.exit_status})`;
-                    }
-                }
-
-                const errorMsg = ` Failed${errorDetail}.\n  Please check network configuration.`;
-                onOutput?.(errorMsg);
-                return { success: false, output: errorMsg };
-            }
-
-            // Approach 2: Use timeout command with ping for better control
-            try {
-                onOutput?.(`• Pinging ${testHost} to check connectivity...`);
-                const pingProc = cockpit.spawn(['timeout', '10', 'ping', '-c', '1', '-W', '5', testHost], { err: 'ignore' });
-                runningProcessRef.current = pingProc;
-                await pingProc;
-                runningProcessRef.current = null;
-                onOutput?.(` Success.`);
-                return { success: true, output: "success" };
-            } catch (pingError) {
-                runningProcessRef.current = null;
-                console.warn(`Ping failed for ${testHost}:`, pingError);
-                // Fall back to basic success if DNS worked
-                const warningMsg = ` Failed.\n  However, pings may be simply blocked by firewall.`;
-                onOutput?.(warningMsg);
-                return { success: true, output: warningMsg };
-            }
-        } catch (error) {
-            runningProcessRef.current = null;
-            console.error('Connectivity test error:', error);
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            const fullErrorMsg = `Network connectivity test failed: ${errorMsg}`;
-            onOutput?.(fullErrorMsg);
-            return { success: false, output: fullErrorMsg };
-        }
+        const testHost = model.connectivityTestHost || 'www.google.com';
+        const iface = model.networkInterface.selectedInterface;
+        return testNetworkConnectivity(testHost, iface, signalRef.current, onOutput);
     };
 
-    const executeEnrollmentScript = async (scriptPath: string, serviceId: string, serviceName: string, endpoint: string, credentialsJson: string, onOutput?: (output: string) => void): Promise<{ success: boolean; output: string; deviceUrl?: string }> => {
-        // Capture output as it streams
-        let capturedOutput = '';
-
-        try {
-            console.log(`Executing enrollment script: ${scriptPath}`);
-            console.log('Service:', serviceName, `(${serviceId})`);
-            console.log('Endpoint:', endpoint);
-
-            onOutput?.(`Executing enrollment script for ${serviceName}...\n`);
-
-            // Write enrollment parameters to a temp file. We need sudo for
-            // privileged operations, but sudo sanitizes the environment, so
-            // env vars set via cockpit.spawn's `environ` won't reach the
-            // script. Passing parameters via file avoids this.
-            const enrollParams = {
-                ENROLLMENT_SERVICE_ID: serviceId,
-                ENROLLMENT_SERVICE_NAME: serviceName,
-                ENROLLMENT_ENDPOINT: endpoint,
-                ENROLLMENT_CREDENTIALS_JSON: credentialsJson,
-                ENROLLMENT_HOSTNAME: model.hostname.value,
-                ENROLLMENT_INTERFACE: model.networkInterface.selectedInterface || '',
-            };
-            const paramsFile = `/tmp/.enrollment-${serviceId}-${Date.now()}.json`;
-            await cockpit.file(paramsFile).replace(JSON.stringify(enrollParams));
-
-            const proc = cockpit.spawn(['sudo', scriptPath, paramsFile], {
-                err: 'out',
-            });
-            runningProcessRef.current = proc;
-
-            // Capture stdout/stderr as it arrives and stream it to UI
-            proc.stream((data) => {
-                capturedOutput += data;
-                onOutput?.(data);
-            });
-
-            await proc;
-            runningProcessRef.current = null;
-            console.log(`Script ${scriptPath} completed successfully`);
-
-            // Parse DEVICE_URL from output (enrollment-api.md specification)
-            const deviceUrlMatch = capturedOutput.match(/^DEVICE_URL:\s*(.+)$/m);
-            if (deviceUrlMatch) {
-                const url = deviceUrlMatch[1].trim();
-                // Validate URL format
-                if (url.startsWith('http://') || url.startsWith('https://')) {
-                    console.log(`Parsed device URL: ${url}`);
-                    return {
-                        success: true,
-                        output: capturedOutput || 'Script completed successfully',
-                        deviceUrl: url
-                    };
-                }
-            }
-
-            return {
-                success: true,
-                output: capturedOutput || 'Script completed successfully'
-            };
-        } catch (error) {
-            runningProcessRef.current = null;
-            console.error(`Script ${scriptPath} failed:`, error);
-
-            // Build error message from captured output and exit status
-            let errorMsg = '';
-
-            // First, include any captured output (which may contain error messages)
-            if (capturedOutput.trim()) {
-                errorMsg = capturedOutput.trim();
-            }
-
-            // Extract error information from ProcessError
-            if (error && typeof error === 'object') {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const processError = error as any;
-
-                // Add exit status information
-                if (processError.exit_status !== undefined) {
-                    const statusMsg = `Script exited with status ${processError.exit_status}`;
-                    errorMsg = errorMsg ? `${errorMsg}\n${statusMsg}` : statusMsg;
-                }
-            }
-
-            onOutput?.(errorMsg || 'Script failed with unknown error');
-            return { success: false, output: errorMsg || 'Script failed with unknown error' };
+    // Detect whether the user is configuring the same NIC that serves this
+    // browser session (single-NIC scenario).
+    const detectSingleNic = (): boolean => {
+        if (!networkManager || !model.networkInterface.selectedInterface) {
+            return false;
         }
+        const interfaces: Interface[] = networkManager.list_interfaces();
+        const setupIface = getSetupInterface(interfaces);
+        return setupIface !== null && setupIface === model.networkInterface.selectedInterface;
     };
 
-    const finalizeEnrollment = async (): Promise<{ success: boolean; output: string }> => {
-        const outputs: string[] = [];
+    // Single-NIC delegation: apply hostname/NTP in-process, create the NM
+    // profile without activating, write params files, and hand off network
+    // activation + enrollment to a systemd-run transient unit that survives
+    // cockpit-bridge exit.
+    const executeSingleNicDelegation = async (resultsBuffer: ResultItem[]) => {
+        const onOutput = (output: string) => {
+            resultsBuffer.push({ type: 'output', content: output });
+            setResults([...resultsBuffer]);
+        };
 
-        // Create marker file to prevent re-running onboarding
+        // -- apply-config step: hostname + NTP only (skip network) --
+        setSteps(prev => prev.map(s => s.id === 'apply-config' ? { ...s, status: 'running' } : s));
+        resultsBuffer.push({ type: 'header', content: _("Applying configuration changes") });
+        setResults([...resultsBuffer]);
+
         try {
-            const markerDir = '/var/lib/cockpit-system-onboarding';
-            const markerPath = `${markerDir}/.onboarding-complete`;
-            const timestamp = new Date().toISOString();
-            const markerContent = JSON.stringify({
-                completedAt: timestamp,
-                hostname: model.hostname.value,
-            });
+            onOutput('Applying hostname and NTP configuration...');
+            const configResult = await systemConfigurationService.applySystemConfiguration(
+                networkManager, model, { skipNetwork: true }
+            );
+            if (!configResult.success) {
+                onOutput('Failed to apply hostname/NTP configuration');
+                setSteps(prev => prev.map(s => s.id === 'apply-config' ? { ...s, status: 'failed' } : s));
+                updateModel('enrollmentProgress', { executionState: 'failed' });
+                return;
+            }
+            configResult.results.forEach(r => onOutput(`  ${r}`));
 
-            // Create directory and marker file (state dir is owned by onboarding user)
-            await cockpit.spawn(
-                ['mkdir', '-p', markerDir],
-                { err: 'message' }
-            );
-            await cockpit.spawn(
-                ['bash', '-c', `echo '${markerContent.replace(/'/g, "'\\''")}' > ${markerPath}`],
-                { err: 'message' }
-            );
-            outputs.push('✓ Onboarding completion marker created');
+            // Create NM profile without activating
+            onOutput('Creating network profile (activation deferred)...');
+            await applyNetworkConfiguration(networkManager, model, true);
+            onOutput(' Network profile created successfully.');
+
+            setSteps(prev => prev.map(s => s.id === 'apply-config' ? { ...s, status: 'success' } : s));
         } catch (error) {
-            console.error('Failed to create marker file:', error);
-            outputs.push(`✗ Failed to create completion marker: ${String(error)}`);
-            return { success: false, output: outputs.join('\n') };
+            onOutput(`Failed: ${String(error)}`);
+            setSteps(prev => prev.map(s => s.id === 'apply-config' ? { ...s, status: 'failed' } : s));
+            updateModel('enrollmentProgress', { executionState: 'failed' });
+            return;
         }
 
-        // Note: cleanup script is NOT called here because it stops the WiFi AP,
-        // which would disconnect the user before they see the results.
-        // Cleanup runs on reboot via the setup service's ExecStop, or on package removal.
+        // -- Write enrollment params files for each service (skip services that evaluated to "skip") --
+        const enrollmentScriptEntries: { scriptPath: string; paramsFile: string }[] = [];
+        const tempFilesToCleanup: string[] = [];
+        for (const service of enrollmentServices) {
+            const skip = skipResults[service.id];
+            if (skip?.action === 'skip' || skip?.action === 'connectivityOnly') {
+                continue;
+            }
+            const params = buildEnrollmentParams(model, service);
+            const pf = await createSecureTempFile(
+                JSON.stringify(params),
+                `.enrollment-${service.id}-`,
+            );
+            tempFilesToCleanup.push(pf);
+            enrollmentScriptEntries.push({ scriptPath: service.scriptPath, paramsFile: pf });
+        }
 
-        return { success: true, output: outputs.join('\n') };
+        // -- Write master params JSON for apply-and-enroll.sh --
+        const ifaceName = model.networkInterface.selectedInterface || '';
+        const masterParams = {
+            connectionId: `flightctl-onboarding-${ifaceName}`,
+            interfaceName: ifaceName,
+            enrollmentScripts: enrollmentScriptEntries,
+            hostname: model.hostname.value,
+            connectivityTestHost: model.connectivityTestHost || 'www.google.com',
+        };
+        const masterParamsFile = await createSecureTempFile(
+            JSON.stringify(masterParams),
+            '.onboarding-apply-',
+        );
+        tempFilesToCleanup.push(masterParamsFile);
+
+        // -- Mark remaining steps as delegated --
+        setSteps(prev => prev.map(s => {
+            if (s.id === 'apply-config') return s;
+            return { ...s, status: 'delegated' };
+        }));
+
+        // -- Launch systemd-run transient unit --
+        resultsBuffer.push({
+            type: 'header',
+            content: _("Delegating network activation and enrollment to background service")
+        });
+        setResults([...resultsBuffer]);
+
+        try {
+            await cockpit.spawn([
+                'sudo',
+                SCRIPT_RUN_APPLY_ENROLL,
+                masterParamsFile
+            ], { err: 'out' });
+        } catch (error) {
+            console.error('Failed to launch systemd-run:', error);
+            onOutput(`Failed to launch background service: ${String(error)}`);
+            for (const f of tempFilesToCleanup) {
+                cockpit.spawn(['rm', '-f', f], { err: 'message' }).catch(() => {});
+            }
+            setSteps(prev => prev.map(s =>
+                s.status === 'delegated' ? { ...s, status: 'failed' } : s
+            ));
+            updateModel('enrollmentProgress', { executionState: 'failed' });
+            return;
+        }
+
+        setSingleNic(true);
+        updateModel('enrollmentProgress', { executionState: 'success', overallProgress: 100 });
     };
 
     // Main execution function
     const executeEnrollment = async () => {
         setHasStarted(true);
-        shouldCancelRef.current = false; // Reset cancel flag
+        shouldCancelRef.current = false;
+        signalRef.current = { cancelled: false };
         updateModel('enrollmentProgress', { executionState: 'running' });
 
-        let completedSteps = 0;
-        const totalSteps = steps.length;
+        await writeAttemptedMarker(model);
+        const testHost = model.connectivityTestHost || 'www.google.com';
+        const watchdogTimeout = model.networkInterface.interfaceType === 'wifi' ? 240 : 600;
+        await armWatchdog(testHost, watchdogTimeout);
+
         const resultsBuffer: ResultItem[] = [];
 
+        // Single-NIC: delegate network activation + enrollment to systemd-run
+        if (detectSingleNic()) {
+            await executeSingleNicDelegation(resultsBuffer);
+            return;
+        }
+
+        // Multi-NIC: execute all steps inline
+        let completedSteps = 0;
+        const totalSteps = steps.length;
+
         for (const step of steps) {
-            // Check if cancellation was requested
             if (shouldCancelRef.current) {
                 console.log('Enrollment cancelled by user');
                 updateModel('enrollmentProgress', { executionState: 'failed' });
                 return;
             }
 
-            // Add step header to results
             const stepHeader: ResultItem = {
                 type: 'header',
                 content: step.name
@@ -431,7 +431,6 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             resultsBuffer.push(stepHeader);
             setResults([...resultsBuffer]);
 
-            // Create callback to stream output in real-time
             const onOutput = (output: string) => {
                 resultsBuffer.push({
                     type: 'output',
@@ -442,7 +441,6 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
 
             const result = await executeStep(step.id, onOutput);
 
-            // Update step status and store deviceUrl
             setSteps(prev => prev.map(s => {
                 if (s.id === step.id) {
                     const updatedStep: Step = {
@@ -461,18 +459,26 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             if (result.success) {
                 completedSteps++;
             } else {
-                // Stop on failure
+                if (networkAppliedRef.current) {
+                    try {
+                        const rollbackResults = await rollbackNetworkConfiguration();
+                        rollbackResults.forEach(msg => {
+                            resultsBuffer.push({ type: 'output', content: `  ${msg}` });
+                        });
+                        setResults([...resultsBuffer]);
+                    } catch (rollbackError) {
+                        console.error('Network rollback failed:', rollbackError);
+                    }
+                }
                 updateModel('enrollmentProgress', { executionState: 'failed' });
                 return;
             }
 
-            // Update overall progress
             updateModel('enrollmentProgress', {
                 overallProgress: Math.round((completedSteps / totalSteps) * 100)
             });
         }
 
-        // All steps completed successfully
         updateModel('enrollmentProgress', { executionState: 'success' });
     };
 
@@ -483,16 +489,16 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         cancelEnrollmentRef.current = () => {
             console.log('Cancellation requested');
             shouldCancelRef.current = true;
+            signalRef.current.cancelled = true;
 
-            // Abort the currently running process if any
-            if (runningProcessRef.current) {
+            if (signalRef.current.process) {
                 console.log('Aborting running process');
                 try {
-                    runningProcessRef.current.close();
+                    signalRef.current.process.close();
                 } catch (error) {
                     console.error('Error aborting process:', error);
                 }
-                runningProcessRef.current = null;
+                signalRef.current.process = undefined;
             }
         };
 
@@ -572,6 +578,11 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                                                     {_("Running...")}
                                                 </span>
                                             )}
+                                            {step.status === 'delegated' && (
+                                                <span style={{ fontStyle: 'italic', color: 'var(--pf-v6-global--info-color--100)' }}>
+                                                    {_("Delegated to background service")}
+                                                </span>
+                                            )}
                                         </div>
                                     </ListItem>
                                 );
@@ -580,12 +591,17 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
 
                         {executionState === 'failed' && (
                             <Alert variant="danger" title={_("Enrollment failed")}>
-                                {_("The enrollment process was cancelled or failed. Please check the results above and try again.")}
+                                {_("The enrollment process was cancelled or failed. Network changes have been rolled back. Please check the results above and try again.")}
                             </Alert>
                         )}
-                        {executionState === 'success' && (
+                        {executionState === 'success' && !singleNic && (
                             <Alert variant="success" title={_("Configuration completed successfully")}>
                                 {_("Your system has been configured successfully.")}
+                            </Alert>
+                        )}
+                        {executionState === 'success' && singleNic && (
+                            <Alert variant="info" title={_("Onboarding continues in the background")}>
+                                {_("Network activation and enrollment have been delegated to a background service. Your browser connection will be lost when the new network configuration is applied. Check /var/log/cockpit-system-onboarding-apply.log on the device for progress.")}
                             </Alert>
                         )}
                     </CardBody>
