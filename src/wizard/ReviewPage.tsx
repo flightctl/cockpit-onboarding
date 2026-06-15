@@ -3,11 +3,13 @@ import cockpit from 'cockpit';
 
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { DescriptionList, DescriptionListGroup, DescriptionListTerm, DescriptionListDescription } from "@patternfly/react-core/dist/esm/components/DescriptionList/index.js";
+import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { useWizardContext } from "@patternfly/react-core/dist/esm/components/Wizard/index.js";
 import { PencilAltIcon } from '@patternfly/react-icons';
 import { useModelContext } from '../model-context';
 import { useConfig } from '../app';
+import { getSetupInterface } from '../services/network';
 
 const _ = cockpit.gettext;
 
@@ -16,9 +18,13 @@ interface ReviewPageProps {
 }
 
 export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnrollmentScripts }) => {
-    const { model } = useModelContext();
+    const { model, networkManager } = useModelContext();
     const { config } = useConfig();
     const { goToStepById } = useWizardContext();
+
+    const interfaces = networkManager?.list_interfaces() || [];
+    const setupIface = getSetupInterface(interfaces);
+    const isSingleNic = setupIface !== null && setupIface === model.networkInterface.selectedInterface;
 
     return (
         <Stack hasGutter>
@@ -29,6 +35,14 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                         : _("Please review your configuration below. Click \"Apply\" to apply these settings to the system.")}
                 </p>
             </StackItem>
+
+            {isSingleNic && (
+                <StackItem>
+                    <Alert variant="warning" isInline title={_("Connection will be interrupted")}>
+                        {_("You are applying changes to the interface serving this browser session. Your connection will drop when the new network profile is activated. The remaining steps (connectivity test, enrollment, and cleanup) will continue in the background automatically.")}
+                    </Alert>
+                </StackItem>
+            )}
 
             <StackItem>
                 <DescriptionList isHorizontal>
@@ -239,16 +253,19 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                         </DescriptionListDescription>
                     </DescriptionListGroup>
                     <DescriptionListGroup>
-                        <DescriptionListTerm>{_("HTTP Proxy")}</DescriptionListTerm>
+                        <DescriptionListTerm>{_("Proxy")}</DescriptionListTerm>
                         <DescriptionListDescription>
                             {model.networkServices.proxy.enabled
                                 ? (
                                     <>
                                         {model.networkServices.proxy.hostname && model.networkServices.proxy.port
-                                        ? `${model.networkServices.proxy.hostname}:${model.networkServices.proxy.port}`
+                                        ? `${model.networkServices.proxy.protocol}://${model.networkServices.proxy.hostname}:${model.networkServices.proxy.port}`
                                         : _("(incomplete configuration)")}
                                         {model.networkServices.proxy.username && (
                                         <div>{_("Username: ")} {model.networkServices.proxy.username}</div>
+                                    )}
+                                        {model.networkServices.proxy.noProxy && (
+                                        <div>{_("No proxy: ")} {model.networkServices.proxy.noProxy}</div>
                                     )}
                                     </>
                             )
@@ -258,6 +275,20 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                 icon={<PencilAltIcon />}
                                 onClick={() => goToStepById('wizard-step-4')}
                                 aria-label={_("Edit network services")}
+                            />
+                        </DescriptionListDescription>
+                    </DescriptionListGroup>
+
+                    {/* Connectivity Test Section */}
+                    <DescriptionListGroup>
+                        <DescriptionListTerm>{_("Connectivity test host")}</DescriptionListTerm>
+                        <DescriptionListDescription>
+                            {model.connectivityTestHost || _("(not set)")}
+                            <Button
+                                variant="link"
+                                icon={<PencilAltIcon />}
+                                onClick={() => goToStepById(hasEnrollmentScripts ? 'wizard-step-6' : 'wizard-step-5')}
+                                aria-label={_("Edit connectivity test host")}
                             />
                         </DescriptionListDescription>
                     </DescriptionListGroup>
@@ -286,7 +317,26 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                     );
                                 }
 
-                                // Service selected - show "Enroll using" with endpoint and credentials
+                                const isUsingExisting = model.enrollment.useExisting?.[service.id] ?? false;
+
+                                if (isUsingExisting) {
+                                    return (
+                                        <DescriptionListGroup key={service.id}>
+                                            <DescriptionListTerm>{service.name}</DescriptionListTerm>
+                                            <DescriptionListDescription>
+                                                {_("Using existing credentials")}
+                                                <Button
+                                                    variant="link"
+                                                    icon={<PencilAltIcon />}
+                                                    onClick={() => goToStepById('wizard-step-5')}
+                                                    aria-label={_("Edit enrollment services")}
+                                                />
+                                            </DescriptionListDescription>
+                                        </DescriptionListGroup>
+                                    );
+                                }
+
+                                // Service selected with new credentials - show endpoint and credentials
                                 const endpoint = model.enrollment.endpoints[service.id] || service.endpoint.url;
                                 const credentials = model.enrollment.credentials[service.id] || {};
 
@@ -299,7 +349,9 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                             </div>
                                             {Object.keys(credentials).length > 0 && (
                                                 <div>
-                                                    {Object.entries(credentials).filter(([key]) => !key.startsWith('_')).map(([key, value]) => {
+                                                    {Object.entries(credentials)
+                                                        .filter(([key]) => !key.startsWith('_'))
+                                                        .map(([key, value]) => {
                                                         // Hide password/token fields
                                                         const isSecret = key.toLowerCase().includes('password') ||
                                                                        key.toLowerCase().includes('token') ||
@@ -327,6 +379,27 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                 );
                             })}
                         </>
+                    )}
+
+                    {/* Labels Section */}
+                    {(model.labels.deviceLabels.length > 0 || model.labels.systemInfoMappings.length > 0) && (
+                        <DescriptionListGroup>
+                            <DescriptionListTerm>{_("Device labels")}</DescriptionListTerm>
+                            <DescriptionListDescription>
+                                {model.labels.deviceLabels.map((entry, i) => (
+                                    <div key={i}>{entry.key} = {entry.value}</div>
+                                ))}
+                                {model.labels.systemInfoMappings.map((entry, i) => (
+                                    <div key={i}>{entry.labelKey} &larr; {entry.systemInfoField}</div>
+                                ))}
+                                <Button
+                                    variant="link"
+                                    icon={<PencilAltIcon />}
+                                    onClick={() => goToStepById(hasEnrollmentScripts ? 'wizard-step-7' : 'wizard-step-6')}
+                                    aria-label={_("Edit device labels")}
+                                />
+                            </DescriptionListDescription>
+                        </DescriptionListGroup>
                     )}
                 </DescriptionList>
             </StackItem>

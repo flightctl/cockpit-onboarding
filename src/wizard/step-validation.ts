@@ -6,7 +6,7 @@
  */
 
 import { Model } from '../model-context';
-import { validateHostname, validateIPv4, validateSubnetMask, validateIPv6, validateIP, validateHostnameOrIP, validatePort } from '../validation';
+import { validateHostname, validateIPv4, validateSubnetMask, validateIPv6, validateIP, validateHostnameOrIP, validatePort, validateLabelKey, validateLabelValue, validateIPv4GatewaySubnet, validateIPv6GatewaySubnet } from '../validation';
 
 /**
  * Validate the hostname step
@@ -59,6 +59,11 @@ export const validateNetworkInterfaceStep = (model: Model): boolean => {
 export const validateNetworkAddressStep = (model: Model): boolean => {
     const { ipv4, ipv6 } = model.networkAddress;
 
+    // At least one protocol must be enabled
+    if (ipv4.method === 'disabled' && ipv6.method === 'disabled') {
+        return false;
+    }
+
     // IPv4 validation
     if (ipv4.method === 'static') {
         // Static IPv4 requires address, subnet mask, and gateway
@@ -70,6 +75,13 @@ export const validateNetworkAddressStep = (model: Model): boolean => {
         }
         if (!ipv4.gateway || validateIPv4(ipv4.gateway) !== null) {
             return false;
+        }
+
+        // Gateway must be in the same subnet as the IP
+        if (ipv4.address && ipv4.gateway && ipv4.subnetMask) {
+            if (validateIPv4GatewaySubnet(ipv4.address, ipv4.gateway, ipv4.subnetMask) !== null) {
+                return false;
+            }
         }
 
         // If manual DNS is selected, primary DNS is required
@@ -93,6 +105,13 @@ export const validateNetworkAddressStep = (model: Model): boolean => {
         }
         if (!ipv6.gateway || validateIPv6(ipv6.gateway) !== null) {
             return false;
+        }
+
+        // Gateway must be in the same subnet as the IP
+        if (ipv6.address && ipv6.gateway) {
+            if (validateIPv6GatewaySubnet(ipv6.address, ipv6.gateway) !== null) {
+                return false;
+            }
         }
 
         // If manual DNS is selected, primary DNS is required
@@ -184,6 +203,11 @@ export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[])
         const service = enrollmentServices.find((s: any) => s.id === serviceId);
         if (!service) continue;
 
+        // When using existing credentials, skip endpoint and credential validation
+        if (model.enrollment.useExisting?.[serviceId]) {
+            continue;
+        }
+
         // Validate endpoint exists
         const endpoint = endpoints?.[serviceId] || service.endpoint.url;
         if (!endpoint || !endpoint.trim()) {
@@ -216,6 +240,47 @@ export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[])
     }
 
     return true;
+};
+
+/**
+ * Validate the labels step
+ * Labels are optional; validates key/value consistency when either is present.
+ */
+export const validateLabelsStep = (model: Model): boolean => {
+    for (const { key, value } of model.labels.deviceLabels) {
+        const hasKey = key.trim().length > 0;
+        const hasValue = value.trim().length > 0;
+
+        if (hasKey || hasValue) {
+            if (!hasKey) return false;
+            if (validateLabelKey(key) !== null) return false;
+            if (validateLabelValue(value) !== null) return false;
+        }
+    }
+
+    for (const { labelKey, systemInfoField } of model.labels.systemInfoMappings) {
+        const hasKey = labelKey.trim().length > 0;
+        const isCustomInfo = systemInfoField.startsWith('customInfo.');
+        const hasField = isCustomInfo
+            ? systemInfoField.slice('customInfo.'.length).trim().length > 0
+            : systemInfoField.trim().length > 0;
+
+        if (hasKey || hasField) {
+            if (!hasKey) return false;
+            if (!hasField) return false;
+            if (validateLabelKey(labelKey) !== null) return false;
+        }
+    }
+
+    return true;
+};
+
+/**
+ * Validate the connectivity test step
+ * Required: A non-empty host must be provided
+ */
+export const validateConnectivityTestStep = (model: Model): boolean => {
+    return model.connectivityTestHost.trim().length > 0;
 };
 
 /**
