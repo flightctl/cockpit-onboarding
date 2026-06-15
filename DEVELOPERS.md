@@ -68,6 +68,24 @@ Individual tools:
 
 Configuration files: `.eslintrc.json`, `.stylelintrc.json`.
 
+## Test VM
+
+Create a Fedora QEMU/KVM VM pre-provisioned with the onboarding RPM, dual ethernet NICs, and simulated WiFi interfaces:
+
+```sh
+make deploy-test-vm
+```
+
+This downloads a Fedora Cloud image, creates a VM with two ethernet interfaces and two virtual WiFi radios (`mac80211_hwsim`), installs all dependencies, builds and installs the onboarding RPM, and starts the setup service. The VM IP is printed at the end — access the wizard at `https://<ip>:9090`.
+
+To destroy the VM:
+
+```sh
+make clean-test-vm
+```
+
+See the [Testing WiFi Interfaces](README.md#testing-wifi-interfaces) section in the README for details on WiFi simulation and how to enable internet connectivity through the virtual radios.
+
 ## Running tests
 
 ### Locally
