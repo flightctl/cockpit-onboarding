@@ -13,6 +13,11 @@ import { SystemOnboardingConfig } from './types';
 const DEFAULT_CONFIG_PATH = '/usr/share/cockpit/system-onboarding/config.json';
 const USER_CONFIG_PATH = '/etc/cockpit/system-onboarding/config.json';
 
+const ALLOWED_SCRIPT_DIRS = [
+    '/usr/share/cockpit/system-onboarding/system-onboarding.d/',
+    '/etc/cockpit/system-onboarding.d/',
+];
+
 // Default configuration if no files are found
 const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
     version: '1.0',
@@ -29,11 +34,15 @@ const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
         wifiAp: {
             enabled: false,
             ssidPrefix: 'setup-',
+            interface: '',
             password: 'onboarding',
         },
     },
     led: {
         enabled: false,
+    },
+    connectivityTest: {
+        host: 'www.google.com',
     },
 };
 
@@ -96,6 +105,23 @@ export async function loadConfig(): Promise<SystemOnboardingConfig> {
             ...userConfig.led,
         },
         enrollmentServices: userConfig.enrollmentServices || defaultConfig.enrollmentServices || [],
+        defaults: {
+            ...defaultConfig.defaults,
+            ...userConfig.defaults,
+            proxy: {
+                ...defaultConfig.defaults?.proxy,
+                ...userConfig.defaults?.proxy,
+            },
+            labels: {
+                ...defaultConfig.defaults?.labels,
+                ...userConfig.defaults?.labels,
+            },
+        },
+        connectivityTest: {
+            ...BUILT_IN_DEFAULTS.connectivityTest,
+            ...defaultConfig.connectivityTest,
+            ...userConfig.connectivityTest,
+        },
     };
 
     // Validate the merged configuration
@@ -171,6 +197,37 @@ export function validateConfig(config: SystemOnboardingConfig): void {
             if (!service.scriptPath || typeof service.scriptPath !== 'string') {
                 throw new Error(`Enrollment service '${service.id}': 'scriptPath' is required and must be a string`);
             }
+
+            if (!ALLOWED_SCRIPT_DIRS.some(dir => service.scriptPath.startsWith(dir))) {
+                throw new Error(
+                    `Enrollment service '${service.id}': scriptPath must be within an allowed directory ` +
+                    `(${ALLOWED_SCRIPT_DIRS.join(' or ')}), got '${service.scriptPath}'`
+                );
+            }
+
+            if (service.scriptPath.includes('..')) {
+                throw new Error(`Enrollment service '${service.id}': scriptPath must not contain '..'`);
+            }
+
+            if (service.skipWhen !== undefined) {
+                if (!Array.isArray(service.skipWhen)) {
+                    throw new Error(`Enrollment service '${service.id}': 'skipWhen' must be an array`);
+                }
+                service.skipWhen.forEach((condition, condIndex) => {
+                    if (!condition.action || (condition.action !== 'skip' && condition.action !== 'connectivityOnly')) {
+                        throw new Error(`Enrollment service '${service.id}': skipWhen[${condIndex}].action must be 'skip' or 'connectivityOnly'`);
+                    }
+                    if (!condition.reason || typeof condition.reason !== 'string') {
+                        throw new Error(`Enrollment service '${service.id}': skipWhen[${condIndex}].reason is required`);
+                    }
+                    if (condition.allPathsExist !== undefined && !Array.isArray(condition.allPathsExist)) {
+                        throw new Error(`Enrollment service '${service.id}': skipWhen[${condIndex}].allPathsExist must be an array`);
+                    }
+                    if (condition.anyPathExists !== undefined && !Array.isArray(condition.anyPathExists)) {
+                        throw new Error(`Enrollment service '${service.id}': skipWhen[${condIndex}].anyPathExists must be an array`);
+                    }
+                });
+            }
         });
     }
 
@@ -186,6 +243,15 @@ export function validateConfig(config: SystemOnboardingConfig): void {
 
                 if (!/^[a-zA-Z0-9_-]+$/.test(wifiAp.ssidPrefix)) {
                     throw new Error('WiFi AP ssidPrefix must contain only alphanumeric characters, underscores, and hyphens');
+                }
+            }
+
+            if (wifiAp.interface !== undefined && wifiAp.interface !== '') {
+                if (typeof wifiAp.interface !== 'string' || wifiAp.interface.length > 15) {
+                    throw new Error('WiFi AP interface must be a string of at most 15 characters');
+                }
+                if (!/^[a-zA-Z0-9._-]+$/.test(wifiAp.interface)) {
+                    throw new Error('WiFi AP interface must contain only alphanumeric characters, dots, underscores, and hyphens');
                 }
             }
 

@@ -8,33 +8,15 @@
     "wifiAp": {
       "enabled": true,
       "ssidPrefix": "cockpit-",
+      "interface": "",
       "password": ""
     },
     "ethernet": {
-      "enabled": true,
+      "enabled": false,
       "staticIp": "192.168.100.1"
     }
   },
   "enrollmentServices": [
-    {
-      "id": "insights",
-      "name": "Red Hat Insights",
-      "description": "Register this system with Red Hat Insights for monitoring and management",
-      "endpoint": {
-        "url": "https://api.access.redhat.com",
-        "allowUserOverride": false
-      },
-      "credentialsSchema": {
-        "type": "object",
-        "properties": {
-          "organizationId": { "type": "string", "title": "Organization ID" },
-          "activationKey": { "type": "string", "title": "Activation key" },
-          "disableRemoteManagement": { "type": "boolean", "title": "Disable remote management (use when Flight Control manages the device)" }
-        },
-        "required": ["organizationId", "activationKey"]
-      },
-      "scriptPath": "/usr/share/cockpit/system-onboarding/system-onboarding.d/insights-enroll.sh"
-    },
     {
       "id": "flightctl",
       "name": "Flight Control",
@@ -66,6 +48,9 @@
       "scriptPath": "/usr/share/cockpit/system-onboarding/system-onboarding.d/flightctl-enroll.sh"
     }
   ],
+  "connectivityTest": {
+    "host": "www.google.com"
+  },
   "led": {
     "enabled": false,
     "states": {

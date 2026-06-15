@@ -129,7 +129,7 @@
 
 ### 3. EnrollmentService
 
-**Purpose**: Define a management service for device enrollment (e.g., Flight Control, Red Hat Insights)
+**Purpose**: Define a management service for device enrollment (e.g., Flight Control)
 
 **Storage**: Part of SystemOnboardingConfig JSON
 

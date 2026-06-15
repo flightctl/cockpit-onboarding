@@ -213,6 +213,86 @@ export const validateIP = (ip: string, required = true): string | null => {
 };
 
 /**
+ * Validate that an IPv4 gateway is within the same subnet as the static IP.
+ *
+ * @param address - The IPv4 address
+ * @param gateway - The IPv4 gateway
+ * @param mask - Subnet mask (dotted decimal or CIDR)
+ * @returns Error message or null if valid
+ */
+export const validateIPv4GatewaySubnet = (address: string, gateway: string, mask: string): string | null => {
+    const addr = address.trim();
+    const gw = gateway.trim();
+    const m = mask.trim();
+    if (!addr || !gw || !m) return null;
+    if (validateIPv4(addr) || validateIPv4(gw) || validateSubnetMask(m)) return null;
+
+    let prefixLen: number;
+    if (m.startsWith('/')) {
+        prefixLen = parseInt(m.slice(1), 10);
+    } else {
+        const octets = m.split('.').map(Number);
+        let bits = '';
+        for (const o of octets) bits += o.toString(2).padStart(8, '0');
+        prefixLen = bits.indexOf('0') === -1 ? 32 : bits.indexOf('0');
+    }
+
+    const addrParts = addr.split('.').map(Number);
+    const gwParts = gw.split('.').map(Number);
+    const maskBits = 0xFFFFFFFF << (32 - prefixLen);
+    const addrInt = ((addrParts[0] << 24) | (addrParts[1] << 16) | (addrParts[2] << 8) | addrParts[3]) >>> 0;
+    const gwInt = ((gwParts[0] << 24) | (gwParts[1] << 16) | (gwParts[2] << 8) | gwParts[3]) >>> 0;
+
+    if ((addrInt & maskBits) !== (gwInt & maskBits)) {
+        return 'Gateway is not in the same subnet as the IP address';
+    }
+
+    return null;
+};
+
+/**
+ * Validate that an IPv6 gateway is within the same subnet as the static IP.
+ *
+ * @param address - The IPv6 address with prefix (e.g. "2001:db8::1/64")
+ * @param gateway - The IPv6 gateway address
+ * @returns Error message or null if valid
+ */
+export const validateIPv6GatewaySubnet = (address: string, gateway: string): string | null => {
+    const addr = address.trim();
+    const gw = gateway.trim();
+    if (!addr || !gw || !addr.includes('/')) return null;
+    if (validateIPv6(addr, true) || validateIPv6(gw)) return null;
+
+    try {
+        const [addrPart, prefixStr] = addr.split('/');
+        const prefixLen = parseInt(prefixStr, 10);
+        const addrParsed = ipaddr.IPv6.parse(addrPart);
+        const gwParsed = ipaddr.IPv6.parse(gw);
+        const addrBytes = addrParsed.toByteArray();
+        const gwBytes = gwParsed.toByteArray();
+
+        const fullBytes = Math.floor(prefixLen / 8);
+        const remainingBits = prefixLen % 8;
+
+        for (let i = 0; i < fullBytes; i++) {
+            if (addrBytes[i] !== gwBytes[i]) {
+                return 'Gateway is not in the same subnet as the IPv6 address';
+            }
+        }
+        if (remainingBits > 0 && fullBytes < 16) {
+            const mask = 0xFF << (8 - remainingBits);
+            if ((addrBytes[fullBytes] & mask) !== (gwBytes[fullBytes] & mask)) {
+                return 'Gateway is not in the same subnet as the IPv6 address';
+            }
+        }
+    } catch {
+        return null;
+    }
+
+    return null;
+};
+
+/**
  * @deprecated Use validateIP instead - DNS servers are just IP addresses
  * Alias for backward compatibility
  */
@@ -274,6 +354,61 @@ export const validatePort = (port: number | null, required = true): string | nul
  * @param required - Whether the field is required
  * @returns Error message or null if valid
  */
+/**
+ * Validate a Kubernetes label key
+ *
+ * Format: [prefix/]name
+ * - prefix: optional DNS subdomain, max 253 chars
+ * - name: max 63 chars, alphanumeric start/end, [-_.a-zA-Z0-9] in between
+ */
+export const validateLabelKey = (key: string, required = true): string | null => {
+    const trimmed = key.trim();
+
+    if (!trimmed) {
+        return required ? 'Label key is required' : null;
+    }
+
+    let name = trimmed;
+    if (trimmed.includes('/')) {
+        const parts = trimmed.split('/');
+        if (parts.length !== 2) return 'Label key can contain at most one "/"';
+        const prefix = parts[0];
+        name = parts[1];
+
+        if (!prefix) return 'Label key prefix cannot be empty';
+        if (prefix.length > 253) return 'Label key prefix must be 253 characters or less';
+        if (!/^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$/.test(prefix)) {
+            return 'Label key prefix must be a valid DNS subdomain';
+        }
+    }
+
+    if (!name) return 'Label key name cannot be empty';
+    if (name.length > 63) return 'Label key name must be 63 characters or less';
+    if (!/^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/.test(name)) {
+        return 'Label key name must start and end with alphanumeric characters, and contain only alphanumerics, hyphens, underscores, or dots';
+    }
+
+    return null;
+};
+
+/**
+ * Validate a Kubernetes label value
+ *
+ * Max 63 chars, alphanumeric start/end if non-empty, [-_.a-zA-Z0-9] in between.
+ * Empty string is valid.
+ */
+export const validateLabelValue = (value: string): string | null => {
+    const trimmed = value.trim();
+
+    if (!trimmed) return null;
+    if (trimmed.length > 63) return 'Label value must be 63 characters or less';
+    if (!/^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/.test(trimmed)) {
+        return 'Label value must start and end with alphanumeric characters, and contain only alphanumerics, hyphens, underscores, or dots';
+    }
+
+    return null;
+};
+
 export const validateURL = (url: string, required = true): string | null => {
     const trimmedUrl = url.trim();
 

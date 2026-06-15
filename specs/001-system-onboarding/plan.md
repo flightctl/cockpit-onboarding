@@ -7,7 +7,7 @@
 
 ## Summary
 
-The Cockpit System Onboarding Plugin provides a wizard-based interface for performing initial network configuration and management service enrollment on newly deployed headless Linux systems. The plugin enables users to access the system via a temporary WiFi access point or well-known Ethernet IP, configure hostname, network interfaces, IP addresses, time services, and enroll into management services (e.g., Red Hat Insights, Flight Control). The implementation leverages Cockpit's DBUS libraries for system configuration, React 18 + PatternFly 6 for the UI, and follows Cockpit's testing and packaging standards.
+The Cockpit System Onboarding Plugin provides a wizard-based interface for performing initial network configuration and management service enrollment on newly deployed headless Linux systems. The plugin enables users to access the system via a temporary WiFi access point or well-known Ethernet IP, configure hostname, network interfaces, IP addresses, time services, and enroll into management services (e.g., Flight Control). The implementation leverages Cockpit's DBUS libraries for system configuration, React 18 + PatternFly 6 for the UI, and follows Cockpit's testing and packaging standards.
 
 ## Technical Context
 

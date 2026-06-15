@@ -16,6 +16,30 @@ export interface SystemOnboardingConfig {
     network?: NetworkConfig;
     enrollmentServices?: EnrollmentService[];
     led?: LedConfig;
+    defaults?: ConfigDefaults;
+    connectivityTest?: ConnectivityTestConfig;
+}
+
+export interface ConnectivityTestConfig {
+    host?: string;
+}
+
+export interface ConfigDefaults {
+    hostname?: string;
+    selectedEnrollmentServices?: string[];
+    proxy?: {
+        enabled?: boolean;
+        protocol?: ProxyProtocol;
+        hostname?: string;
+        port?: number;
+        username?: string;
+        password?: string;
+        noProxy?: string;
+    };
+    labels?: {
+        deviceLabels?: { key: string; value: string }[];
+        systemInfoMappings?: { labelKey: string; systemInfoField: string }[];
+    };
 }
 
 export interface NetworkConfig {
@@ -36,6 +60,13 @@ export interface EthernetConfig {
     staticIp?: string;
 }
 
+export interface SkipWhenCondition {
+    allPathsExist?: string[];
+    anyPathExists?: string[];
+    action: 'skip' | 'connectivityOnly';
+    reason: string;
+}
+
 export interface EnrollmentService {
     id: string;
     name: string;
@@ -43,6 +74,7 @@ export interface EnrollmentService {
     endpoint: EndpointConfig;
     credentialsSchema: any; // JSON Schema Draft 7
     scriptPath: string;
+    skipWhen?: SkipWhenCondition[];
 }
 
 export interface EndpointConfig {
@@ -99,7 +131,7 @@ export interface IPv4Config {
 }
 
 export interface IPv6Config {
-    method: 'auto' | 'static' | 'disabled';
+    method: 'auto' | 'dhcp' | 'static' | 'disabled';
     address: string | null; // with /prefix
     gateway: string | null;
     autoDns: boolean;
@@ -117,18 +149,28 @@ export interface NtpConfig {
     servers: string[];
 }
 
+export type ProxyProtocol = 'http' | 'https' | 'socks5';
+
 export interface ProxyConfig {
     enabled: boolean;
+    protocol: ProxyProtocol;
     hostname: string | null;
     port: number | null;
     username: string | null;
     password: string | null;
+    noProxy: string;
 }
 
 export interface EnrollmentState {
     selectedServices: string[];
     credentials: Record<string, any>;
     endpoints: Record<string, string>;
+    useExisting: Record<string, boolean>;
+}
+
+export interface LabelsState {
+    deviceLabels: { key: string; value: string }[];
+    systemInfoMappings: { labelKey: string; systemInfoField: string }[];
 }
 
 // ========== System Integration Types ==========

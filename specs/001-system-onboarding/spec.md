@@ -137,7 +137,7 @@ A user whose network requires a proxy server to access the internet needs to con
 
 ### User Story 8 - Management Service Enrollment (Priority: P2)
 
-A user wants to enroll the system into one or more management services (e.g., Red Hat Insights, Flight Control) using provided credentials. The specific services and their credential requirements are defined in the main configuration file or a drop-in configuration file.
+A user wants to enroll the system into one or more management services (e.g., Flight Control) using provided credentials. The specific services and their credential requirements are defined in the main configuration file or a drop-in configuration file.
 
 **Why this priority**: Management service enrollment is essential for completing system onboarding. Further configuration of the system can depend on the system being enrolled into these services.
 

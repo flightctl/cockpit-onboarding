@@ -552,24 +552,6 @@ polkit.addRule(function(action, subject) {
         "required": ["username", "password"]
       },
       "scriptPath": "/etc/cockpit/system-onboarding.d/flightctl-enroll.sh"
-    },
-    {
-      "id": "insights",
-      "name": "Red Hat Insights",
-      "description": "Register with Red Hat Insights for proactive monitoring",
-      "endpoint": {
-        "url": "https://cert-api.access.redhat.com",
-        "allowUserOverride": false
-      },
-      "credentialsSchema": {
-        "type": "object",
-        "properties": {
-          "organizationId": { "type": "string", "title": "Organization ID" },
-          "activationKey": { "type": "string", "title": "Activation Key", "format": "password" }
-        },
-        "required": ["organizationId", "activationKey"]
-      },
-      "scriptPath": "/etc/cockpit/system-onboarding.d/insights-enroll.sh"
     }
   ]
 }

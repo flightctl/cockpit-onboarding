@@ -28,8 +28,10 @@ import { NetworkManagerModel, Interface } from '../pkg/networkmanager/interfaces
 import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
 import { ModelProvider, useModelContext } from './model-context';
 import { loadConfig } from './config-loader';
+import { readAttemptedMarker, AttemptedMarkerData } from './attempted-marker';
 import { SystemOnboardingConfig } from './types';
 
+import { Alert, AlertActionCloseButton } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist/esm/components/Page/index.js";
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
@@ -40,19 +42,36 @@ import { NetworkInterfacePage } from './wizard/NetworkInterfacePage.tsx';
 import { NetworkAddressPage } from './wizard/NetworkAddressPage.tsx';
 import { NetworkServicesPage } from './wizard/NetworkServicesPage.tsx';
 import { EnrollmentPage } from './wizard/EnrollmentPage.tsx';
+import { ConnectivityTestPage } from './wizard/ConnectivityTestPage.tsx';
+import { LabelsPage } from './wizard/LabelsPage.tsx';
 import { ReviewPage } from './wizard/ReviewPage.tsx';
 import { EnrollmentProgressPage } from './wizard/EnrollmentProgressPage.tsx';
+import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from './paths';
 import {
     validateHostnameStep,
     validateNetworkInterfaceStep,
     validateNetworkAddressStep,
     validateNetworkServicesStep,
     validateEnrollmentStep,
+    validateConnectivityTestStep,
+    validateLabelsStep,
 } from './wizard/step-validation';
 
 import { WithDialogs } from "dialogs.jsx";
 
 const _ = cockpit.gettext;
+
+interface WatchdogStatusData {
+    status: 'success' | 'app_failure' | 'network_failure';
+    message: string;
+    details?: {
+        carrierDetected: boolean;
+        dnsResolved: boolean;
+        pingSucceeded: boolean;
+        testedHost: string;
+        activeConnections: string;
+    };
+}
 
 // Configuration context to provide loaded configuration throughout the app
 interface ConfigContextType {
@@ -75,6 +94,8 @@ export const Application = () => {
     const [configError, setConfigError] = useState<string | null>(null);
     const [onboardingComplete, setOnboardingComplete] = useState(false);
     const [checkingMarker, setCheckingMarker] = useState(true);
+    const [previousAttempt, setPreviousAttempt] = useState<AttemptedMarkerData | null>(null);
+    const [watchdogStatus, setWatchdogStatus] = useState<WatchdogStatusData | null>(null);
 
     const nmService = useObject(() => service.proxy("NetworkManager"),
                                 null,
@@ -90,23 +111,36 @@ export const Application = () => {
 
     // Check for onboarding completion marker file
     useEffect(() => {
-        const markerPath = '/var/lib/cockpit-system-onboarding/.onboarding-complete';
-        const markerFile = cockpit.file(markerPath);
+        const markerFile = cockpit.file(MARKER_COMPLETE);
 
         markerFile.read()
-                .then((content) => {
-                    // File exists with content - onboarding is complete
-                    // read() returns null when file doesn't exist
+                .then(async (content) => {
                     if (content !== null) {
                         setOnboardingComplete(true);
                         console.log('Onboarding already complete (marker file exists)');
                     } else {
                         setOnboardingComplete(false);
                         console.log('Marker file does not exist - onboarding not complete');
+                        const attempt = await readAttemptedMarker();
+                        if (attempt) {
+                            console.log('Previous attempt data found, will pre-populate wizard');
+                            setPreviousAttempt(attempt);
+
+                            try {
+                                const statusContent = await cockpit.file(WATCHDOG_STATUS).read();
+                                if (statusContent) {
+                                    const parsed = JSON.parse(statusContent) as WatchdogStatusData;
+                                    if (parsed.status === 'network_failure' || parsed.status === 'app_failure') {
+                                        setWatchdogStatus(parsed);
+                                    }
+                                }
+                            } catch {
+                                // No watchdog status file or parse error — not a rollback scenario
+                            }
+                        }
                     }
                 })
                 .catch((error) => {
-                    // Error reading file (permissions, etc.) - assume not complete
                     console.log('Error checking marker file:', error);
                     setOnboardingComplete(false);
                 })
@@ -214,9 +248,9 @@ icon={ ExclamationCircleIcon }
     /* At this point NM is running, the model is ready, and configuration is loaded */
     return (
         <ConfigContext.Provider value={{ config, isConfigLoaded, configError }}>
-            <ModelProvider networkManager={networkManager}>
+            <ModelProvider networkManager={networkManager} config={config} previousAttempt={previousAttempt}>
                 <WithDialogs key="1">
-                    <SystemOnboardingWizardWrapper interfaces={interfaces} />
+                    <SystemOnboardingWizardWrapper interfaces={interfaces} previousAttempt={previousAttempt} watchdogStatus={watchdogStatus} />
                 </WithDialogs>
             </ModelProvider>
         </ConfigContext.Provider>
@@ -224,32 +258,33 @@ icon={ ExclamationCircleIcon }
 };
 
 // Wrapper to wait for model initialization before showing wizard
-const SystemOnboardingWizardWrapper: React.FunctionComponent<{ interfaces: Interface[] }> = ({ interfaces }) => {
+const SystemOnboardingWizardWrapper: React.FunctionComponent<{ interfaces: Interface[]; previousAttempt?: AttemptedMarkerData | null; watchdogStatus?: WatchdogStatusData | null }> = ({ interfaces, previousAttempt, watchdogStatus }) => {
     const { isInitialized } = useModelContext();
 
-    // Wait for model to be initialized with system data before showing wizard
     if (!isInitialized) {
         return <EmptyStatePanel loading />;
     }
 
-    return <SystemOnboardingWizard interfaces={interfaces} />;
+    return <SystemOnboardingWizard interfaces={interfaces} previousAttempt={previousAttempt} watchdogStatus={watchdogStatus} />;
 };
 
 interface SystemOnboardingWizardProps {
     interfaces: Interface[];
+    previousAttempt?: AttemptedMarkerData | null | undefined;
+    watchdogStatus?: WatchdogStatusData | null | undefined;
 }
 
-export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({ interfaces }) => {
+export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({ interfaces, previousAttempt, watchdogStatus }) => {
     const { config } = useConfig();
     const { model, cancelEnrollmentRef } = useModelContext();
     const [currentStepIndex, setCurrentStepIndex] = useState(1);
     const [maxReachedStep, setMaxReachedStep] = useState(1);
+    const [showRestoredAlert, setShowRestoredAlert] = useState(Boolean(previousAttempt));
 
     // Check if enrollment services are configured (controls whether step 5 is shown)
     const hasEnrollmentServices = Boolean(config && config.enrollmentServices && config.enrollmentServices.length > 0);
     // Check if the user actually selected any enrollment services
     const hasSelectedEnrollments = hasEnrollmentServices && model.enrollment.selectedServices.length > 0;
-
     const reviewButtonText = hasSelectedEnrollments ? _("Enroll") : _("Apply");
     const finalStepName = hasSelectedEnrollments ? _("Apply and enroll") : _("Apply configuration");
 
@@ -259,6 +294,8 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     const isNetworkAddressValid = validateNetworkAddressStep(model);
     const isNetworkServicesValid = validateNetworkServicesStep(model);
     const isEnrollmentValid = validateEnrollmentStep(model, config?.enrollmentServices);
+    const isConnectivityTestValid = validateConnectivityTestStep(model);
+    const isLabelsValid = validateLabelsStep(model);
 
     // Map step index to validation state
     const stepValidations = [
@@ -267,6 +304,8 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
         isNetworkAddressValid, // step 3
         isNetworkServicesValid, // step 4
         isEnrollmentValid, // step 5 (if enrollment enabled)
+        isConnectivityTestValid, // step 6 (connectivity test)
+        isLabelsValid, // step 7 (labels)
         true, // review step - always valid
         true, // progress step - always valid
     ];
@@ -323,9 +362,8 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
             // after a short delay. Cleanup tears down the WiFi AP, so we must show
             // the user feedback first before the connection drops.
             const wantReboot = config?.autoReboot === true;
-            const cleanupScript = '/usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh';
             const runCleanup = () =>
-                cockpit.spawn(['sudo', cleanupScript], { err: 'message' })
+                cockpit.spawn(['sudo', SCRIPT_CLEANUP], { err: 'message' })
                         .catch(error => console.warn('Cleanup failed:', error));
             const handleFinish = () => {
                 // Marker file is already written — reload shows the "Onboarding complete" page
@@ -365,6 +403,34 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
 
     return (
         <Page className='no-masthead-sidebar' isContentFilled id="system-onboarding-wizard">
+            {showRestoredAlert && (
+                <PageSection>
+                    <Alert
+                        variant={watchdogStatus?.status === 'network_failure' ? "warning" : "info"}
+                        title={watchdogStatus?.status === 'network_failure'
+                            ? _("Network configuration rolled back")
+                            : watchdogStatus?.status === 'app_failure'
+                                ? _("Enrollment did not complete")
+                                : _("Previous configuration restored")}
+                        isInline
+                        actionClose={<AlertActionCloseButton onClose={() => setShowRestoredAlert(false)} />}
+                    >
+                        {watchdogStatus?.status === 'network_failure'
+                            ? _("The watchdog timer rolled back your configuration because network connectivity could not be established.") +
+                              (watchdogStatus.details
+                                  ? ` ${!watchdogStatus.details.carrierDetected
+                                      ? _("No network carrier was detected on any interface.")
+                                      : !watchdogStatus.details.dnsResolved
+                                          ? cockpit.format(_("DNS resolution failed for $0."), watchdogStatus.details.testedHost)
+                                          : _("Network connectivity check failed.")}`
+                                  : '') +
+                              ' ' + _("Review and modify the settings as needed before re-applying.")
+                            : watchdogStatus?.status === 'app_failure'
+                                ? _("Network connectivity is working, but enrollment did not complete. You can retry without changing network settings.")
+                                : _("Your previous onboarding configuration has been restored. Review and modify the settings as needed before re-applying.")}
+                    </Alert>
+                </PageSection>
+            )}
             <PageSection hasBodyWrapper={false} type={PageSectionTypes.wizard} padding={{ default: 'noPadding' }} aria-label="Wizard container">
                 <Wizard onStepChange={handleStepChange}>
                     <WizardStep
@@ -410,18 +476,50 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         </WizardStep>
                     )}
                     <WizardStep
-                        name={_("Review")}
+                        name={_("Connectivity test")}
                         id={hasEnrollmentServices ? "wizard-step-6" : "wizard-step-5"}
-                        footer={{ nextButtonText: reviewButtonText, isCancelHidden: true }}
+                        footer={{ isNextDisabled: !isConnectivityTestValid, isCancelHidden: true }}
                         isDisabled={canNavigateToStep(hasEnrollmentServices ? 6 : 5)}
+                    >
+                        <ConnectivityTestPage />
+                    </WizardStep>
+                    <WizardStep
+                        name={_("Device labels")}
+                        id={hasEnrollmentServices ? "wizard-step-7" : "wizard-step-6"}
+                        footer={{ isNextDisabled: !isLabelsValid, isCancelHidden: true }}
+                        isDisabled={canNavigateToStep(hasEnrollmentServices ? 7 : 6)}
+                    >
+                        <LabelsPage />
+                    </WizardStep>
+                    <WizardStep
+                        name={_("Review")}
+                        id={(() => {
+                            let n = 7;
+                            if (hasEnrollmentServices) n++;
+                            return `wizard-step-${n}`;
+                        })()}
+                        footer={{ nextButtonText: reviewButtonText, isCancelHidden: true }}
+                        isDisabled={canNavigateToStep((() => {
+                            let n = 7;
+                            if (hasEnrollmentServices) n++;
+                            return n;
+                        })())}
                     >
                         <ReviewPage hasEnrollmentScripts={hasEnrollmentServices} />
                     </WizardStep>
                     <WizardStep
                         name={finalStepName}
-                        id={hasEnrollmentServices ? "wizard-step-7" : "wizard-step-6"}
+                        id={(() => {
+                            let n = 8;
+                            if (hasEnrollmentServices) n++;
+                            return `wizard-step-${n}`;
+                        })()}
                         footer={getProgressPageFooter()}
-                        isDisabled={canNavigateToStep(hasEnrollmentServices ? 7 : 6)}
+                        isDisabled={canNavigateToStep((() => {
+                            let n = 8;
+                            if (hasEnrollmentServices) n++;
+                            return n;
+                        })())}
                     >
                         <EnrollmentProgressPage />
                     </WizardStep>

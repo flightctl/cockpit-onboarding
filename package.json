@@ -11,6 +11,7 @@
   },
   "scripts": {
     "watch": "ESBUILD_WATCH='true' ./build.js",
+    "prebuild": "test -d pkg/lib || make pkg/lib/cockpit-po-plugin.js",
     "build": "./build.js",
     "eslint": "eslint src/",
     "eslint:fix": "eslint --fix src/",

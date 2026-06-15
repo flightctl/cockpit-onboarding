@@ -7,7 +7,12 @@ import {
     NetworkAddressState,
     NetworkServicesState,
     EnrollmentState,
+    LabelsState,
+    SystemOnboardingConfig,
 } from './types';
+import { detectFlightctlConfig } from './services/flightctl-config';
+import { parseIpv6Address } from './services/network';
+import { AttemptedMarkerData } from './attempted-marker';
 
 // NetworkAddressConfig - internal type for compatibility with existing code
 // Uses string instead of string | null for backward compatibility
@@ -41,6 +46,8 @@ export interface Model {
   userNetworkConfigs: { [interfaceName: string]: NetworkAddressConfig };
   networkServices: NetworkServicesState;
   enrollment: EnrollmentState;
+  labels: LabelsState;
+  connectivityTestHost: string;
   enrollmentProgress: {
     currentStep: number; // 0-3
     stepStates: ('pending' | 'running' | 'success' | 'error')[];
@@ -115,17 +122,25 @@ const initialModel: Model = {
         },
         proxy: {
             enabled: false,
+            protocol: 'http',
             hostname: null,
             port: null,
             username: null,
             password: null,
+            noProxy: 'localhost,127.0.0.1,::1',
         },
     },
     enrollment: {
         selectedServices: [],
         credentials: {},
         endpoints: {},
+        useExisting: {},
     },
+    labels: {
+        deviceLabels: [],
+        systemInfoMappings: [],
+    },
+    connectivityTestHost: '',
     enrollmentProgress: {
         currentStep: 0,
         stepStates: ['pending', 'pending', 'pending', 'pending'],
@@ -184,14 +199,17 @@ const stateToConfig = (state: NetworkAddressState): NetworkAddressConfig => {
 
 // Helper to convert NetworkAddressConfig to NetworkAddressState
 const configToState = (config: NetworkAddressConfig): NetworkAddressState => {
-    // Map 'dhcp' to 'auto' for type compatibility with NetworkAddressState
-    const mapMethod = (method: 'dhcp' | 'static' | 'auto' | 'disabled'): 'auto' | 'static' | 'disabled' => {
+    const mapIpv4Method = (method: 'dhcp' | 'static' | 'auto' | 'disabled'): 'auto' | 'static' | 'disabled' => {
         return method === 'dhcp' ? 'auto' : method;
+    };
+
+    const mapIpv6Method = (method: 'dhcp' | 'static' | 'auto' | 'disabled'): 'auto' | 'dhcp' | 'static' | 'disabled' => {
+        return method;
     };
 
     return {
         ipv4: {
-            method: mapMethod(config.ipv4.method),
+            method: mapIpv4Method(config.ipv4.method),
             address: config.ipv4.address || null,
             subnetMask: config.ipv4.subnetMask || null,
             gateway: config.ipv4.gateway || null,
@@ -200,7 +218,7 @@ const configToState = (config: NetworkAddressConfig): NetworkAddressState => {
             secondaryDns: config.ipv4.secondaryDns || null,
         },
         ipv6: {
-            method: mapMethod(config.ipv6.method),
+            method: mapIpv6Method(config.ipv6.method),
             address: config.ipv6.address || null,
             gateway: config.ipv6.gateway || null,
             autoDns: config.ipv6.autoDns,
@@ -223,19 +241,6 @@ const prefixToSubnetMask = (prefix: number): string => {
         (mask >>> 8) & 255,
         mask & 255
     ].join('.');
-};
-
-// Helper function to parse IPv6 address with prefix
-export const parseIpv6Address = (addressWithPrefix: string): { address: string; prefix: number } => {
-    if (!addressWithPrefix) {
-        return { address: '', prefix: 64 };
-    }
-
-    const parts = addressWithPrefix.split('/');
-    const address = parts[0] || '';
-    const prefix = parts[1] ? parseInt(parts[1], 10) : 64;
-
-    return { address, prefix };
 };
 
 // Helper function to format IPv6 address with prefix
@@ -272,7 +277,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
 
         config.ipv4 = {
             ...config.ipv4,
-            method: ipv4Method === 'manual' ? 'static' : 'dhcp',
+            method: ipv4Method === 'manual' ? 'static' : ipv4Method === 'disabled' ? 'disabled' : 'dhcp',
             address: address[0] || '',
             subnetMask: address[1] ? prefixToSubnetMask(Number(address[1])) : '',
             gateway: address[2] || '',
@@ -284,7 +289,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
         // Handle case where there are DNS settings but no active addresses
         config.ipv4 = {
             ...config.ipv4,
-            method: ipv4Method === 'manual' ? 'static' : 'dhcp',
+            method: ipv4Method === 'manual' ? 'static' : ipv4Method === 'disabled' ? 'disabled' : 'dhcp',
             autoDns: false,
             primaryDns: ipv4ConnectionDns[0] || '',
             secondaryDns: ipv4ConnectionDns[1] || ''
@@ -307,7 +312,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
 
         config.ipv6 = {
             ...config.ipv6,
-            method: ipv6Method === 'manual' ? 'static' : ipv6Method === 'ignore' ? 'disabled' : 'dhcp',
+            method: ipv6Method === 'manual' ? 'static' : ipv6Method === 'ignore' ? 'disabled' : ipv6Method === 'dhcp' ? 'dhcp' : 'auto',
             address: address[0] && address[1] ? `${address[0]}/${address[1]}` : address[0] || '',
             gateway: address[2] || '',
             autoDns: !hasStaticDns,
@@ -318,7 +323,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
         // Handle case where there are DNS settings but no active addresses
         config.ipv6 = {
             ...config.ipv6,
-            method: ipv6Method === 'manual' ? 'static' : ipv6Method === 'ignore' ? 'disabled' : 'dhcp',
+            method: ipv6Method === 'manual' ? 'static' : ipv6Method === 'ignore' ? 'disabled' : ipv6Method === 'dhcp' ? 'dhcp' : 'auto',
             autoDns: false,
             primaryDns: ipv6ConnectionDns[0] || '',
             secondaryDns: ipv6ConnectionDns[1] || ''
@@ -330,19 +335,24 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
 
 // Provider component
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const ModelProvider: React.FunctionComponent<{ children: ReactNode; networkManager?: any }> = ({ children, networkManager }) => {
+export const ModelProvider: React.FunctionComponent<{ children: ReactNode; networkManager?: any; config?: SystemOnboardingConfig | null; previousAttempt?: AttemptedMarkerData | null }> = ({ children, networkManager, config, previousAttempt }) => {
     const [model, setModel] = useState<Model>(initialModel);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
     const cancelEnrollmentRef = useRef<(() => void) | null>(null);
 
     const updateModel = (section: keyof Model, updates: Partial<Model[keyof Model]>) => {
-        setModel(prev => ({
-            ...prev,
-            [section]: {
-                ...(prev[section] as object),
-                ...(updates as object),
-            },
-        }));
+        setModel(prev => {
+            if (typeof updates !== 'object' || updates === null) {
+                return { ...prev, [section]: updates };
+            }
+            return {
+                ...prev,
+                [section]: {
+                    ...(prev[section] as object),
+                    ...(updates as object),
+                },
+            };
+        });
     };
 
     const updateNestedModel = <T extends keyof Model, K extends keyof Model[T]>(
@@ -453,11 +463,34 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
             const defaultInterface = interfaces.find(iface => iface.Name === systemInfo.defaultInterface);
             const defaultInterfaceType = defaultInterface?.Device?.DeviceType === '802-11-wireless' ? 'wifi' : 'ethernet';
 
-            // Update model with system information
+            const defaults = config?.defaults;
+            const flightctlConfig = await detectFlightctlConfig();
+
+            const hostnameIsDefault = !defaultHostname || defaultHostname === 'localhost' || defaultHostname === 'localhost.localdomain';
+            const resolvedHostname = (hostnameIsDefault && defaults?.hostname) ? defaults.hostname : defaultHostname;
+
+            const flightctlService = config?.enrollmentServices?.find(s => s.id === 'flightctl');
+            let flightctlEndpoint = '';
+            if (flightctlService?.endpoint?.url) {
+                flightctlEndpoint = flightctlService.endpoint.url;
+            } else if (flightctlConfig.serverUrl) {
+                flightctlEndpoint = flightctlConfig.serverUrl;
+            }
+
+            let connectivityHost = config?.connectivityTest?.host || 'www.google.com';
+            if (flightctlEndpoint) {
+                try {
+                    const url = new URL(flightctlEndpoint);
+                    connectivityHost = url.hostname;
+                } catch {
+                    connectivityHost = flightctlEndpoint;
+                }
+            }
+
             setModel(prev => ({
                 ...prev,
                 hostname: {
-                    value: defaultHostname,
+                    value: resolvedHostname,
                     dhcpHostname: systemInfo.dhcpHostname
                 },
                 networkInterface: {
@@ -475,9 +508,35 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
                         autoConfig: systemInfo.ntpServers.length === 0
                     },
                     proxy: {
-                        ...prev.networkServices.proxy
+                        ...prev.networkServices.proxy,
+                        ...(defaults?.proxy && {
+                            enabled: defaults.proxy.enabled ?? prev.networkServices.proxy.enabled,
+                            protocol: defaults.proxy.protocol ?? prev.networkServices.proxy.protocol,
+                            hostname: defaults.proxy.hostname ?? prev.networkServices.proxy.hostname,
+                            port: defaults.proxy.port ?? prev.networkServices.proxy.port,
+                            username: defaults.proxy.username ?? prev.networkServices.proxy.username,
+                            password: defaults.proxy.password ?? prev.networkServices.proxy.password,
+                            noProxy: defaults.proxy.noProxy ?? prev.networkServices.proxy.noProxy,
+                        }),
                     }
-                }
+                },
+                enrollment: {
+                    ...prev.enrollment,
+                    selectedServices: defaults?.selectedEnrollmentServices ?? prev.enrollment.selectedServices,
+                    useExisting: {
+                        ...prev.enrollment.useExisting,
+                        ...(flightctlConfig.exists && flightctlConfig.hasCredentials && { flightctl: true }),
+                    },
+                    endpoints: {
+                        ...prev.enrollment.endpoints,
+                        ...(flightctlEndpoint && { flightctl: flightctlEndpoint }),
+                    },
+                },
+                labels: {
+                    deviceLabels: defaults?.labels?.deviceLabels ?? prev.labels.deviceLabels,
+                    systemInfoMappings: defaults?.labels?.systemInfoMappings ?? prev.labels.systemInfoMappings,
+                },
+                connectivityTestHost: connectivityHost,
             }));
 
             setIsInitialized(true);
@@ -501,6 +560,49 @@ export const ModelProvider: React.FunctionComponent<{ children: ReactNode; netwo
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [networkManager, networkManager?.ready, isInitialized]);
+
+    useEffect(() => {
+        if (!isInitialized || !previousAttempt) return;
+
+        setModel(prev => ({
+            ...prev,
+            hostname: previousAttempt.hostname
+                ? { value: previousAttempt.hostname.value, dhcpHostname: previousAttempt.hostname.dhcpHostname || prev.hostname.dhcpHostname || '' }
+                : prev.hostname,
+            networkInterface: {
+                ...prev.networkInterface,
+                selectedInterface: previousAttempt.networkInterface?.selectedInterface ?? prev.networkInterface.selectedInterface,
+                interfaceType: previousAttempt.networkInterface?.interfaceType ?? prev.networkInterface.interfaceType,
+                wifiSsid: previousAttempt.networkInterface?.wifiSsid ?? prev.networkInterface.wifiSsid,
+                wifiSecurity: previousAttempt.networkInterface?.wifiSecurity ?? prev.networkInterface.wifiSecurity,
+                vlanId: previousAttempt.networkInterface?.vlanId ?? prev.networkInterface.vlanId,
+            },
+            networkAddress: previousAttempt.networkAddress ?? prev.networkAddress,
+            userNetworkConfigs: previousAttempt.userNetworkConfigs ?? prev.userNetworkConfigs,
+            networkServices: {
+                ntp: previousAttempt.networkServices?.ntp ?? prev.networkServices.ntp,
+                proxy: {
+                    ...prev.networkServices.proxy,
+                    ...(previousAttempt.networkServices?.proxy && {
+                        enabled: previousAttempt.networkServices.proxy.enabled,
+                        protocol: previousAttempt.networkServices.proxy.protocol,
+                        hostname: previousAttempt.networkServices.proxy.hostname,
+                        port: previousAttempt.networkServices.proxy.port,
+                        noProxy: previousAttempt.networkServices.proxy.noProxy,
+                    }),
+                },
+            },
+            enrollment: {
+                ...prev.enrollment,
+                selectedServices: previousAttempt.enrollment?.selectedServices ?? prev.enrollment.selectedServices,
+                endpoints: previousAttempt.enrollment?.endpoints ?? prev.enrollment.endpoints,
+                useExisting: previousAttempt.enrollment?.useExisting ?? prev.enrollment.useExisting,
+            },
+            labels: previousAttempt.labels ?? prev.labels,
+            connectivityTestHost: previousAttempt.connectivityTestHost ?? prev.connectivityTestHost,
+        }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isInitialized, previousAttempt]);
 
     useEffect(() => {
     // Cleanup system info service on unmount
