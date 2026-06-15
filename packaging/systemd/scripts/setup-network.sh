@@ -4,40 +4,14 @@
 
 set -e
 
-USER_CONFIG="/etc/cockpit/system-onboarding/config.json"
-DEFAULT_CONFIG="/usr/share/cockpit/system-onboarding/config.json"
+# shellcheck source=common.sh
+. /usr/libexec/cockpit-system-onboarding/common.sh
+
 DEFAULT_IP="192.168.100.1"
 DEFAULT_PREFIX="24"
 
-# Load configuration with fallback hierarchy
-load_config() {
-    local key="$1"
-    local default="$2"
-
-    # Try user override first
-    if [ -f "$USER_CONFIG" ]; then
-        value=$(jq -r "$key" "$USER_CONFIG" 2>/dev/null)
-        if [ -n "$value" ] && [ "$value" != "null" ]; then
-            echo "$value"
-            return
-        fi
-    fi
-
-    # Fall back to default config
-    if [ -f "$DEFAULT_CONFIG" ]; then
-        value=$(jq -r "$key" "$DEFAULT_CONFIG" 2>/dev/null)
-        if [ -n "$value" ] && [ "$value" != "null" ]; then
-            echo "$value"
-            return
-        fi
-    fi
-
-    # Use built-in default
-    echo "$default"
-}
-
 # Check if either config file exists
-if [ ! -f "$USER_CONFIG" ] && [ ! -f "$DEFAULT_CONFIG" ]; then
+if [ ! -f "$ONBOARDING_USER_CONFIG" ] && [ ! -f "$ONBOARDING_DEFAULT_CONFIG" ]; then
     echo "No configuration file found"
     echo "Skipping network setup"
     exit 0
@@ -73,7 +47,7 @@ if ! nmcli device show "$ETHERNET_INTERFACE" >/dev/null 2>&1; then
 fi
 
 # Create NetworkManager connection for onboarding access
-CONNECTION_NAME="Cockpit-Onboarding-Ethernet"
+CONNECTION_NAME="$ONBOARDING_SETUP_CONNECTION"
 
 # Delete existing onboarding connection if it exists
 if nmcli connection show "$CONNECTION_NAME" >/dev/null 2>&1; then

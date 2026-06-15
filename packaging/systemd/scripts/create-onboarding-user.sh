@@ -4,17 +4,30 @@
 
 set -e
 
+# shellcheck source=common.sh
+. /usr/libexec/cockpit-system-onboarding/common.sh
+
 # Create onboarding user with no password (pam_succeed_if allows login)
 if ! id onboarding >/dev/null 2>&1; then
     useradd -m -s /bin/bash -c "System Onboarding User" onboarding
-    passwd -d onboarding  # Remove password
+    passwd -d onboarding  # Remove password (required for Cockpit passwordless login)
     echo "Created onboarding user"
 else
     echo "Onboarding user already exists"
 fi
 
+# Block SSH access for the onboarding user (passwordless account must not be reachable via SSH)
+mkdir -p /etc/ssh/sshd_config.d
+cat > /etc/ssh/sshd_config.d/50-deny-onboarding.conf <<EOF
+DenyUsers onboarding
+EOF
+chmod 0644 /etc/ssh/sshd_config.d/50-deny-onboarding.conf
+systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null || true
+echo "Blocked SSH access for onboarding user"
+
 # Ensure state directory is writable by onboarding user (for completion marker)
 mkdir -p /var/lib/cockpit-system-onboarding
+chmod 0700 /var/lib/cockpit-system-onboarding
 chown onboarding:onboarding /var/lib/cockpit-system-onboarding
 
 # Install sudoers file for system configuration permissions
@@ -54,36 +67,6 @@ else
 fi
 
 # Install module overrides if hideModules=true
-USER_CONFIG="/etc/cockpit/system-onboarding/config.json"
-DEFAULT_CONFIG="/usr/share/cockpit/system-onboarding/config.json"
-
-# Load configuration with fallback hierarchy
-load_config() {
-    local key="$1"
-    local default="$2"
-
-    # Try user override first
-    if [ -f "$USER_CONFIG" ]; then
-        value=$(jq -r "$key" "$USER_CONFIG" 2>/dev/null)
-        if [ -n "$value" ] && [ "$value" != "null" ]; then
-            echo "$value"
-            return
-        fi
-    fi
-
-    # Fall back to default config
-    if [ -f "$DEFAULT_CONFIG" ]; then
-        value=$(jq -r "$key" "$DEFAULT_CONFIG" 2>/dev/null)
-        if [ -n "$value" ] && [ "$value" != "null" ]; then
-            echo "$value"
-            return
-        fi
-    fi
-
-    # Use built-in default
-    echo "$default"
-}
-
 HIDE_MODULES=$(load_config '.hideModules' 'true')
 if [ "$HIDE_MODULES" = "true" ]; then
     echo "Installing module overrides to hide other Cockpit modules"

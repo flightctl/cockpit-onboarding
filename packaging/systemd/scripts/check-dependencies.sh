@@ -43,11 +43,11 @@ fi
 # Optional dependencies (warnings only)
 OPTIONAL_MISSING=()
 
-if ! check_command "hostapd" "hostapd"; then
+if ! command -v "hostapd" >/dev/null 2>&1; then
     OPTIONAL_MISSING+=("hostapd")
 fi
 
-if ! check_command "dnsmasq" "dnsmasq"; then
+if ! command -v "dnsmasq" >/dev/null 2>&1; then
     OPTIONAL_MISSING+=("dnsmasq")
 fi
 

@@ -18,5 +18,15 @@ ExecStop=/usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh
 StandardOutput=journal
 StandardError=journal
 
+# Hardening: limited directives only — this service creates users, writes to /etc/,
+# manages systemd services, and writes to /home/onboarding, so most filesystem and
+# privilege restrictions would break it.
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ProtectClock=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
 [Install]
 WantedBy=multi-user.target

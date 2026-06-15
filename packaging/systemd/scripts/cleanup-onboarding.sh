@@ -5,38 +5,11 @@
 
 set -e
 
+# shellcheck source=common.sh
+. /usr/libexec/cockpit-system-onboarding/common.sh
+
 ONBOARDING_USER="onboarding"
-USER_CONFIG="/etc/cockpit/system-onboarding/config.json"
-DEFAULT_CONFIG="/usr/share/cockpit/system-onboarding/config.json"
 SERVICE_NAME="cockpit-system-onboarding-setup.service"
-
-# Load configuration value with fallback hierarchy
-# Usage: load_config '.key' 'default_value'
-load_config() {
-    local key="$1"
-    local default="$2"
-
-    # Try user override first
-    if [ -f "$USER_CONFIG" ]; then
-        value=$(jq -r "$key" "$USER_CONFIG" 2>/dev/null)
-        if [ -n "$value" ] && [ "$value" != "null" ]; then
-            echo "$value"
-            return
-        fi
-    fi
-
-    # Fall back to default config
-    if [ -f "$DEFAULT_CONFIG" ]; then
-        value=$(jq -r "$key" "$DEFAULT_CONFIG" 2>/dev/null)
-        if [ -n "$value" ] && [ "$value" != "null" ]; then
-            echo "$value"
-            return
-        fi
-    fi
-
-    # Use built-in default
-    echo "$default"
-}
 
 # Read configuration values
 RUN_ONCE=$(load_config '.runOnce' 'true')
@@ -45,9 +18,18 @@ HIDE_MODULES=$(load_config '.hideModules' 'true')
 
 echo "Cleanup configuration: runOnce=$RUN_ONCE, keepCockpit=$KEEP_COCKPIT, hideModules=$HIDE_MODULES"
 
+# Disarm the connectivity watchdog (transient timer + service) if active
+systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
+systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
+rm -f "${ONBOARDING_MARKER_DIR}/.watchdog-active" 2>/dev/null || true
+rm -f "${ONBOARDING_MARKER_DIR}/.watchdog-status" 2>/dev/null || true
+
+# Remove attempted marker file
+rm -f "${ONBOARDING_MARKER_DIR}/.onboarding-attempted" 2>/dev/null || true
+
 # Remove the onboarding Ethernet connection
-if nmcli connection show "Cockpit-Onboarding-Ethernet" >/dev/null 2>&1; then
-    nmcli connection delete "Cockpit-Onboarding-Ethernet" 2>/dev/null || true
+if nmcli connection show "$ONBOARDING_SETUP_CONNECTION" >/dev/null 2>&1; then
+    nmcli connection delete "$ONBOARDING_SETUP_CONNECTION" 2>/dev/null || true
     echo "Removed onboarding Ethernet connection"
 fi
 
@@ -71,8 +53,24 @@ for pattern in 'cockpit-system-onboarding-wifi-ap@*.service' \
     done
 done
 
+# Remove the dedicated firewalld zone if it exists
+if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
+    if firewall-cmd --permanent --info-zone=cockpit-onboarding-ap >/dev/null 2>&1; then
+        firewall-cmd --permanent --delete-zone=cockpit-onboarding-ap
+        firewall-cmd --reload
+        echo "Removed firewalld zone 'cockpit-onboarding-ap'"
+    fi
+fi
+
 # Clean up runtime files (hostapd configs, env files)
 rm -rf /run/cockpit-system-onboarding 2>/dev/null || true
+
+# Remove SSH denial for onboarding user (no longer needed after cleanup)
+if [ -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf ]; then
+    rm -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf
+    systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null || true
+    echo "Removed SSH denial for onboarding user"
+fi
 
 if [ "$RUN_ONCE" = "true" ]; then
     echo "runOnce is enabled - performing full cleanup"
@@ -96,9 +94,11 @@ if [ "$RUN_ONCE" = "true" ]; then
     else
         # Delete the onboarding user entirely
         if id "$ONBOARDING_USER" >/dev/null 2>&1; then
+            # Terminate the user's login session and systemd --user instance
+            loginctl terminate-user "$ONBOARDING_USER" 2>/dev/null || true
             # Kill any remaining user processes
             pkill -u "$ONBOARDING_USER" 2>/dev/null || true
-            sleep 1
+            sleep 2
 
             # Remove user and home directory
             userdel -r "$ONBOARDING_USER" 2>/dev/null || true
@@ -121,5 +121,9 @@ if [ "$RUN_ONCE" = "true" ]; then
 else
     echo "runOnce is disabled - skipping user and service cleanup"
 fi
+
+# Create the gate file so flightctl-agent's ConditionPathExists is satisfied
+touch "${ONBOARDING_MARKER_DIR}/.onboarding-confirmed"
+echo "Created agent startup gate file"
 
 echo "Post-onboarding cleanup complete"

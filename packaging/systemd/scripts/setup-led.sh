@@ -4,35 +4,8 @@
 
 set -e
 
-USER_CONFIG="/etc/cockpit/system-onboarding/config.json"
-DEFAULT_CONFIG="/usr/share/cockpit/system-onboarding/config.json"
-
-# Load configuration with fallback hierarchy
-load_config() {
-    local key="$1"
-    local default="$2"
-
-    # Try user override first
-    if [ -f "$USER_CONFIG" ]; then
-        value=$(jq -r "$key" "$USER_CONFIG" 2>/dev/null)
-        if [ -n "$value" ] && [ "$value" != "null" ]; then
-            echo "$value"
-            return
-        fi
-    fi
-
-    # Fall back to default config
-    if [ -f "$DEFAULT_CONFIG" ]; then
-        value=$(jq -r "$key" "$DEFAULT_CONFIG" 2>/dev/null)
-        if [ -n "$value" ] && [ "$value" != "null" ]; then
-            echo "$value"
-            return
-        fi
-    fi
-
-    # Use built-in default
-    echo "$default"
-}
+# shellcheck source=common.sh
+. /usr/libexec/cockpit-system-onboarding/common.sh
 
 # Check if LED control is enabled
 LED_ENABLED=$(load_config '.led.enabled' 'false')
