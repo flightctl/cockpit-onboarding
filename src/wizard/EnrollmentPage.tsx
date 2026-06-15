@@ -18,6 +18,7 @@ import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/comp
 import { useModelContext } from '../model-context';
 import { useConfig } from '../app';
 import { validateURL } from '../validation';
+import { evaluateSkipConditions, SkipResult } from '../services/skip-conditions';
 import type { EnrollmentService } from '../types';
 
 /**
@@ -287,15 +288,59 @@ export const EnrollmentPage: React.FunctionComponent = () => {
     const selectedServices = useMemo(() => model.enrollment.selectedServices || [], [model.enrollment.selectedServices]);
     const credentials = model.enrollment.credentials || {};
     const endpoints = useMemo(() => model.enrollment.endpoints || {}, [model.enrollment.endpoints]);
+    const useExisting = useMemo(() => model.enrollment.useExisting || {}, [model.enrollment.useExisting]);
+
+    const [skipResults, setSkipResults] = useState<Record<string, SkipResult>>({});
+    const [detectedExisting, setDetectedExisting] = useState<Record<string, boolean>>({});
 
     // Track endpoint validation errors and touched state
     const [endpointErrors, setEndpointErrors] = useState<Record<string, string>>({});
     const [endpointTouched, setEndpointTouched] = useState<Record<string, boolean>>({});
 
+    // Capture which services had existing credentials detected at init time
+    useEffect(() => {
+        setDetectedExisting({ ...useExisting });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Evaluate skipWhen conditions on mount
+    useEffect(() => {
+        let cancelled = false;
+        const evaluate = async () => {
+            const results: Record<string, SkipResult> = {};
+            for (const service of enrollmentServices) {
+                results[service.id] = await evaluateSkipConditions(service.skipWhen);
+            }
+            if (!cancelled) {
+                setSkipResults(results);
+
+                // Auto-set useExisting for connectivityOnly services so that
+                // step validation does not require credentials.
+                const updates: Record<string, boolean> = {};
+                for (const service of enrollmentServices) {
+                    if (results[service.id]?.action === 'connectivityOnly') {
+                        updates[service.id] = true;
+                    }
+                }
+                if (Object.keys(updates).length > 0) {
+                    updateModel('enrollment', {
+                        useExisting: { ...useExisting, ...updates },
+                    });
+                }
+            }
+        };
+        evaluate();
+        return () => { cancelled = true };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [enrollmentServices]);
+
     // Validate endpoints on mount and when they change
     useEffect(() => {
         const errors: Record<string, string> = {};
         for (const serviceId of selectedServices) {
+            if (useExisting[serviceId]) {
+                continue;
+            }
             const service = enrollmentServices.find(s => s.id === serviceId);
             if (service) {
                 const endpoint = endpoints[serviceId] || service.endpoint.url;
@@ -306,7 +351,7 @@ export const EnrollmentPage: React.FunctionComponent = () => {
             }
         }
         setEndpointErrors(errors);
-    }, [endpoints, selectedServices, enrollmentServices]);
+    }, [endpoints, selectedServices, enrollmentServices, useExisting]);
 
     const toggleServiceSelection = (serviceId: string) => {
         const newSelectedServices = selectedServices.includes(serviceId)
@@ -328,10 +373,8 @@ export const EnrollmentPage: React.FunctionComponent = () => {
     };
 
     const updateServiceEndpoint = (serviceId: string, endpoint: string) => {
-        // Mark as touched
         setEndpointTouched(prev => ({ ...prev, [serviceId]: true }));
 
-        // Validate
         const error = validateURL(endpoint, true);
         setEndpointErrors(prev => ({ ...prev, [serviceId]: error || '' }));
 
@@ -339,6 +382,15 @@ export const EnrollmentPage: React.FunctionComponent = () => {
             endpoints: {
                 ...endpoints,
                 [serviceId]: endpoint,
+            },
+        });
+    };
+
+    const setUseExisting = (serviceId: string, value: boolean) => {
+        updateModel('enrollment', {
+            useExisting: {
+                ...useExisting,
+                [serviceId]: value,
             },
         });
     };
@@ -368,7 +420,21 @@ export const EnrollmentPage: React.FunctionComponent = () => {
             </StackItem>
 
             {enrollmentServices.map((service: EnrollmentService) => {
+                const skip = skipResults[service.id];
+
+                if (skip?.action === 'skip') {
+                    return (
+                        <StackItem key={service.id}>
+                            <Alert variant={AlertVariant.info} isInline title={service.name}>
+                                {skip.reason}
+                            </Alert>
+                        </StackItem>
+                    );
+                }
+
                 const isSelected = selectedServices.includes(service.id);
+                const isConnectivityOnly = skip?.action === 'connectivityOnly';
+                const isUsingExisting = useExisting[service.id] ?? false;
                 const serviceCredentials = credentials[service.id] || {};
                 // Use nullish coalescing to only fall back to default if undefined/null, not empty string
                 const serviceEndpoint = endpoints[service.id] ?? service.endpoint.url;
@@ -396,47 +462,87 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                                 />
                             </CardTitle>
 
-                            {isSelected && (
+                            {isSelected && isConnectivityOnly && skip?.action === 'connectivityOnly' && (
+                                <CardBody>
+                                    <Alert variant={AlertVariant.info} isInline title="Existing credentials detected">
+                                        {skip.reason}
+                                    </Alert>
+                                </CardBody>
+                            )}
+                            {isSelected && !isConnectivityOnly && (
                                 <CardBody>
                                     <Stack hasGutter>
-                                        {/* Endpoint URL (with optional override) */}
-                                        <StackItem>
-                                            <FormGroup
-                                                label="Service Endpoint"
-                                                isRequired
-                                            >
-                                                <TextInput
-                                                    id={`endpoint-${service.id}`}
-                                                    value={serviceEndpoint}
-                                                    onChange={(_event, value) => updateServiceEndpoint(service.id, value)}
-                                                    isDisabled={!service.endpoint.allowUserOverride}
-                                                    validated={endpointValidated}
-                                                />
-                                                {showEndpointError && (
-                                                    <FormHelperText>
-                                                        <HelperText>
-                                                            <HelperTextItem variant="error">{endpointError}</HelperTextItem>
-                                                        </HelperText>
-                                                    </FormHelperText>
-                                                )}
-                                                {!service.endpoint.allowUserOverride && (
-                                                    <div style={{ fontSize: 'var(--pf-global--FontSize--sm)', color: 'var(--pf-global--Color--200)', marginTop: '0.25rem' }}>
-                                                        Endpoint is configured by the administrator
-                                                    </div>
-                                                )}
-                                            </FormGroup>
-                                        </StackItem>
+                                        {detectedExisting[service.id] && (
+                                            <StackItem>
+                                                <FormGroup label="Enrollment credentials">
+                                                    <Stack>
+                                                        <StackItem>
+                                                            <Radio
+                                                                id={`use-existing-${service.id}`}
+                                                                name={`credential-mode-${service.id}`}
+                                                                label="Use existing enrollment credentials"
+                                                                description="The device already has enrollment credentials configured. The agent will be restarted to pick up any label and proxy changes."
+                                                                isChecked={isUsingExisting}
+                                                                onChange={() => setUseExisting(service.id, true)}
+                                                            />
+                                                        </StackItem>
+                                                        <StackItem>
+                                                            <Radio
+                                                                id={`configure-new-${service.id}`}
+                                                                name={`credential-mode-${service.id}`}
+                                                                label="Configure new enrollment"
+                                                                description="Provide an endpoint and credentials to enroll this device."
+                                                                isChecked={!isUsingExisting}
+                                                                onChange={() => setUseExisting(service.id, false)}
+                                                            />
+                                                        </StackItem>
+                                                    </Stack>
+                                                </FormGroup>
+                                            </StackItem>
+                                        )}
 
-                                        {/* Credentials Form (dynamic based on schema) */}
-                                        <StackItem>
-                                            <FormGroup label="Credentials">
-                                                <JsonSchemaForm
-                                                    schema={service.credentialsSchema}
-                                                    formData={serviceCredentials}
-                                                    onChange={(data) => updateServiceCredentials(service.id, data)}
-                                                />
-                                            </FormGroup>
-                                        </StackItem>
+                                        {!isUsingExisting && (
+                                            <>
+                                                {/* Endpoint URL (with optional override) */}
+                                                <StackItem>
+                                                    <FormGroup
+                                                        label="Service Endpoint"
+                                                        isRequired
+                                                    >
+                                                        <TextInput
+                                                            id={`endpoint-${service.id}`}
+                                                            value={serviceEndpoint}
+                                                            onChange={(_event, value) => updateServiceEndpoint(service.id, value)}
+                                                            isDisabled={!service.endpoint.allowUserOverride}
+                                                            validated={endpointValidated}
+                                                        />
+                                                        {showEndpointError && (
+                                                            <FormHelperText>
+                                                                <HelperText>
+                                                                    <HelperTextItem variant="error">{endpointError}</HelperTextItem>
+                                                                </HelperText>
+                                                            </FormHelperText>
+                                                        )}
+                                                        {!service.endpoint.allowUserOverride && (
+                                                            <div style={{ fontSize: 'var(--pf-global--FontSize--sm)', color: 'var(--pf-global--Color--200)', marginTop: '0.25rem' }}>
+                                                                Endpoint is configured by the administrator
+                                                            </div>
+                                                        )}
+                                                    </FormGroup>
+                                                </StackItem>
+
+                                                {/* Credentials Form (dynamic based on schema) */}
+                                                <StackItem>
+                                                    <FormGroup label="Credentials">
+                                                        <JsonSchemaForm
+                                                            schema={service.credentialsSchema}
+                                                            formData={serviceCredentials}
+                                                            onChange={(data) => updateServiceCredentials(service.id, data)}
+                                                        />
+                                                    </FormGroup>
+                                                </StackItem>
+                                            </>
+                                        )}
                                     </Stack>
                                 </CardBody>
                             )}
