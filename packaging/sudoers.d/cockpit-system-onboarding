@@ -5,30 +5,23 @@
 #
 # This file should be installed to /etc/sudoers.d/cockpit-system-onboarding with mode 0440.
 
-# Hostname configuration
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/hostnamectl set-hostname *
-
-# Network configuration via NetworkManager CLI (fallback)
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/nmcli *
-
-# Time and NTP configuration
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/timedatectl *
-
-# Service restart (NetworkManager, time sync services)
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart NetworkManager
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart chronyd
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart systemd-timesyncd
-
-# Network interface management (for WiFi AP setup and fallback operations)
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/ip link set * up
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/ip link set * down
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/ip addr add * dev *
+# IP address conflict detection and gateway reachability (restricted wrapper)
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/check-network.sh *
 
 # Reboot after onboarding completes
 onboarding ALL=(ALL) NOPASSWD: /usr/sbin/shutdown -r now
 
 # NTP configuration helper
 onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/configure-ntp.sh *
+
+# Proxy configuration helper
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/apply-proxy.sh *
+
+# Labels configuration helper
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/apply-labels.sh *
+
+# Finalization script (writes completion marker)
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/finalize-onboarding.sh *
 
 # Cleanup script (executed after successful onboarding)
 onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh
@@ -37,8 +30,13 @@ onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/cleanup-on
 # These paths allow enrollment scripts to run with elevated privileges
 onboarding ALL=(ALL) NOPASSWD: /usr/share/cockpit/system-onboarding/system-onboarding.d/*.sh
 onboarding ALL=(ALL) NOPASSWD: /etc/cockpit/system-onboarding.d/*.sh
-onboarding ALL=(ALL) NOPASSWD: /home/onboarding/.config/cockpit/system-onboarding.d/*.sh
 
-# LED control tool (if configured)
-onboarding ALL=(ALL) NOPASSWD: /usr/local/bin/led-control *
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/led-control *
+# Single-NIC apply via restricted wrapper (validates args, generates unit name)
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/run-apply-enroll.sh *
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/apply-and-enroll.sh *
+
+# Connectivity watchdog (arm via restricted wrapper, disarm via systemctl)
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/run-watchdog.sh *
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop cockpit-system-onboarding-watchdog.timer
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop cockpit-system-onboarding-watchdog.service
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/rm -f /var/lib/cockpit-system-onboarding/.watchdog-active

@@ -21,8 +21,10 @@ polkit.addRule(function(action, subject) {
         return polkit.Result.YES;
     }
 
-    // NetworkManager configuration
-    if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0) {
+    // NetworkManager configuration (only the actions the onboarding wizard needs)
+    if (action.id === "org.freedesktop.NetworkManager.settings.modify.system" ||
+        action.id === "org.freedesktop.NetworkManager.network-control" ||
+        action.id === "org.freedesktop.NetworkManager.wifi.scan") {
         return polkit.Result.YES;
     }
 
