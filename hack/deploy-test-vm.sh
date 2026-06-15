@@ -265,6 +265,13 @@ NS="wifi_ap"
 SUBNET="10.43.0"
 VETH_SUBNET="10.43.1"
 
+# Use the VM's default gateway as the upstream DNS server.
+# Public DNS (8.8.8.8) is unreachable from inside a network namespace
+# behind double NAT (namespace → VM → libvirt host) because the
+# return UDP traffic doesn't traverse back through both NAT layers.
+UPSTREAM_DNS=$(ip route show default dev enp1s0 | awk '/default/ {print $3}' | head -1)
+UPSTREAM_DNS="${UPSTREAM_DNS:-192.168.122.1}"
+
 # Clean up any leftover state from a previous run
 ip link delete veth-host 2>/dev/null || true
 ip netns delete "${NS}" 2>/dev/null || true
@@ -316,8 +323,7 @@ ip netns exec "${NS}" dnsmasq \
     --dhcp-range=${SUBNET}.10,${SUBNET}.50,255.255.255.0,1h \
     --dhcp-option=3,${SUBNET}.1 \
     --dhcp-option=6,${SUBNET}.1 \
-    --server=8.8.8.8 \
-    --server=8.8.4.4 \
+    --server=${UPSTREAM_DNS} \
     --pid-file=/run/test-infra-wifi-dnsmasq.pid
 
 # Bridge namespace to host via a veth pair so NAT can reach enp1s0

@@ -397,7 +397,11 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
     const scanUnavailable = !isScanning && scanError !== null && networks.length === 0;
 
     const handleSsidChange = (value: string) => {
-        updateModel("networkInterface", { wifiSsid: value, interfaceType: "wifi" });
+        const updates: Partial<typeof model.networkInterface> = { wifiSsid: value, interfaceType: "wifi" };
+        if (model.networkInterface.wifiSecurity === null) {
+            updates.wifiSecurity = "wpa";
+        }
+        updateModel("networkInterface", updates);
     };
 
     const handleSecurityChange = (security: "none" | "wep" | "wpa") => {
