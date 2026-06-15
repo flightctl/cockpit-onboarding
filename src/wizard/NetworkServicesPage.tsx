@@ -5,12 +5,14 @@ import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/
 import { TextInputGroup, TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
+import { FormSelect, FormSelectOption } from "@patternfly/react-core/dist/esm/components/FormSelect/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { useModelContext } from '../model-context';
 import { validateHostnameOrIP, validatePort } from '../validation';
+import type { ProxyProtocol } from '../types';
 
 export const NetworkServicesPage: React.FunctionComponent = () => {
     const { model, updateNestedModel } = useModelContext();
@@ -88,6 +90,14 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
 
     const handleProxyPasswordChange = (value: string) => {
         updateNestedModel('networkServices', 'proxy', { password: value || null });
+    };
+
+    const handleProxyProtocolChange = (value: string) => {
+        updateNestedModel('networkServices', 'proxy', { protocol: value as ProxyProtocol });
+    };
+
+    const handleProxyNoProxyChange = (value: string) => {
+        updateNestedModel('networkServices', 'proxy', { noProxy: value });
     };
 
     return (
@@ -198,6 +208,20 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                 <StackItem style={{ marginLeft: '1.5rem' }}>
                     <Stack hasGutter>
                         <StackItem>
+                            <FormGroup label="Protocol">
+                                <FormSelect
+                                    id="proxy-protocol-select"
+                                    value={model.networkServices.proxy.protocol}
+                                    onChange={(_event, value) => handleProxyProtocolChange(value)}
+                                >
+                                    <FormSelectOption value="http" label="HTTP" />
+                                    <FormSelectOption value="https" label="HTTPS" />
+                                    <FormSelectOption value="socks5" label="SOCKS5" />
+                                </FormSelect>
+                            </FormGroup>
+                        </StackItem>
+
+                        <StackItem>
                             <FormGroup label="Proxy Hostname" isRequired>
                                 <TextInput
                                     id="proxy-hostname-input"
@@ -252,6 +276,20 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                     onChange={(_, value) => handleProxyPasswordChange(value)}
                                     placeholder="password"
                                 />
+                            </FormGroup>
+                        </StackItem>
+
+                        <StackItem>
+                            <FormGroup label="No Proxy" fieldId="proxy-no-proxy-input">
+                                <TextInput
+                                    id="proxy-no-proxy-input"
+                                    value={model.networkServices.proxy.noProxy}
+                                    onChange={(_, value) => handleProxyNoProxyChange(value)}
+                                    placeholder="localhost,127.0.0.1,::1,*.internal.corp,10.0.0.0/8"
+                                />
+                                <div style={{ fontSize: 'var(--pf-global--FontSize--sm)', color: 'var(--pf-global--Color--200)', marginTop: '0.25rem' }}>
+                                    Comma-separated list of hosts, domains, or CIDRs that should bypass the proxy
+                                </div>
                             </FormGroup>
                         </StackItem>
                     </Stack>

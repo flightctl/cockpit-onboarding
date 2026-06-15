@@ -10,6 +10,14 @@ set -e
 ACTION="${1:?Usage: configure-ntp.sh auto|set [servers...]}"
 shift
 
+validate_server() {
+    local srv="$1"
+    if [[ ! "$srv" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$ ]]; then
+        echo "Invalid NTP server name: $srv" >&2
+        exit 1
+    fi
+}
+
 # Detect NTP backend
 if systemctl list-unit-files systemd-timesyncd.service >/dev/null 2>&1; then
     BACKEND="timesyncd"
@@ -41,6 +49,9 @@ EOF
             echo "No servers specified" >&2
             exit 1
         fi
+        for srv in "$@"; do
+            validate_server "$srv"
+        done
         if [ "$BACKEND" = "timesyncd" ]; then
             mkdir -p -m755 /etc/systemd/timesyncd.conf.d
             cat > /etc/systemd/timesyncd.conf.d/50-cockpit.conf <<EOF
