@@ -4,9 +4,6 @@
 
 A [Cockpit](https://cockpit-project.org/) module that provides a guided setup wizard for headless Linux devices.
 
-> [!NOTE]
-> This is an experimental project. Use at your own risk — no maintenance or support is guaranteed.
-
 ## Overview
 
 Headless devices — servers, edge nodes, embedded systems — often lack displays, keyboards, and pre-configured network access. Before they can onboard into management services like [Flight Control](https://flightctl.io/), they need network connectivity and credentials. The Cockpit System Onboarding plugin bridges that gap.
@@ -25,28 +22,26 @@ Cockpit System Onboarding runs inside [Cockpit](https://cockpit-project.org/) on
 
 ## Installing
 
-### On RPM-based distributions
+### Building the RPM
 
-1. Install the latest RPM directly from [GitHub Releases](https://github.com/fzdarsky/cockpit-system-onboarding/releases):
+```sh
+make rpm
+```
 
-    ```sh
-    VERSION=$(curl -s https://api.github.com/repos/fzdarsky/cockpit-system-onboarding/releases/latest | jq -r .tag_name)
-    sudo dnf install -y "https://github.com/fzdarsky/cockpit-system-onboarding/releases/download/${VERSION}/cockpit-system-onboarding-${VERSION#v}-1.$(uname -m).rpm"
-    ```
+This produces an RPM under `tmp/rpmbuild/RPMS/`. Install it on the target device:
 
-2. Enable the onboarding setup service:
+```sh
+sudo dnf install -y ./cockpit-system-onboarding-*.rpm
+sudo systemctl enable --now cockpit-system-onboarding-setup.service
+```
 
-    ```sh
-    sudo systemctl enable --now cockpit-system-onboarding-setup.service
-    ```
+If provisioning over WiFi, install the additional dependencies:
 
-3. If provisioning over WiFi, install the additional dependencies:
+```sh
+sudo dnf install -y hostapd dnsmasq
+```
 
-    ```sh
-    sudo dnf install -y hostapd dnsmasq
-    ```
-
-4. Access the wizard at `https://<device-ip>:9090` in your browser. Log in as user `onboarding` without password.
+Access the wizard at `https://<device-ip>:9090` in your browser. Log in as user `onboarding` without password.
 
 ### From source
 
