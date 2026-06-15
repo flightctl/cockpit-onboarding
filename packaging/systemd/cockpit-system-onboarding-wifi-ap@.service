@@ -19,7 +19,21 @@ ExecStartPre=/bin/bash -c 'sleep 2 && /usr/sbin/ip link set %i up && for i in $(
 ExecStartPre=/bin/bash -c 'mkdir -p /run/hostapd && cp /run/cockpit-system-onboarding/hostapd-%i.conf /run/hostapd/ && restorecon /run/hostapd/hostapd-%i.conf'
 ExecStart=/usr/sbin/hostapd /run/hostapd/hostapd-%i.conf
 ExecStartPost=/usr/sbin/ip addr add ${WIFI_AP_ADDRESS}/${WIFI_AP_NETMASK} dev %i
+ExecStartPost=-/usr/bin/firewall-cmd --zone=cockpit-onboarding-ap --add-interface=%i
+ExecStopPost=-/usr/bin/firewall-cmd --zone=cockpit-onboarding-ap --remove-interface=%i
 ExecStopPost=/usr/sbin/ip addr flush dev %i
 ExecStopPost=/usr/sbin/ip link set %i down
 ExecStopPost=-/usr/bin/nmcli device set %i managed yes
 Restart=no
+
+# Hardening: hostapd needs raw network access but not /etc/ or /home/
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictRealtime=yes
+LockPersonality=yes

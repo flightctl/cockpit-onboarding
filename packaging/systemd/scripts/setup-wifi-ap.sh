@@ -4,41 +4,15 @@
 
 set -e
 
-USER_CONFIG="/etc/cockpit/system-onboarding/config.json"
-DEFAULT_CONFIG="/usr/share/cockpit/system-onboarding/config.json"
-RUNTIME_DIR="/run/cockpit-system-onboarding"
+# shellcheck source=common.sh
+. /usr/libexec/cockpit-system-onboarding/common.sh
+
+RUNTIME_DIR="$ONBOARDING_RUNTIME_DIR"
 DEFAULT_AP_ADDRESS="10.42.0.1"
 DEFAULT_AP_NETMASK="24"
 
-# Load configuration with fallback hierarchy
-load_config() {
-    local key="$1"
-    local default="$2"
-
-    # Try user override first
-    if [ -f "$USER_CONFIG" ]; then
-        value=$(jq -r "$key" "$USER_CONFIG" 2>/dev/null)
-        if [ -n "$value" ] && [ "$value" != "null" ]; then
-            echo "$value"
-            return
-        fi
-    fi
-
-    # Fall back to default config
-    if [ -f "$DEFAULT_CONFIG" ]; then
-        value=$(jq -r "$key" "$DEFAULT_CONFIG" 2>/dev/null)
-        if [ -n "$value" ] && [ "$value" != "null" ]; then
-            echo "$value"
-            return
-        fi
-    fi
-
-    # Use built-in default
-    echo "$default"
-}
-
 # Check if either config file exists
-if [ ! -f "$USER_CONFIG" ] && [ ! -f "$DEFAULT_CONFIG" ]; then
+if [ ! -f "$ONBOARDING_USER_CONFIG" ] && [ ! -f "$ONBOARDING_DEFAULT_CONFIG" ]; then
     echo "No configuration file found"
     echo "Skipping WiFi AP setup"
     exit 0
@@ -59,11 +33,21 @@ if ! command -v hostapd >/dev/null 2>&1; then
 fi
 
 # Get configuration values
-SSID_PREFIX=$(load_config '.network.wifiAp.ssidPrefix' 'cockpit-')
+SSID_PREFIX=$(load_config '.network.wifiAp.ssidPrefix' 'flightctl-')
 PASSWORD=$(load_config '.network.wifiAp.password' '')
 
-# Auto-detect first WiFi interface
-WIFI_INTERFACE=$(nmcli -t -f DEVICE,TYPE device | grep ':wifi$' | head -n 1 | cut -d: -f1)
+# Determine WiFi interface: use configured value or auto-detect
+WIFI_AP_IFACE=$(load_config '.network.wifiAp.interface' '')
+if [ -n "$WIFI_AP_IFACE" ]; then
+    if ! nmcli -t -f DEVICE,TYPE device | grep -q "^${WIFI_AP_IFACE}:wifi$"; then
+        echo "ERROR: Configured WiFi AP interface '$WIFI_AP_IFACE' is not a WiFi device or does not exist"
+        exit 1
+    fi
+    WIFI_INTERFACE="$WIFI_AP_IFACE"
+    echo "Using configured WiFi interface: $WIFI_INTERFACE"
+else
+    WIFI_INTERFACE=$(nmcli -t -f DEVICE,TYPE device | grep ':wifi$' | head -n 1 | cut -d: -f1)
+fi
 
 if [ -z "$WIFI_INTERFACE" ]; then
     echo "No WiFi interface found"
@@ -73,9 +57,27 @@ fi
 
 echo "Using WiFi interface: $WIFI_INTERFACE"
 
-# Generate SSID from prefix + short hostname suffix
-HOSTNAME_SUFFIX=$(hostname -s | tail -c 7)
-SSID="${SSID_PREFIX}${HOSTNAME_SUFFIX}"
+# Generate SSID suffix from DMI product serial, falling back to MAC address
+DMI_SERIAL_FILE="/sys/class/dmi/id/product_serial"
+SSID_SUFFIX=""
+if [ -f "$DMI_SERIAL_FILE" ]; then
+    DMI_SERIAL=$(tr -d '[:space:]' < "$DMI_SERIAL_FILE")
+    case "$DMI_SERIAL" in
+        ''|'DefaultString'|'Default string'|'ToBeFilledByO.E.M.'|'ToBeFilled')
+            DMI_SERIAL=""
+            ;;
+    esac
+    if [ -n "$DMI_SERIAL" ]; then
+        SSID_SUFFIX=$(printf '%s' "$DMI_SERIAL" | tail -c 8)
+    fi
+fi
+
+if [ -z "$SSID_SUFFIX" ]; then
+    MAC_RAW=$(tr -d ':' < "/sys/class/net/${WIFI_INTERFACE}/address")
+    SSID_SUFFIX=$(printf '%s' "$MAC_RAW" | tail -c 6)
+fi
+
+SSID="${SSID_PREFIX}${SSID_SUFFIX}"
 echo "WiFi AP SSID: $SSID"
 
 # Create runtime directory
@@ -104,6 +106,7 @@ wpa_key_mgmt=WPA-PSK
 wpa_pairwise=TKIP
 rsn_pairwise=CCMP
 EOF
+    chmod 0600 "$HOSTAPD_CONF"
     echo "WiFi AP configured with WPA2 security"
 else
     cat >> "$HOSTAPD_CONF" <<EOF
@@ -123,6 +126,8 @@ dhcp-option=6,${DEFAULT_AP_ADDRESS}
 no-resolv
 no-hosts
 address=/#/${DEFAULT_AP_ADDRESS}
+dhcp-leasefile=/tmp/dnsmasq.leases
+pid-file=/tmp/dnsmasq.pid
 EOF
 echo "Generated dnsmasq DHCP config"
 
@@ -130,7 +135,29 @@ echo "Generated dnsmasq DHCP config"
 cat > "$RUNTIME_DIR/wifi-ap.env" <<EOF
 WIFI_AP_ADDRESS=${DEFAULT_AP_ADDRESS}
 WIFI_AP_NETMASK=${DEFAULT_AP_NETMASK}
+WIFI_AP_INTERFACE=${WIFI_INTERFACE}
 EOF
+
+# Create a dedicated firewalld zone for the AP interface if firewalld is active.
+# The zone only permits DHCP, DNS, Cockpit (9090/tcp), and captive portal (80/tcp).
+# All other inbound traffic on the AP interface is rejected.
+ONBOARDING_FW_ZONE="cockpit-onboarding-ap"
+if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
+    if ! firewall-cmd --permanent --info-zone="$ONBOARDING_FW_ZONE" >/dev/null 2>&1; then
+        firewall-cmd --permanent --new-zone="$ONBOARDING_FW_ZONE"
+        firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --set-target=REJECT
+        firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-service=dhcp
+        firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-service=dns
+        firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=9090/tcp
+        firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=80/tcp
+        firewall-cmd --reload
+        echo "Created firewalld zone '$ONBOARDING_FW_ZONE' (DHCP, DNS, Cockpit, captive portal only)"
+    else
+        echo "Firewalld zone '$ONBOARDING_FW_ZONE' already exists"
+    fi
+else
+    echo "firewalld is not active, skipping firewall zone setup"
+fi
 
 # Enable and start the WiFi AP service for this interface
 systemctl enable "cockpit-system-onboarding-wifi-ap@${WIFI_INTERFACE}.service" 2>/dev/null || true

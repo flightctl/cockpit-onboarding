@@ -12,3 +12,17 @@ Type=simple
 ExecStartPre=/bin/bash -c 'mkdir -p /run/dnsmasq && cp /run/cockpit-system-onboarding/dnsmasq-%i.conf /run/dnsmasq/ && restorecon /run/dnsmasq/dnsmasq-%i.conf'
 ExecStart=/usr/sbin/dnsmasq --keep-in-foreground --conf-file=/run/dnsmasq/dnsmasq-%i.conf
 Restart=no
+
+# Hardening: dnsmasq needs network (DHCP/DNS) and /run/ write but not /etc/ or /home/
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictRealtime=yes
+LockPersonality=yes

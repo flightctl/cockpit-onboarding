@@ -6,5 +6,21 @@ After=cockpit-system-onboarding-dnsmasq@%i.service
 [Service]
 Type=simple
 EnvironmentFile=/run/cockpit-system-onboarding/wifi-ap.env
-ExecStart=/usr/bin/python3 /usr/libexec/cockpit-system-onboarding/captive-portal.py ${WIFI_AP_ADDRESS}
+ExecStart=/usr/bin/python3 /usr/libexec/cockpit-system-onboarding/captive-portal.py ${WIFI_AP_ADDRESS} ${WIFI_AP_INTERFACE}
 Restart=no
+
+# Hardening: this service only serves HTTP on port 80 and reads /sys/ for device info
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictRealtime=yes
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+RestrictNamespaces=yes
