@@ -28,7 +28,7 @@ Cockpit System Onboarding runs inside [Cockpit](https://cockpit-project.org/) on
 make rpm
 ```
 
-This produces an RPM under `tmp/rpmbuild/RPMS/`. Install it on the target device:
+This produces `cockpit-system-onboarding-*.noarch.rpm` in the repository root. Install it on the target device:
 
 ```sh
 sudo dnf install -y ./cockpit-system-onboarding-*.rpm

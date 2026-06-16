@@ -13,8 +13,8 @@ On Fedora:
 ## Building
 
 ```sh
-git clone https://github.com/fzdarsky/cockpit-system-onboarding.git
-cd cockpit-system-onboarding
+git clone https://github.com/flightctl/cockpit-onboarding.git
+cd cockpit-onboarding
 make
 ```
 
@@ -69,6 +69,14 @@ Individual tools:
     npm run stylelint:fix   # auto-fix Stylelint violations
 
 Configuration files: `.eslintrc.json`, `.stylelintrc.json`.
+
+## Unit tests
+
+Run Jest unit tests:
+
+    npm test
+    npm run test:watch
+    npm run test:coverage
 
 ## Test VM
 
