@@ -163,6 +163,9 @@ provision_vm() {
     echo "Installing required packages..."
     run_ssh "${vm_ip}" "sudo dnf install -y cockpit cockpit-ws cockpit-bridge jq chrony"
 
+    echo "Preparing development rsync target..."
+    run_ssh "${vm_ip}" "sudo mkdir -p /usr/local/share/cockpit && sudo chown fedora:fedora /usr/local/share/cockpit"
+
     echo "Enabling chronyd for NTP..."
     run_ssh "${vm_ip}" "sudo systemctl enable --now chronyd"
 
@@ -439,6 +442,9 @@ main() {
     echo "  IP:      ${vm_ip}"
     echo "  SSH:     ssh fedora@${vm_ip}"
     echo "  Cockpit: https://${vm_ip}:9090"
+    echo ""
+    echo "  Development:"
+    echo "    RSYNC=fedora@${vm_ip} make watch"
     echo ""
     echo "  WiFi Interfaces:"
     echo "    ${onboarding_iface:-wlan0}  Onboarding AP (SSID: ${onboarding_ssid:-cockpit-*})"
