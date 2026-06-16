@@ -83,9 +83,35 @@ rollback() {
     systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
     systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
     rm -f /var/lib/cockpit-system-onboarding/.watchdog-active 2>/dev/null || true
+    rm -f "$PARAMS_FILE" 2>/dev/null || true
     log "Rollback complete -- NetworkManager will restore previous connection"
 }
 trap rollback ERR
+
+# Step 0: If the WiFi AP is running on the target interface, stop it so NM
+# can reclaim the device and hostapd releases the radio.
+WIFI_AP_UNIT="cockpit-system-onboarding-wifi-ap@${INTERFACE_NAME}.service"
+if [ -n "$INTERFACE_NAME" ] && systemctl is-active --quiet "$WIFI_AP_UNIT" 2>/dev/null; then
+    log "Stopping WiFi AP on $INTERFACE_NAME before activating connection"
+    systemctl stop "$WIFI_AP_UNIT"
+    log "WiFi AP stopped on $INTERFACE_NAME"
+
+    # After stopping the AP, NM transitions the device through
+    # unmanaged → unavailable → disconnected.  The wpa_supplicant
+    # interface must come up before NM considers the device ready.
+    # Wait for the device to leave "unavailable" before activating.
+    log "Waiting for $INTERFACE_NAME to become ready..."
+    dev_wait=0
+    while [ "$dev_wait" -lt 30 ]; do
+        dev_state=$(nmcli -t -f DEVICE,STATE device status 2>/dev/null | grep "^${INTERFACE_NAME}:" | cut -d: -f2) || true
+        if [ -n "$dev_state" ] && [ "$dev_state" != "unavailable" ] && [ "$dev_state" != "unmanaged" ]; then
+            log "Device $INTERFACE_NAME is ready (state: $dev_state)"
+            break
+        fi
+        sleep 1
+        dev_wait=$((dev_wait + 1))
+    done
+fi
 
 # Step 1: Activate the new NM profile
 log "Activating connection: $CONNECTION_ID"

@@ -254,7 +254,10 @@ function buildConnectionSettings(
             mode: { t: "s", v: "infrastructure" },
         };
 
-        if (model.networkInterface.wifiSecurity && model.networkInterface.wifiSecurity !== "none") {
+        if (
+            model.networkInterface.wifiSecurity !== "none" &&
+            (model.networkInterface.wifiSecurity || model.networkInterface.wifiPassword)
+        ) {
             settings["802-11-wireless"].security = { t: "s", v: "802-11-wireless-security" };
             settings["802-11-wireless-security"] = {
                 "key-mgmt": { t: "s", v: "wpa-psk" },
@@ -423,6 +426,31 @@ export async function applyNetworkConfiguration(
             }
         } catch (cleanupError) {
             console.warn("Failed to clean up previous onboarding profile:", cleanupError);
+        }
+
+        // If the WiFi AP service is running on this interface, stop it first
+        // so NM can reclaim the device and hostapd releases the radio.
+        // Skip this when skipActivation is true (single-NIC path) because
+        // stopping the AP severs the browser connection. The apply-and-enroll.sh
+        // script handles stopping the AP before activation in that case.
+        if (!skipActivation) {
+            const wifiApUnit = `cockpit-system-onboarding-wifi-ap@${ifaceName}.service`;
+            try {
+                const isActive = await cockpit
+                    .spawn(["systemctl", "is-active", "--quiet", wifiApUnit], { err: "ignore" })
+                    .then(
+                        () => true,
+                        () => false
+                    );
+
+                if (isActive) {
+                    console.log(`Stopping WiFi AP on ${ifaceName} before applying network config`);
+                    await cockpit.spawn(["sudo", "systemctl", "stop", wifiApUnit], { err: "message" });
+                    results.push(`Stopped WiFi AP on ${ifaceName}`);
+                }
+            } catch (apError) {
+                console.warn("Failed to stop WiFi AP service:", apError);
+            }
         }
 
         // Build NM connection settings for the new profile
