@@ -127,7 +127,9 @@ export async function getDhcpHostname(interfaces: Interface[]): Promise<string> 
 
 export function subnetMaskToPrefixLength(subnetMask: string): number {
     const parts = subnetMask.split(".").map(Number);
-    if (parts.length !== 4) {return 24}
+    if (parts.length !== 4) {
+        return 24;
+    }
 
     let prefixLength = 0;
     for (const part of parts) {
@@ -148,6 +150,17 @@ export function parseIpv6Address(addressWithPrefix: string): { address: string; 
     return { address, prefix };
 }
 
+interface VlanInfo {
+    isVlan: boolean;
+    effectiveIfaceName: string;
+}
+
+function resolveVlanInfo(ifaceName: string, interfaceType: string, vlanId: number | null): VlanInfo {
+    const isVlan = vlanId !== null && interfaceType !== "wifi";
+    const effectiveIfaceName = isVlan ? `${ifaceName}.${vlanId}` : ifaceName;
+    return { isVlan, effectiveIfaceName };
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function waitForActivation(nmClient: any, activeConnPath: string): Promise<void> {
     const NM_ACTIVE_CONNECTION_STATE_ACTIVATED = 2;
@@ -162,8 +175,12 @@ function waitForActivation(nmClient: any, activeConnPath: string): Promise<void>
         let pollInterval: ReturnType<typeof setInterval> | null = null;
 
         const cleanup = () => {
-            if (timer) {clearTimeout(timer)}
-            if (pollInterval) {clearInterval(pollInterval)}
+            if (timer) {
+                clearTimeout(timer);
+            }
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
         };
 
         timer = setTimeout(() => {
@@ -202,24 +219,30 @@ function buildConnectionSettings(
     ifaceName: string,
     interfaceType: string
 ): Record<string, Record<string, unknown>> {
-    const connectionId = `${ONBOARDING_PROFILE_PREFIX}${ifaceName}`;
+    const vlanId = model.networkInterface.vlanId;
+    const { isVlan, effectiveIfaceName } = resolveVlanInfo(ifaceName, interfaceType, vlanId);
+    const connectionId = `${ONBOARDING_PROFILE_PREFIX}${effectiveIfaceName}`;
 
-    // Determine the NM connection type
-    const nmType = interfaceType === "wifi" ? "802-11-wireless" : "802-3-ethernet";
+    const nmType = isVlan ? "vlan" : interfaceType === "wifi" ? "802-11-wireless" : "802-3-ethernet";
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const settings: Record<string, Record<string, any>> = {
         connection: {
             id: { t: "s", v: connectionId },
             type: { t: "s", v: nmType },
-            "interface-name": { t: "s", v: ifaceName },
+            "interface-name": { t: "s", v: effectiveIfaceName },
             autoconnect: { t: "b", v: true },
             "autoconnect-priority": { t: "i", v: 999 },
         },
     };
 
-    // Add type-specific section
-    if (nmType === "802-3-ethernet") {
+    if (isVlan) {
+        settings.vlan = {
+            id: { t: "u", v: vlanId },
+            parent: { t: "s", v: ifaceName },
+        };
+        settings["802-3-ethernet"] = {};
+    } else if (nmType === "802-3-ethernet") {
         settings["802-3-ethernet"] = {};
     } else if (nmType === "802-11-wireless") {
         const ssid = model.networkInterface.wifiSsid || "";
@@ -389,11 +412,15 @@ export async function applyNetworkConfiguration(
         }
 
         const interfaceType = model.networkInterface.interfaceType || "ethernet";
-        const connectionId = `${ONBOARDING_PROFILE_PREFIX}${ifaceName}`;
+        const { isVlan, effectiveIfaceName } = resolveVlanInfo(ifaceName, interfaceType, model.networkInterface.vlanId);
+        const connectionId = `${ONBOARDING_PROFILE_PREFIX}${effectiveIfaceName}`;
 
         // Delete any previously created onboarding profile for this interface
         try {
             await deleteOnboardingProfiles(ifaceName);
+            if (isVlan) {
+                await deleteOnboardingProfiles(effectiveIfaceName);
+            }
         } catch (cleanupError) {
             console.warn("Failed to clean up previous onboarding profile:", cleanupError);
         }
@@ -427,14 +454,17 @@ export async function applyNetworkConfiguration(
             if (skipActivation) {
                 results.push(`Created profile ${connectionId} (activation deferred to systemd-run)`);
             } else {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const devicePathResult = await (nmClient as any).call(
-                    "/org/freedesktop/NetworkManager",
-                    "org.freedesktop.NetworkManager",
-                    "GetDeviceByIpIface",
-                    [ifaceName]
-                );
-                const devicePath = Array.isArray(devicePathResult) ? devicePathResult[0] : devicePathResult;
+                let devicePath = "/";
+                if (!isVlan) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const devicePathResult = await (nmClient as any).call(
+                        "/org/freedesktop/NetworkManager",
+                        "org.freedesktop.NetworkManager",
+                        "GetDeviceByIpIface",
+                        [ifaceName]
+                    );
+                    devicePath = Array.isArray(devicePathResult) ? devicePathResult[0] : devicePathResult;
+                }
 
                 console.log("Activating connection on device:", devicePath);
 
@@ -451,7 +481,7 @@ export async function applyNetworkConfiguration(
                     await waitForActivation(nmClient, activeConnPath);
                 }
 
-                results.push(`Activated connection ${connectionId} on ${ifaceName}`);
+                results.push(`Activated connection ${connectionId} on ${effectiveIfaceName}`);
             }
         } catch (networkError) {
             const errorMsg = String(networkError);

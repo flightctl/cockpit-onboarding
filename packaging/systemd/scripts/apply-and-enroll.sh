@@ -70,12 +70,16 @@ validate_script_path() {
 PARAMS_FILE="$1"
 CONNECTION_ID=$(jq -r '.connectionId' "$PARAMS_FILE")
 INTERFACE_NAME=$(jq -r '.interfaceName // empty' "$PARAMS_FILE")
+EFFECTIVE_IFACE=$(jq -r '.effectiveIfaceName // .interfaceName // empty' "$PARAMS_FILE")
 HOSTNAME=$(jq -r '.hostname // empty' "$PARAMS_FILE")
 CONNECTIVITY_TEST_HOST=$(jq -r '.connectivityTestHost // "www.google.com"' "$PARAMS_FILE")
 
 rollback() {
     log "Rolling back: deleting onboarding NM profiles..."
     nmcli connection delete "$CONNECTION_ID" 2>/dev/null || true
+    if [ "$EFFECTIVE_IFACE" != "$INTERFACE_NAME" ] && [ -n "$INTERFACE_NAME" ]; then
+        nmcli connection delete "${CONNECTION_ID/$EFFECTIVE_IFACE/$INTERFACE_NAME}" 2>/dev/null || true
+    fi
     systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
     systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
     rm -f /var/lib/cockpit-system-onboarding/.watchdog-active 2>/dev/null || true
@@ -91,6 +95,7 @@ nmcli connection up "$CONNECTION_ID"
 # In ethernet single-NIC scenarios the operator must physically move the cable
 # from the configuration laptop to the production switch. Wait up to 5 minutes
 # for carrier, then 30 retries at 2s intervals (~60 seconds) for connectivity.
+# Carrier is checked on the physical interface, not the VLAN subinterface.
 CARRIER_FILE="/sys/class/net/${INTERFACE_NAME}/carrier"
 CARRIER_TIMEOUT=300
 CONNECTIVITY_TIMEOUT=30
