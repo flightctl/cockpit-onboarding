@@ -1,15 +1,20 @@
-import React from 'react';
-import cockpit from 'cockpit';
+import React from "react";
+import cockpit from "cockpit";
 
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
-import { DescriptionList, DescriptionListGroup, DescriptionListTerm, DescriptionListDescription } from "@patternfly/react-core/dist/esm/components/DescriptionList/index.js";
+import {
+    DescriptionList,
+    DescriptionListGroup,
+    DescriptionListTerm,
+    DescriptionListDescription,
+} from "@patternfly/react-core/dist/esm/components/DescriptionList/index.js";
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { useWizardContext } from "@patternfly/react-core/dist/esm/components/Wizard/index.js";
-import { PencilAltIcon } from '@patternfly/react-icons';
-import { useModelContext } from '../model-context';
-import { useConfig } from '../app';
-import { getSetupInterface } from '../services/network';
+import { PencilAltIcon } from "@patternfly/react-icons";
+import { useModelContext } from "../model-context";
+import { useConfig } from "../app";
+import { getSetupInterface } from "../services/network";
 
 const _ = cockpit.gettext;
 
@@ -31,15 +36,21 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
             <StackItem>
                 <p>
                     {hasEnrollmentScripts
-                        ? _("Please review your configuration below. Click \"Enroll\" to apply these settings and complete the system onboarding.")
-                        : _("Please review your configuration below. Click \"Apply\" to apply these settings to the system.")}
+                        ? _(
+                              'Please review your configuration below. Click "Enroll" to apply these settings and complete the system onboarding.'
+                          )
+                        : _(
+                              'Please review your configuration below. Click "Apply" to apply these settings to the system.'
+                          )}
                 </p>
             </StackItem>
 
             {isSingleNic && (
                 <StackItem>
                     <Alert variant="warning" isInline title={_("Connection will be interrupted")}>
-                        {_("You are applying changes to the interface serving this browser session. Your connection will drop when the new network profile is activated. The remaining steps (connectivity test, enrollment, and cleanup) will continue in the background automatically.")}
+                        {_(
+                            "You are applying changes to the interface serving this browser session. Your connection will drop when the new network profile is activated. The remaining steps (connectivity test, enrollment, and cleanup) will continue in the background automatically."
+                        )}
                     </Alert>
                 </StackItem>
             )}
@@ -54,7 +65,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById('wizard-step-1')}
+                                onClick={() => goToStepById("wizard-step-1")}
                                 aria-label={_("Edit hostname")}
                             />
                         </DescriptionListDescription>
@@ -68,12 +79,12 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById('wizard-step-2')}
+                                onClick={() => goToStepById("wizard-step-2")}
                                 aria-label={_("Edit network interface")}
                             />
                         </DescriptionListDescription>
                     </DescriptionListGroup>
-                    {model.networkInterface.interfaceType === 'wifi' && (
+                    {model.networkInterface.interfaceType === "wifi" && (
                         <>
                             <DescriptionListGroup>
                                 <DescriptionListTerm>{_("WiFi SSID")}</DescriptionListTerm>
@@ -82,7 +93,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                     <Button
                                         variant="link"
                                         icon={<PencilAltIcon />}
-                                        onClick={() => goToStepById('wizard-step-2')}
+                                        onClick={() => goToStepById("wizard-step-2")}
                                         aria-label={_("Edit network interface")}
                                     />
                                 </DescriptionListDescription>
@@ -90,9 +101,9 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <DescriptionListGroup>
                                 <DescriptionListTerm>{_("WiFi Security")}</DescriptionListTerm>
                                 <DescriptionListDescription>
-                                    {model.networkInterface.wifiSecurity === 'none' && _("None")}
-                                    {model.networkInterface.wifiSecurity === 'wep' && _("WEP")}
-                                    {model.networkInterface.wifiSecurity === 'wpa' && _("WPA/WPA2")}
+                                    {model.networkInterface.wifiSecurity === "none" && _("None")}
+                                    {model.networkInterface.wifiSecurity === "wep" && _("WEP")}
+                                    {model.networkInterface.wifiSecurity === "wpa" && _("WPA/WPA2")}
                                     {!model.networkInterface.wifiSecurity && _("(not set)")}
                                 </DescriptionListDescription>
                             </DescriptionListGroup>
@@ -104,10 +115,10 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <DescriptionListDescription>
                                 {model.networkInterface.vlanId}
                                 <Button
-                                variant="link"
-                                icon={<PencilAltIcon />}
-                                onClick={() => goToStepById('wizard-step-2')}
-                                aria-label={_("Edit network interface")}
+                                    variant="link"
+                                    icon={<PencilAltIcon />}
+                                    onClick={() => goToStepById("wizard-step-2")}
+                                    aria-label={_("Edit network interface")}
                                 />
                             </DescriptionListDescription>
                         </DescriptionListGroup>
@@ -117,35 +128,35 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                     <DescriptionListGroup>
                         <DescriptionListTerm>{_("IPv4 Configuration")}</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.networkAddress.ipv4.method === 'auto' && _("Automatic (DHCP)")}
-                            {model.networkAddress.ipv4.method === 'static' && _("Static")}
-                            {model.networkAddress.ipv4.method === 'disabled' && _("Disabled")}
+                            {model.networkAddress.ipv4.method === "auto" && _("Automatic (DHCP)")}
+                            {model.networkAddress.ipv4.method === "static" && _("Static")}
+                            {model.networkAddress.ipv4.method === "disabled" && _("Disabled")}
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById('wizard-step-3')}
+                                onClick={() => goToStepById("wizard-step-3")}
                                 aria-label={_("Edit network address")}
                             />
                         </DescriptionListDescription>
                     </DescriptionListGroup>
-                    {model.networkAddress.ipv4.method === 'static' && (
+                    {model.networkAddress.ipv4.method === "static" && (
                         <>
                             <DescriptionListGroup>
                                 <DescriptionListTerm>IPv4 Address</DescriptionListTerm>
                                 <DescriptionListDescription>
-                                    {model.networkAddress.ipv4.address || '(empty)'}
+                                    {model.networkAddress.ipv4.address || "(empty)"}
                                 </DescriptionListDescription>
                             </DescriptionListGroup>
                             <DescriptionListGroup>
                                 <DescriptionListTerm>IPv4 Subnet Mask</DescriptionListTerm>
                                 <DescriptionListDescription>
-                                    {model.networkAddress.ipv4.subnetMask || '(empty)'}
+                                    {model.networkAddress.ipv4.subnetMask || "(empty)"}
                                 </DescriptionListDescription>
                             </DescriptionListGroup>
                             <DescriptionListGroup>
                                 <DescriptionListTerm>Gateway</DescriptionListTerm>
                                 <DescriptionListDescription>
-                                    {model.networkAddress.ipv4.gateway || '(empty)'}
+                                    {model.networkAddress.ipv4.gateway || "(empty)"}
                                 </DescriptionListDescription>
                             </DescriptionListGroup>
                         </>
@@ -153,22 +164,19 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                     <DescriptionListGroup>
                         <DescriptionListTerm>DNS servers</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.networkAddress.ipv4.autoDns
-? (
+                            {model.networkAddress.ipv4.autoDns ? (
                                 _("Automatic")
-                            )
-: (
-    <>
-        {model.networkAddress.ipv4.primaryDns && (
-        <div>{model.networkAddress.ipv4.primaryDns}</div>
+                            ) : (
+                                <>
+                                    {model.networkAddress.ipv4.primaryDns && (
+                                        <div>{model.networkAddress.ipv4.primaryDns}</div>
                                     )}
-        {model.networkAddress.ipv4.secondaryDns && (
-        <div>{model.networkAddress.ipv4.secondaryDns}</div>
+                                    {model.networkAddress.ipv4.secondaryDns && (
+                                        <div>{model.networkAddress.ipv4.secondaryDns}</div>
                                     )}
-        {!model.networkAddress.ipv4.primaryDns && !model.networkAddress.ipv4.secondaryDns && (
-        <div>(empty)</div>
-                                    )}
-    </>
+                                    {!model.networkAddress.ipv4.primaryDns &&
+                                        !model.networkAddress.ipv4.secondaryDns && <div>(empty)</div>}
+                                </>
                             )}
                         </DescriptionListDescription>
                     </DescriptionListGroup>
@@ -176,53 +184,50 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                     <DescriptionListGroup>
                         <DescriptionListTerm>{_("IPv6 Configuration")}</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.networkAddress.ipv6.method === 'auto' && _("Automatic (DHCP)")}
-                            {model.networkAddress.ipv6.method === 'static' && _("Static")}
-                            {model.networkAddress.ipv6.method === 'disabled' && _("Disabled")}
+                            {model.networkAddress.ipv6.method === "auto" && _("Automatic (DHCP)")}
+                            {model.networkAddress.ipv6.method === "static" && _("Static")}
+                            {model.networkAddress.ipv6.method === "disabled" && _("Disabled")}
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById('wizard-step-3')}
+                                onClick={() => goToStepById("wizard-step-3")}
                                 aria-label={_("Edit network address")}
                             />
                         </DescriptionListDescription>
                     </DescriptionListGroup>
-                    {model.networkAddress.ipv6.method === 'static' && (
+                    {model.networkAddress.ipv6.method === "static" && (
                         <>
                             <DescriptionListGroup>
                                 <DescriptionListTerm>IPv6 Address</DescriptionListTerm>
                                 <DescriptionListDescription>
-                                    {model.networkAddress.ipv6.address || '(empty)'}
+                                    {model.networkAddress.ipv6.address || "(empty)"}
                                 </DescriptionListDescription>
                             </DescriptionListGroup>
                             <DescriptionListGroup>
                                 <DescriptionListTerm>Gateway</DescriptionListTerm>
                                 <DescriptionListDescription>
-                                    {model.networkAddress.ipv6.gateway || '(empty)'}
+                                    {model.networkAddress.ipv6.gateway || "(empty)"}
                                 </DescriptionListDescription>
                             </DescriptionListGroup>
                         </>
                     )}
-                    {model.networkAddress.ipv6.method !== 'disabled' && (
+                    {model.networkAddress.ipv6.method !== "disabled" && (
                         <DescriptionListGroup>
                             <DescriptionListTerm>DNS servers</DescriptionListTerm>
                             <DescriptionListDescription>
-                                {model.networkAddress.ipv6.autoDns
-? (
+                                {model.networkAddress.ipv6.autoDns ? (
                                     _("Automatic")
-                                )
-: (
-    <>
-        {model.networkAddress.ipv6.primaryDns && (
-        <div>{model.networkAddress.ipv6.primaryDns}</div>
+                                ) : (
+                                    <>
+                                        {model.networkAddress.ipv6.primaryDns && (
+                                            <div>{model.networkAddress.ipv6.primaryDns}</div>
                                         )}
-        {model.networkAddress.ipv6.secondaryDns && (
-        <div>{model.networkAddress.ipv6.secondaryDns}</div>
+                                        {model.networkAddress.ipv6.secondaryDns && (
+                                            <div>{model.networkAddress.ipv6.secondaryDns}</div>
                                         )}
-        {!model.networkAddress.ipv6.primaryDns && !model.networkAddress.ipv6.secondaryDns && (
-        <div>(empty)</div>
-                                        )}
-    </>
+                                        {!model.networkAddress.ipv6.primaryDns &&
+                                            !model.networkAddress.ipv6.secondaryDns && <div>(empty)</div>}
+                                    </>
                                 )}
                             </DescriptionListDescription>
                         </DescriptionListGroup>
@@ -232,22 +237,19 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                     <DescriptionListGroup>
                         <DescriptionListTerm>{_("NTP Servers")}</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.networkServices.ntp.autoConfig
-                                ? _("Automatic")
-                                : (model.networkServices.ntp.servers.length > 0
-                                    ? (
-                                    model.networkServices.ntp.servers.map((server, index) => (
-                                        <div key={index}>{server}</div>
-                                    ))
-                                )
-: (
-    <span>{_("(empty)")}</span>
-                                )
+                            {model.networkServices.ntp.autoConfig ? (
+                                _("Automatic")
+                            ) : model.networkServices.ntp.servers.length > 0 ? (
+                                model.networkServices.ntp.servers.map((server, index) => (
+                                    <div key={index}>{server}</div>
+                                ))
+                            ) : (
+                                <span>{_("(empty)")}</span>
                             )}
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById('wizard-step-4')}
+                                onClick={() => goToStepById("wizard-step-4")}
                                 aria-label={_("Edit network services")}
                             />
                         </DescriptionListDescription>
@@ -255,25 +257,29 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                     <DescriptionListGroup>
                         <DescriptionListTerm>{_("Proxy")}</DescriptionListTerm>
                         <DescriptionListDescription>
-                            {model.networkServices.proxy.enabled
-                                ? (
-                                    <>
-                                        {model.networkServices.proxy.hostname && model.networkServices.proxy.port
+                            {model.networkServices.proxy.enabled ? (
+                                <>
+                                    {model.networkServices.proxy.hostname && model.networkServices.proxy.port
                                         ? `${model.networkServices.proxy.protocol}://${model.networkServices.proxy.hostname}:${model.networkServices.proxy.port}`
                                         : _("(incomplete configuration)")}
-                                        {model.networkServices.proxy.username && (
-                                        <div>{_("Username: ")} {model.networkServices.proxy.username}</div>
+                                    {model.networkServices.proxy.username && (
+                                        <div>
+                                            {_("Username: ")} {model.networkServices.proxy.username}
+                                        </div>
                                     )}
-                                        {model.networkServices.proxy.noProxy && (
-                                        <div>{_("No proxy: ")} {model.networkServices.proxy.noProxy}</div>
+                                    {model.networkServices.proxy.noProxy && (
+                                        <div>
+                                            {_("No proxy: ")} {model.networkServices.proxy.noProxy}
+                                        </div>
                                     )}
-                                    </>
-                            )
-: _("Not configured")}
+                                </>
+                            ) : (
+                                _("Not configured")
+                            )}
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById('wizard-step-4')}
+                                onClick={() => goToStepById("wizard-step-4")}
                                 aria-label={_("Edit network services")}
                             />
                         </DescriptionListDescription>
@@ -287,7 +293,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById(hasEnrollmentScripts ? 'wizard-step-6' : 'wizard-step-5')}
+                                onClick={() => goToStepById(hasEnrollmentScripts ? "wizard-step-6" : "wizard-step-5")}
                                 aria-label={_("Edit connectivity test host")}
                             />
                         </DescriptionListDescription>
@@ -296,7 +302,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                     {hasEnrollmentScripts && (
                         <>
                             {/* Enrollment Section */}
-                            {config?.enrollmentServices?.map(service => {
+                            {config?.enrollmentServices?.map((service) => {
                                 const isSelected = model.enrollment.selectedServices.includes(service.id);
 
                                 if (!isSelected) {
@@ -309,7 +315,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                                 <Button
                                                     variant="link"
                                                     icon={<PencilAltIcon />}
-                                                    onClick={() => goToStepById('wizard-step-5')}
+                                                    onClick={() => goToStepById("wizard-step-5")}
                                                     aria-label={_("Edit enrollment services")}
                                                 />
                                             </DescriptionListDescription>
@@ -328,7 +334,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                                 <Button
                                                     variant="link"
                                                     icon={<PencilAltIcon />}
-                                                    onClick={() => goToStepById('wizard-step-5')}
+                                                    onClick={() => goToStepById("wizard-step-5")}
                                                     aria-label={_("Edit enrollment services")}
                                                 />
                                             </DescriptionListDescription>
@@ -350,28 +356,30 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                             {Object.keys(credentials).length > 0 && (
                                                 <div>
                                                     {Object.entries(credentials)
-                                                        .filter(([key]) => !key.startsWith('_'))
+                                                        .filter(([key]) => !key.startsWith("_"))
                                                         .map(([key, value]) => {
-                                                        // Hide password/token fields
-                                                        const isSecret = key.toLowerCase().includes('password') ||
-                                                                       key.toLowerCase().includes('token') ||
-                                                                       key.toLowerCase().includes('key');
-                                                        const displayValue = isSecret && value
-                                                            ? '•'.repeat(8)
-                                                            : String(value || _("(empty)"));
+                                                            // Hide password/token fields
+                                                            const isSecret =
+                                                                key.toLowerCase().includes("password") ||
+                                                                key.toLowerCase().includes("token") ||
+                                                                key.toLowerCase().includes("key");
+                                                            const displayValue =
+                                                                isSecret && value
+                                                                    ? "•".repeat(8)
+                                                                    : String(value || _("(empty)"));
 
-                                                        return (
-                                                            <div key={key}>
-                                                                {key}: {displayValue}
-                                                            </div>
-                                                        );
-                                                    })}
+                                                            return (
+                                                                <div key={key}>
+                                                                    {key}: {displayValue}
+                                                                </div>
+                                                            );
+                                                        })}
                                                 </div>
                                             )}
                                             <Button
                                                 variant="link"
                                                 icon={<PencilAltIcon />}
-                                                onClick={() => goToStepById('wizard-step-5')}
+                                                onClick={() => goToStepById("wizard-step-5")}
                                                 aria-label={_("Edit enrollment services")}
                                             />
                                         </DescriptionListDescription>
@@ -387,15 +395,21 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <DescriptionListTerm>{_("Device labels")}</DescriptionListTerm>
                             <DescriptionListDescription>
                                 {model.labels.deviceLabels.map((entry, i) => (
-                                    <div key={i}>{entry.key} = {entry.value}</div>
+                                    <div key={i}>
+                                        {entry.key} = {entry.value}
+                                    </div>
                                 ))}
                                 {model.labels.systemInfoMappings.map((entry, i) => (
-                                    <div key={i}>{entry.labelKey} &larr; {entry.systemInfoField}</div>
+                                    <div key={i}>
+                                        {entry.labelKey} &larr; {entry.systemInfoField}
+                                    </div>
                                 ))}
                                 <Button
                                     variant="link"
                                     icon={<PencilAltIcon />}
-                                    onClick={() => goToStepById(hasEnrollmentScripts ? 'wizard-step-7' : 'wizard-step-6')}
+                                    onClick={() =>
+                                        goToStepById(hasEnrollmentScripts ? "wizard-step-7" : "wizard-step-6")
+                                    }
                                     aria-label={_("Edit device labels")}
                                 />
                             </DescriptionListDescription>

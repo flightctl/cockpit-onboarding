@@ -63,7 +63,7 @@ export interface EthernetConfig {
 export interface SkipWhenCondition {
     allPathsExist?: string[];
     anyPathExists?: string[];
-    action: 'skip' | 'connectivityOnly';
+    action: "skip" | "connectivityOnly";
     reason: string;
 }
 
@@ -88,7 +88,7 @@ export interface LedConfig {
     states?: Record<LedState, string>;
 }
 
-export type LedState = 'ready' | 'in-progress' | 'applying' | 'success' | 'error' | 'off';
+export type LedState = "ready" | "in-progress" | "applying" | "success" | "error" | "off";
 
 // ========== Runtime State Types (OnboardingSession) ==========
 
@@ -108,10 +108,10 @@ export interface HostnameState {
 
 export interface NetworkInterfaceState {
     selectedInterface: string | null;
-    interfaceType: 'ethernet' | 'wifi' | null;
+    interfaceType: "ethernet" | "wifi" | null;
     wifiSsid: string | null;
     wifiPassword: string | null;
-    wifiSecurity: 'none' | 'wep' | 'wpa' | null;
+    wifiSecurity: "none" | "wep" | "wpa" | null;
     vlanId: number | null;
 }
 
@@ -121,7 +121,7 @@ export interface NetworkAddressState {
 }
 
 export interface IPv4Config {
-    method: 'auto' | 'static' | 'disabled';
+    method: "auto" | "static" | "disabled";
     address: string | null;
     subnetMask: string | null;
     gateway: string | null;
@@ -131,7 +131,7 @@ export interface IPv4Config {
 }
 
 export interface IPv6Config {
-    method: 'auto' | 'dhcp' | 'static' | 'disabled';
+    method: "auto" | "dhcp" | "static" | "disabled";
     address: string | null; // with /prefix
     gateway: string | null;
     autoDns: boolean;
@@ -149,7 +149,7 @@ export interface NtpConfig {
     servers: string[];
 }
 
-export type ProxyProtocol = 'http' | 'https' | 'socks5';
+export type ProxyProtocol = "http" | "https" | "socks5";
 
 export interface ProxyConfig {
     enabled: boolean;
@@ -177,7 +177,7 @@ export interface LabelsState {
 
 export interface NetworkInterface {
     name: string;
-    type: 'ethernet' | 'wifi' | 'other';
+    type: "ethernet" | "wifi" | "other";
     macAddress: string;
     state: number;
     ipv4Address: string | null;
@@ -188,7 +188,7 @@ export interface NetworkInterface {
 export interface WifiNetwork {
     ssid: string;
     strength: number;
-    security: 'none' | 'wep' | 'wpa';
+    security: "none" | "wep" | "wpa";
     frequency: number;
 }
 

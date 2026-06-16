@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import cockpit from 'cockpit';
+import React, { useEffect, useState } from "react";
+import cockpit from "cockpit";
 
 import { Progress } from "@patternfly/react-core/dist/esm/components/Progress/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
@@ -7,22 +7,22 @@ import { List, ListItem } from "@patternfly/react-core/dist/esm/components/List/
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 import { Card, CardBody } from "@patternfly/react-core/dist/esm/components/Card/index.js";
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
-import { CheckCircleIcon, ExclamationCircleIcon, InProgressIcon, OutlinedClockIcon } from '@patternfly/react-icons';
-import { useModelContext } from '../model-context';
-import { systemConfigurationService } from '../system-config';
-import { loadConfig } from '../config-loader';
-import { getSetupInterface, applyNetworkConfiguration, rollbackNetworkConfiguration } from '../services/network';
-import { evaluateSkipConditions, SkipResult } from '../services/skip-conditions';
-import { writeAttemptedMarker } from '../attempted-marker';
-import { SCRIPT_RUN_APPLY_ENROLL } from '../paths';
-import { armWatchdog } from '../services/watchdog';
-import { testNetworkConnectivity, verifyServiceConnectivity, CancellationSignal } from '../services/connectivity';
-import { buildEnrollmentParams, executeEnrollmentScript, finalizeEnrollment } from '../services/enrollment';
-import { createSecureTempFile } from '../services/spawn-helpers';
-import { Interface } from '../../pkg/networkmanager/interfaces.js';
-import { EnrollmentService } from '../types';
+import { CheckCircleIcon, ExclamationCircleIcon, InProgressIcon, OutlinedClockIcon } from "@patternfly/react-icons";
+import { useModelContext } from "../model-context";
+import { systemConfigurationService } from "../system-config";
+import { loadConfig } from "../config-loader";
+import { getSetupInterface, applyNetworkConfiguration, rollbackNetworkConfiguration } from "../services/network";
+import { evaluateSkipConditions, SkipResult } from "../services/skip-conditions";
+import { writeAttemptedMarker } from "../attempted-marker";
+import { SCRIPT_RUN_APPLY_ENROLL } from "../paths";
+import { armWatchdog } from "../services/watchdog";
+import { testNetworkConnectivity, verifyServiceConnectivity, CancellationSignal } from "../services/connectivity";
+import { buildEnrollmentParams, executeEnrollmentScript, finalizeEnrollment } from "../services/enrollment";
+import { createSecureTempFile } from "../services/spawn-helpers";
+import { Interface } from "../../pkg/networkmanager/interfaces.js";
+import { EnrollmentService } from "../types";
 
-type StepStatus = 'pending' | 'running' | 'success' | 'failed' | 'warning' | 'delegated';
+type StepStatus = "pending" | "running" | "success" | "failed" | "warning" | "delegated";
 
 interface Step {
     id: string;
@@ -34,7 +34,7 @@ interface Step {
 }
 
 interface ResultItem {
-    type: 'header' | 'output';
+    type: "header" | "output";
     content: string;
 }
 
@@ -42,7 +42,7 @@ const _ = cockpit.gettext;
 
 // Utility function to escape HTML in user output
 const escapeHtml = (text: string): string => {
-    const div = document.createElement('div');
+    const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML;
 };
@@ -61,24 +61,35 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
 
     const getStepIcon = (status: StepStatus) => {
         switch (status) {
-            case 'pending': return null;
-            case 'running': return <InProgressIcon className="pf-v6-u-animation-spin" />;
-            case 'success': return <CheckCircleIcon color="var(--pf-v6-global--success-color--100)" />;
-            case 'delegated': return <OutlinedClockIcon color="var(--pf-v6-global--info-color--100)" />;
-            case 'failed':
-            case 'warning': return <ExclamationCircleIcon color="var(--pf-v6-global--danger-color--100)" />;
-            default: return null;
+            case "pending":
+                return null;
+            case "running":
+                return <InProgressIcon className="pf-v6-u-animation-spin" />;
+            case "success":
+                return <CheckCircleIcon color="var(--pf-v6-global--success-color--100)" />;
+            case "delegated":
+                return <OutlinedClockIcon color="var(--pf-v6-global--info-color--100)" />;
+            case "failed":
+            case "warning":
+                return <ExclamationCircleIcon color="var(--pf-v6-global--danger-color--100)" />;
+            default:
+                return null;
         }
     };
 
     const getStepTextColor = (status: StepStatus) => {
         switch (status) {
-            case 'success': return 'var(--pf-v6-global--success-color--100)';
-            case 'failed':
-            case 'warning': return 'var(--pf-v6-global--danger-color--100)';
-            case 'running': return 'var(--pf-v6-global--primary-color--100)';
-            case 'delegated': return 'var(--pf-v6-global--info-color--100)';
-            default: return 'inherit';
+            case "success":
+                return "var(--pf-v6-global--success-color--100)";
+            case "failed":
+            case "warning":
+                return "var(--pf-v6-global--danger-color--100)";
+            case "running":
+                return "var(--pf-v6-global--primary-color--100)";
+            case "delegated":
+                return "var(--pf-v6-global--info-color--100)";
+            default:
+                return "inherit";
         }
     };
 
@@ -91,9 +102,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
 
             // Filter to only include services that the user selected
             const selectedServiceIds = model.enrollment.selectedServices || [];
-            const servicesToEnroll = configuredServices.filter(service =>
-                selectedServiceIds.includes(service.id)
-            );
+            const servicesToEnroll = configuredServices.filter((service) => selectedServiceIds.includes(service.id));
 
             setEnrollmentServices(servicesToEnroll);
 
@@ -107,33 +116,33 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             // Create initial steps
             const initialSteps: Step[] = [
                 {
-                    id: 'apply-config',
+                    id: "apply-config",
                     name: _("Applying configuration changes"),
-                    status: 'pending',
-                    isBuiltIn: true
+                    status: "pending",
+                    isBuiltIn: true,
                 },
                 {
-                    id: 'test-connectivity',
+                    id: "test-connectivity",
                     name: _("Testing network connectivity"),
-                    status: 'pending',
-                    isBuiltIn: true
-                }
+                    status: "pending",
+                    isBuiltIn: true,
+                },
             ];
 
             // Add enrollment service steps (respecting skipWhen results)
             servicesToEnroll.forEach((service) => {
                 const skip = skipMap[service.id];
 
-                if (skip?.action === 'skip') {
+                if (skip?.action === "skip") {
                     return;
                 }
 
-                if (skip?.action === 'connectivityOnly') {
+                if (skip?.action === "connectivityOnly") {
                     initialSteps.push({
                         id: `enroll-${service.id}`,
-                        name: _("Verifying connectivity to {{serviceName}}").replace('{{serviceName}}', service.name),
-                        status: 'pending',
-                        isBuiltIn: false
+                        name: _("Verifying connectivity to {{serviceName}}").replace("{{serviceName}}", service.name),
+                        status: "pending",
+                        isBuiltIn: false,
                     });
                     return;
                 }
@@ -142,74 +151,83 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                 initialSteps.push({
                     id: `enroll-${service.id}`,
                     name: isUsingExisting
-                        ? _("Restarting {{serviceName}} agent").replace('{{serviceName}}', service.name)
-                        : _("Enrolling into {{serviceName}}").replace('{{serviceName}}', service.name),
-                    status: 'pending',
-                    isBuiltIn: false
+                        ? _("Restarting {{serviceName}} agent").replace("{{serviceName}}", service.name)
+                        : _("Enrolling into {{serviceName}}").replace("{{serviceName}}", service.name),
+                    status: "pending",
+                    isBuiltIn: false,
                 });
             });
 
             // Add finalize step
             initialSteps.push({
-                id: 'finalize',
+                id: "finalize",
                 name: servicesToEnroll.length > 0 ? _("Finalizing enrollment") : _("Finalizing configuration"),
-                status: 'pending',
-                isBuiltIn: true
+                status: "pending",
+                isBuiltIn: true,
             });
 
             setSteps(initialSteps);
         } catch (error) {
-            console.error('Failed to initialize enrollment steps:', error);
+            console.error("Failed to initialize enrollment steps:", error);
             // Fallback to basic steps if initialization fails
             setSteps([
                 {
-                    id: 'apply-config',
+                    id: "apply-config",
                     name: _("Applying configuration changes"),
-                    status: 'pending',
-                    isBuiltIn: true
+                    status: "pending",
+                    isBuiltIn: true,
                 },
                 {
-                    id: 'test-connectivity',
+                    id: "test-connectivity",
                     name: _("Testing network connectivity"),
-                    status: 'pending',
-                    isBuiltIn: true
+                    status: "pending",
+                    isBuiltIn: true,
                 },
                 {
-                    id: 'finalize',
+                    id: "finalize",
                     name: _("Finalizing configuration"),
-                    status: 'pending',
-                    isBuiltIn: true
-                }
+                    status: "pending",
+                    isBuiltIn: true,
+                },
             ]);
         }
     };
 
     // Execute a single step
-    const executeStep = async (stepId: string, onOutput?: (output: string) => void): Promise<{ success: boolean; output: string; deviceUrl?: string }> => {
-        const step = steps.find(s => s.id === stepId);
-        if (!step) return { success: false, output: 'Step not found' };
+    const executeStep = async (
+        stepId: string,
+        onOutput?: (output: string) => void
+    ): Promise<{ success: boolean; output: string; deviceUrl?: string }> => {
+        const step = steps.find((s) => s.id === stepId);
+        if (!step) {return { success: false, output: "Step not found" }}
 
         // Update step to running
-        setSteps(prev => prev.map(s => s.id === stepId ? { ...s, status: 'running' } : s));
+        setSteps((prev) => prev.map((s) => (s.id === stepId ? { ...s, status: "running" } : s)));
 
         try {
             switch (stepId) {
-                case 'apply-config':
+                case "apply-config":
                     return await applyConfiguration(onOutput);
-                case 'test-connectivity':
+                case "test-connectivity":
                     return await testConnectivity(onOutput);
-                case 'finalize':
+                case "finalize":
                     return await finalizeEnrollment(model.hostname.value);
                 default:
                     // Handle enrollment service execution
-                    if (stepId.startsWith('enroll-')) {
-                        const serviceId = stepId.replace('enroll-', '');
-                        const service = enrollmentServices.find(s => s.id === serviceId);
+                    if (stepId.startsWith("enroll-")) {
+                        const serviceId = stepId.replace("enroll-", "");
+                        const service = enrollmentServices.find((s) => s.id === serviceId);
                         if (service) {
                             const skip = skipResults[serviceId];
-                            if (skip?.action === 'connectivityOnly') {
+                            if (skip?.action === "connectivityOnly") {
                                 const endpoint = model.enrollment.endpoints[serviceId] || service.endpoint.url;
-                                return await verifyServiceConnectivity(service, endpoint, skip, signalRef.current, onOutput);
+                                return await verifyServiceConnectivity(
+                                    service,
+                                    endpoint,
+                                    skip,
+                                    signalRef.current,
+                                    onOutput
+                                );
                             }
 
                             const params = buildEnrollmentParams(model, service);
@@ -221,7 +239,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                             );
                         }
                     }
-                    return { success: false, output: 'Unknown step' };
+                    return { success: false, output: "Unknown step" };
             }
         } catch (error) {
             return { success: false, output: String(error) };
@@ -229,9 +247,11 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
     };
 
     // Built-in step implementations
-    const applyConfiguration = async (onOutput?: (output: string) => void): Promise<{ success: boolean; output: string }> => {
+    const applyConfiguration = async (
+        onOutput?: (output: string) => void
+    ): Promise<{ success: boolean; output: string }> => {
         try {
-            onOutput?.('• Applying configuration updates...');
+            onOutput?.("• Applying configuration updates...");
 
             const result = await systemConfigurationService.applySystemConfiguration(networkManager, model);
 
@@ -239,36 +259,40 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                 setSingleNic(true);
             }
             networkAppliedRef.current = true;
-            updateModel('networkInterface', { wifiPassword: null });
+            updateModel("networkInterface", { wifiPassword: null });
 
-            const summary = result.success
-                ? ' Success.'
-                : ' Failed.';
+            const summary = result.success ? " Success." : " Failed.";
 
-            const indentedResults = result.results.map(r => `  ${r}`).join('\n');
+            const indentedResults = result.results.map((r) => `  ${r}`).join("\n");
             const fullOutput = `${summary}\n${indentedResults}`;
             onOutput?.(fullOutput);
 
             if (result.singleNic) {
-                onOutput?.(_('\n  Note: Network changes applied on the interface serving this browser session. Connection may be interrupted.'));
+                onOutput?.(
+                    _(
+                        "\n  Note: Network changes applied on the interface serving this browser session. Connection may be interrupted."
+                    )
+                );
             }
 
             return {
                 success: result.success,
-                output: fullOutput
+                output: fullOutput,
             };
         } catch (error) {
             const errorMsg = `failed: ${String(error)}`;
-            onOutput?.(errorMsg + '\n');
+            onOutput?.(errorMsg + "\n");
             return {
                 success: false,
-                output: errorMsg
+                output: errorMsg,
             };
         }
     };
 
-    const testConnectivity = async (onOutput?: (output: string) => void): Promise<{ success: boolean; output: string }> => {
-        const testHost = model.connectivityTestHost || 'www.google.com';
+    const testConnectivity = async (
+        onOutput?: (output: string) => void
+    ): Promise<{ success: boolean; output: string }> => {
+        const testHost = model.connectivityTestHost || "www.google.com";
         const iface = model.networkInterface.selectedInterface;
         return testNetworkConnectivity(testHost, iface, signalRef.current, onOutput);
     };
@@ -290,38 +314,38 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
     // cockpit-bridge exit.
     const executeSingleNicDelegation = async (resultsBuffer: ResultItem[]) => {
         const onOutput = (output: string) => {
-            resultsBuffer.push({ type: 'output', content: output });
+            resultsBuffer.push({ type: "output", content: output });
             setResults([...resultsBuffer]);
         };
 
         // -- apply-config step: hostname + NTP only (skip network) --
-        setSteps(prev => prev.map(s => s.id === 'apply-config' ? { ...s, status: 'running' } : s));
-        resultsBuffer.push({ type: 'header', content: _("Applying configuration changes") });
+        setSteps((prev) => prev.map((s) => (s.id === "apply-config" ? { ...s, status: "running" } : s)));
+        resultsBuffer.push({ type: "header", content: _("Applying configuration changes") });
         setResults([...resultsBuffer]);
 
         try {
-            onOutput('Applying hostname and NTP configuration...');
-            const configResult = await systemConfigurationService.applySystemConfiguration(
-                networkManager, model, { skipNetwork: true }
-            );
+            onOutput("Applying hostname and NTP configuration...");
+            const configResult = await systemConfigurationService.applySystemConfiguration(networkManager, model, {
+                skipNetwork: true,
+            });
             if (!configResult.success) {
-                onOutput('Failed to apply hostname/NTP configuration');
-                setSteps(prev => prev.map(s => s.id === 'apply-config' ? { ...s, status: 'failed' } : s));
-                updateModel('enrollmentProgress', { executionState: 'failed' });
+                onOutput("Failed to apply hostname/NTP configuration");
+                setSteps((prev) => prev.map((s) => (s.id === "apply-config" ? { ...s, status: "failed" } : s)));
+                updateModel("enrollmentProgress", { executionState: "failed" });
                 return;
             }
-            configResult.results.forEach(r => onOutput(`  ${r}`));
+            configResult.results.forEach((r) => onOutput(`  ${r}`));
 
             // Create NM profile without activating
-            onOutput('Creating network profile (activation deferred)...');
+            onOutput("Creating network profile (activation deferred)...");
             await applyNetworkConfiguration(networkManager, model, true);
-            onOutput(' Network profile created successfully.');
+            onOutput(" Network profile created successfully.");
 
-            setSteps(prev => prev.map(s => s.id === 'apply-config' ? { ...s, status: 'success' } : s));
+            setSteps((prev) => prev.map((s) => (s.id === "apply-config" ? { ...s, status: "success" } : s)));
         } catch (error) {
             onOutput(`Failed: ${String(error)}`);
-            setSteps(prev => prev.map(s => s.id === 'apply-config' ? { ...s, status: 'failed' } : s));
-            updateModel('enrollmentProgress', { executionState: 'failed' });
+            setSteps((prev) => prev.map((s) => (s.id === "apply-config" ? { ...s, status: "failed" } : s)));
+            updateModel("enrollmentProgress", { executionState: "failed" });
             return;
         }
 
@@ -330,67 +354,57 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         const tempFilesToCleanup: string[] = [];
         for (const service of enrollmentServices) {
             const skip = skipResults[service.id];
-            if (skip?.action === 'skip' || skip?.action === 'connectivityOnly') {
+            if (skip?.action === "skip" || skip?.action === "connectivityOnly") {
                 continue;
             }
             const params = buildEnrollmentParams(model, service);
-            const pf = await createSecureTempFile(
-                JSON.stringify(params),
-                `.enrollment-${service.id}-`,
-            );
+            const pf = await createSecureTempFile(JSON.stringify(params), `.enrollment-${service.id}-`);
             tempFilesToCleanup.push(pf);
             enrollmentScriptEntries.push({ scriptPath: service.scriptPath, paramsFile: pf });
         }
 
         // -- Write master params JSON for apply-and-enroll.sh --
-        const ifaceName = model.networkInterface.selectedInterface || '';
+        const ifaceName = model.networkInterface.selectedInterface || "";
         const masterParams = {
             connectionId: `flightctl-onboarding-${ifaceName}`,
             interfaceName: ifaceName,
             enrollmentScripts: enrollmentScriptEntries,
             hostname: model.hostname.value,
-            connectivityTestHost: model.connectivityTestHost || 'www.google.com',
+            connectivityTestHost: model.connectivityTestHost || "www.google.com",
         };
-        const masterParamsFile = await createSecureTempFile(
-            JSON.stringify(masterParams),
-            '.onboarding-apply-',
-        );
+        const masterParamsFile = await createSecureTempFile(JSON.stringify(masterParams), ".onboarding-apply-");
         tempFilesToCleanup.push(masterParamsFile);
 
         // -- Mark remaining steps as delegated --
-        setSteps(prev => prev.map(s => {
-            if (s.id === 'apply-config') return s;
-            return { ...s, status: 'delegated' };
-        }));
+        setSteps((prev) =>
+            prev.map((s) => {
+                if (s.id === "apply-config") {return s}
+                return { ...s, status: "delegated" };
+            })
+        );
 
         // -- Launch systemd-run transient unit --
         resultsBuffer.push({
-            type: 'header',
-            content: _("Delegating network activation and enrollment to background service")
+            type: "header",
+            content: _("Delegating network activation and enrollment to background service"),
         });
         setResults([...resultsBuffer]);
 
         try {
-            await cockpit.spawn([
-                'sudo',
-                SCRIPT_RUN_APPLY_ENROLL,
-                masterParamsFile
-            ], { err: 'out' });
+            await cockpit.spawn(["sudo", SCRIPT_RUN_APPLY_ENROLL, masterParamsFile], { err: "out" });
         } catch (error) {
-            console.error('Failed to launch systemd-run:', error);
+            console.error("Failed to launch systemd-run:", error);
             onOutput(`Failed to launch background service: ${String(error)}`);
             for (const f of tempFilesToCleanup) {
-                cockpit.spawn(['rm', '-f', f], { err: 'message' }).catch(() => {});
+                cockpit.spawn(["rm", "-f", f], { err: "message" }).catch(() => {});
             }
-            setSteps(prev => prev.map(s =>
-                s.status === 'delegated' ? { ...s, status: 'failed' } : s
-            ));
-            updateModel('enrollmentProgress', { executionState: 'failed' });
+            setSteps((prev) => prev.map((s) => (s.status === "delegated" ? { ...s, status: "failed" } : s)));
+            updateModel("enrollmentProgress", { executionState: "failed" });
             return;
         }
 
         setSingleNic(true);
-        updateModel('enrollmentProgress', { executionState: 'success', overallProgress: 100 });
+        updateModel("enrollmentProgress", { executionState: "success", overallProgress: 100 });
     };
 
     // Main execution function
@@ -398,11 +412,11 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         setHasStarted(true);
         shouldCancelRef.current = false;
         signalRef.current = { cancelled: false };
-        updateModel('enrollmentProgress', { executionState: 'running' });
+        updateModel("enrollmentProgress", { executionState: "running" });
 
         await writeAttemptedMarker(model);
-        const testHost = model.connectivityTestHost || 'www.google.com';
-        const watchdogTimeout = model.networkInterface.interfaceType === 'wifi' ? 240 : 600;
+        const testHost = model.connectivityTestHost || "www.google.com";
+        const watchdogTimeout = model.networkInterface.interfaceType === "wifi" ? 240 : 600;
         await armWatchdog(testHost, watchdogTimeout);
 
         const resultsBuffer: ResultItem[] = [];
@@ -419,42 +433,44 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
 
         for (const step of steps) {
             if (shouldCancelRef.current) {
-                console.log('Enrollment cancelled by user');
-                updateModel('enrollmentProgress', { executionState: 'failed' });
+                console.log("Enrollment cancelled by user");
+                updateModel("enrollmentProgress", { executionState: "failed" });
                 return;
             }
 
             const stepHeader: ResultItem = {
-                type: 'header',
-                content: step.name
+                type: "header",
+                content: step.name,
             };
             resultsBuffer.push(stepHeader);
             setResults([...resultsBuffer]);
 
             const onOutput = (output: string) => {
                 resultsBuffer.push({
-                    type: 'output',
-                    content: output
+                    type: "output",
+                    content: output,
                 });
                 setResults([...resultsBuffer]);
             };
 
             const result = await executeStep(step.id, onOutput);
 
-            setSteps(prev => prev.map(s => {
-                if (s.id === step.id) {
-                    const updatedStep: Step = {
-                        ...s,
-                        status: result.success ? 'success' : 'failed',
-                        output: result.output
-                    };
-                    if (result.deviceUrl) {
-                        updatedStep.deviceUrl = result.deviceUrl;
+            setSteps((prev) =>
+                prev.map((s) => {
+                    if (s.id === step.id) {
+                        const updatedStep: Step = {
+                            ...s,
+                            status: result.success ? "success" : "failed",
+                            output: result.output,
+                        };
+                        if (result.deviceUrl) {
+                            updatedStep.deviceUrl = result.deviceUrl;
+                        }
+                        return updatedStep;
                     }
-                    return updatedStep;
-                }
-                return s;
-            }));
+                    return s;
+                })
+            );
 
             if (result.success) {
                 completedSteps++;
@@ -462,24 +478,24 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                 if (networkAppliedRef.current) {
                     try {
                         const rollbackResults = await rollbackNetworkConfiguration();
-                        rollbackResults.forEach(msg => {
-                            resultsBuffer.push({ type: 'output', content: `  ${msg}` });
+                        rollbackResults.forEach((msg) => {
+                            resultsBuffer.push({ type: "output", content: `  ${msg}` });
                         });
                         setResults([...resultsBuffer]);
                     } catch (rollbackError) {
-                        console.error('Network rollback failed:', rollbackError);
+                        console.error("Network rollback failed:", rollbackError);
                     }
                 }
-                updateModel('enrollmentProgress', { executionState: 'failed' });
+                updateModel("enrollmentProgress", { executionState: "failed" });
                 return;
             }
 
-            updateModel('enrollmentProgress', {
-                overallProgress: Math.round((completedSteps / totalSteps) * 100)
+            updateModel("enrollmentProgress", {
+                overallProgress: Math.round((completedSteps / totalSteps) * 100),
             });
         }
 
-        updateModel('enrollmentProgress', { executionState: 'success' });
+        updateModel("enrollmentProgress", { executionState: "success" });
     };
 
     // Note: cleanup and reboot/finish actions are handled by the wizard footer in app.tsx
@@ -487,16 +503,16 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
     // Set up cancellation handler
     useEffect(() => {
         cancelEnrollmentRef.current = () => {
-            console.log('Cancellation requested');
+            console.log("Cancellation requested");
             shouldCancelRef.current = true;
             signalRef.current.cancelled = true;
 
             if (signalRef.current.process) {
-                console.log('Aborting running process');
+                console.log("Aborting running process");
                 try {
                     signalRef.current.process.close();
                 } catch (error) {
-                    console.error('Error aborting process:', error);
+                    console.error("Error aborting process:", error);
                 }
                 signalRef.current.process = undefined;
             }
@@ -520,7 +536,8 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [steps, hasStarted]);
 
-    const overallProgress = steps.length > 0 ? Math.round((steps.filter(s => s.status === 'success').length / steps.length) * 100) : 0;
+    const overallProgress =
+        steps.length > 0 ? Math.round((steps.filter((s) => s.status === "success").length / steps.length) * 100) : 0;
     const executionState = model.enrollmentProgress.executionState;
 
     const hasEnrollmentServices = enrollmentServices.length > 0;
@@ -538,48 +555,65 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             <StackItem>
                 <Card>
                     <CardBody>
-                        <Title headingLevel="h3" size="md">{_("Overall Progress")}</Title>
+                        <Title headingLevel="h3" size="md">
+                            {_("Overall Progress")}
+                        </Title>
                         <Progress
                             value={overallProgress}
                             size="lg"
-                            variant={executionState === 'failed' ? 'danger' : 'success'}
+                            variant={executionState === "failed" ? "danger" : "success"}
                         />
 
-                        <Title headingLevel="h3" size="md" style={{ marginTop: '1rem' }}>{_("Steps")}</Title>
+                        <Title headingLevel="h3" size="md" style={{ marginTop: "1rem" }}>
+                            {_("Steps")}
+                        </Title>
                         <List isPlain>
                             {steps.map((step) => {
-                                const serviceId = step.id.startsWith('enroll-') ? step.id.replace('enroll-', '') : null;
-                                const service = serviceId ? enrollmentServices.find(s => s.id === serviceId) : null;
+                                const serviceId = step.id.startsWith("enroll-") ? step.id.replace("enroll-", "") : null;
+                                const service = serviceId ? enrollmentServices.find((s) => s.id === serviceId) : null;
 
                                 return (
                                     <ListItem key={step.id}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <span style={{ minWidth: '20px' }}>
-                                                {getStepIcon(step.status)}
-                                            </span>
-                                            <span style={{
-                                                color: getStepTextColor(step.status),
-                                                flex: 1
-                                            }}
+                                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                            <span style={{ minWidth: "20px" }}>{getStepIcon(step.status)}</span>
+                                            <span
+                                                style={{
+                                                    color: getStepTextColor(step.status),
+                                                    flex: 1,
+                                                }}
                                             >
                                                 {step.name}
                                                 {step.deviceUrl && service && (
                                                     <>
                                                         {" ("}
-                                                        <a href={step.deviceUrl} target="_blank" rel="noopener noreferrer">
+                                                        <a
+                                                            href={step.deviceUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
                                                             {_("view system")}
                                                         </a>
                                                         )
                                                     </>
                                                 )}
                                             </span>
-                                            {step.status === 'running' && (
-                                                <span style={{ fontStyle: 'italic', color: 'var(--pf-v6-global--Color--200)' }}>
+                                            {step.status === "running" && (
+                                                <span
+                                                    style={{
+                                                        fontStyle: "italic",
+                                                        color: "var(--pf-v6-global--Color--200)",
+                                                    }}
+                                                >
                                                     {_("Running...")}
                                                 </span>
                                             )}
-                                            {step.status === 'delegated' && (
-                                                <span style={{ fontStyle: 'italic', color: 'var(--pf-v6-global--info-color--100)' }}>
+                                            {step.status === "delegated" && (
+                                                <span
+                                                    style={{
+                                                        fontStyle: "italic",
+                                                        color: "var(--pf-v6-global--info-color--100)",
+                                                    }}
+                                                >
                                                     {_("Delegated to background service")}
                                                 </span>
                                             )}
@@ -589,19 +623,23 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                             })}
                         </List>
 
-                        {executionState === 'failed' && (
+                        {executionState === "failed" && (
                             <Alert variant="danger" title={_("Enrollment failed")}>
-                                {_("The enrollment process was cancelled or failed. Network changes have been rolled back. Please check the results above and try again.")}
+                                {_(
+                                    "The enrollment process was cancelled or failed. Network changes have been rolled back. Please check the results above and try again."
+                                )}
                             </Alert>
                         )}
-                        {executionState === 'success' && !singleNic && (
+                        {executionState === "success" && !singleNic && (
                             <Alert variant="success" title={_("Configuration completed successfully")}>
                                 {_("Your system has been configured successfully.")}
                             </Alert>
                         )}
-                        {executionState === 'success' && singleNic && (
+                        {executionState === "success" && singleNic && (
                             <Alert variant="info" title={_("Onboarding continues in the background")}>
-                                {_("Network activation and enrollment have been delegated to a background service. Your browser connection will be lost when the new network configuration is applied. Check /var/log/cockpit-system-onboarding-apply.log on the device for progress.")}
+                                {_(
+                                    "Network activation and enrollment have been delegated to a background service. Your browser connection will be lost when the new network configuration is applied. Check /var/log/cockpit-system-onboarding-apply.log on the device for progress."
+                                )}
                             </Alert>
                         )}
                     </CardBody>
@@ -610,20 +648,24 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
 
             <StackItem>
                 {results.length > 0 && (
-                    <pre style={{
-                        fontFamily: 'monospace',
-                        fontSize: '0.9rem',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        backgroundColor: 'var(--pf-v6-global--BackgroundColor--dark-100)',
-                        padding: '0',
-                        overflowY: 'auto'
-                    }}
+                    <pre
+                        style={{
+                            fontFamily: "monospace",
+                            fontSize: "0.9rem",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                            backgroundColor: "var(--pf-v6-global--BackgroundColor--dark-100)",
+                            padding: "0",
+                            overflowY: "auto",
+                        }}
                     >
                         {results.map((item, index) => {
-                            if (item.type === 'header') {
+                            if (item.type === "header") {
                                 return (
-                                    <div key={index} style={{ fontWeight: 'bold', marginTop: index > 0 ? '1rem' : '0' }}>
+                                    <div
+                                        key={index}
+                                        style={{ fontWeight: "bold", marginTop: index > 0 ? "1rem" : "0" }}
+                                    >
                                         {item.content}
                                     </div>
                                 );

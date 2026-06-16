@@ -5,7 +5,7 @@ export async function waitForProxy(proxy: any): Promise<void> {
             if (proxy.valid) {
                 resolve();
             } else {
-                reject(new Error('Failed to connect to D-Bus proxy'));
+                reject(new Error("Failed to connect to D-Bus proxy"));
             }
         });
     });
@@ -16,7 +16,7 @@ export async function waitForProxyWithTimeout(proxy: any, timeoutMs: number): Pr
     await Promise.race([
         waitForProxy(proxy),
         new Promise<void>((_resolve, reject) => {
-            setTimeout(() => reject(new Error('Timeout waiting for D-Bus proxy')), timeoutMs);
-        })
+            setTimeout(() => reject(new Error("Timeout waiting for D-Bus proxy")), timeoutMs);
+        }),
     ]);
 }

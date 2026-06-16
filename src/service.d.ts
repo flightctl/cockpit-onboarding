@@ -1,5 +1,5 @@
-declare module 'service.js' {
-    import cockpit from 'cockpit';
+declare module "service.js" {
+    import cockpit from "cockpit";
 
     interface ServiceEvents extends cockpit.EventMap {
         changed: () => void;
