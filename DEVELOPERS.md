@@ -49,6 +49,8 @@ When developing against a virtual machine, set `RSYNC` to upload changes automat
 
     RSYNC=c make watch
 
+The `c` alias must be setup according to these [instructions](https://github.com/cockpit-project/cockpit/blob/main/test/README.md#convenient-test-vm-ssh-access). In the next section you can learn how to configure it for the test VM.
+
 To upload to `~/.local/share/cockpit/` (as a normal user) instead of `/usr/local`:
 
     RSYNC_DEVEL=example.com make watch
@@ -77,6 +79,13 @@ make deploy-test-vm
 ```
 
 This downloads a Fedora Cloud image, creates a VM with two ethernet interfaces and two virtual WiFi radios (`mac80211_hwsim`), installs all dependencies, builds and installs the onboarding RPM, and starts the setup service. The VM IP is printed at the end — access the wizard at `https://<ip>:9090`.
+
+After the VM is ready, sync local code changes on every rebuild:
+
+    RSYNC=fedora@<ip> make watch
+
+The deploy script prepares `/usr/local/share/cockpit/` on the VM for rsync. Cockpit loads
+that directory in addition to the RPM-installed files under `/usr/share/cockpit/`.
 
 To destroy the VM:
 
