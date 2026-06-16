@@ -4,12 +4,22 @@ import { waitForProxy } from "./dbus-helpers";
 import { ServerTime } from "../../pkg/lib/serverTime.js";
 import { validateHostnameOrIP } from "../validation";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let serverTimeInstance: any = null;
+interface CustomNtpConfig {
+    backend: "timesyncd" | "chronyd" | null;
+    enabled: boolean;
+    servers: string[];
+}
 
-function getServerTime(): ServerTime {
+interface ServerTimeInstance {
+    get_custom_ntp(): Promise<CustomNtpConfig>;
+    close(): void;
+}
+
+let serverTimeInstance: ServerTimeInstance | null = null;
+
+function getServerTime(): ServerTimeInstance {
     if (!serverTimeInstance) {
-        serverTimeInstance = new ServerTime();
+        serverTimeInstance = new ServerTime() as unknown as ServerTimeInstance;
     }
     return serverTimeInstance;
 }

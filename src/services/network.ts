@@ -1,5 +1,5 @@
 import cockpit from "cockpit";
-import { Interface } from "../../pkg/networkmanager/interfaces.js";
+import { Interface, NetworkManagerModel } from "../../pkg/networkmanager/interfaces.js";
 import { Model } from "../model-context";
 import { ONBOARDING_PROFILE_PREFIX } from "../paths";
 import { waitForProxy, waitForProxyWithTimeout } from "./dbus-helpers";
@@ -104,15 +104,15 @@ export async function getDhcpHostname(interfaces: Interface[]): Promise<string> 
         // polkit rule authorizes the onboarding user
         const nmClient = cockpit.dbus("org.freedesktop.NetworkManager");
         try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const ip4ConfigProxy = nmClient.proxy(
                 "org.freedesktop.NetworkManager.IP4Config",
-                activeConnection.Ip4Config as any as string
+                activeConnection.Ip4Config as unknown as string
             );
             await waitForProxyWithTimeout(ip4ConfigProxy, 2000);
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const dhcpOptions = (ip4ConfigProxy.data as any).DhcpOptions || {};
+            const dhcpOptions =
+                (ip4ConfigProxy as cockpit.DBusProxy & { data: { DhcpOptions?: Record<string, string> } }).data
+                    .DhcpOptions || {};
 
             // DHCP option 12 is the hostname option
             return dhcpOptions["12"] || "";
@@ -359,13 +359,17 @@ function ipv6ToBytes(ip: string): number[] {
     return result;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function applyNetworkConfiguration(
-    networkManager: any,
+    networkManager: NetworkManagerModel | undefined,
     model: Model,
     skipActivation = false
 ): Promise<NetworkApplyResult> {
     const results: string[] = [];
+
+    if (!networkManager) {
+        results.push("NetworkManager unavailable");
+        return { results, singleNic: false };
+    }
 
     if (!model.networkInterface.selectedInterface) {
         results.push("No network interface selected");

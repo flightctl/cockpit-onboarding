@@ -294,7 +294,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
     ): Promise<{ success: boolean; output: string }> => {
         const testHost = model.connectivityTestHost || "www.google.com";
         const iface = model.networkInterface.selectedInterface;
-        return testNetworkConnectivity(testHost, iface, signalRef.current, onOutput);
+        return testNetworkConnectivity(testHost, iface ?? undefined, signalRef.current, onOutput);
     };
 
     // Detect whether the user is configuring the same NIC that serves this

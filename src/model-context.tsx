@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { systemConfigurationService } from "./system-config.js";
-import { Interface } from "../pkg/networkmanager/interfaces.js";
+import { Interface, NetworkManagerModel } from "../pkg/networkmanager/interfaces.js";
 import {
     HostnameState,
     NetworkInterfaceState,
@@ -154,8 +154,7 @@ const initialModel: Model = {
 
 // Context type combining existing NetworkManager model and application model
 interface ModelContextType {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    networkManager?: any; // Keep existing NetworkManager model
+    networkManager?: NetworkManagerModel | undefined;
     model: Model;
     isInitialized: boolean;
     updateModel: (section: keyof Model, updates: Partial<Model[keyof Model]>) => void;
@@ -353,10 +352,9 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
 };
 
 // Provider component
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const ModelProvider: React.FunctionComponent<{
     children: ReactNode;
-    networkManager?: any;
+    networkManager?: NetworkManagerModel | undefined;
     config?: SystemOnboardingConfig | null;
     previousAttempt?: AttemptedMarkerData | null;
 }> = ({ children, networkManager, config, previousAttempt }) => {

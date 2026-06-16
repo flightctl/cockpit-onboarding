@@ -19,9 +19,8 @@ export interface WifiNetwork {
     bssid: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function findWifiDevice(
-    nmClient: any,
+    nmClient: cockpit.DBusClient,
     interfaceName: string
 ): Promise<{ devicePath: string; activeConnectionPath?: string } | null> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

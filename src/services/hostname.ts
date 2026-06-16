@@ -13,12 +13,19 @@ export async function getHostnameInfo(): Promise<HostnameInfo> {
         const hostnameProxy = hostnameClient.proxy("org.freedesktop.hostname1", "/org/freedesktop/hostname1");
         await waitForProxy(hostnameProxy);
 
-        const hostnameData = hostnameProxy.data;
-        return {
+        const hostnameData = (hostnameProxy as cockpit.DBusProxy & {
+            data: { Hostname?: string; PrettyHostname?: string; StaticHostname?: string };
+        }).data;
+        const info: HostnameInfo = {
             hostname: hostnameData.Hostname || "",
-            prettyHostname: hostnameData.PrettyHostname || undefined,
-            staticHostname: hostnameData.StaticHostname || undefined,
         };
+        if (hostnameData.PrettyHostname) {
+            info.prettyHostname = hostnameData.PrettyHostname;
+        }
+        if (hostnameData.StaticHostname) {
+            info.staticHostname = hostnameData.StaticHostname;
+        }
+        return info;
     } catch (error) {
         console.warn("Failed to get hostname via D-Bus:", error);
         return { hostname: "" };

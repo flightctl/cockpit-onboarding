@@ -1,4 +1,4 @@
-import { Interface } from "../pkg/networkmanager/interfaces.js";
+import { Interface, NetworkManagerModel } from "../pkg/networkmanager/interfaces.js";
 import { Model } from "./model-context";
 import { getHostnameInfo, getFormattedHostname, setHostname } from "./services/hostname";
 import { getDefaultInterface, getDhcpHostname, applyNetworkConfiguration } from "./services/network";
@@ -49,9 +49,8 @@ export class SystemConfigurationService {
         };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async applySystemConfiguration(
-        networkManager: any,
+        networkManager: NetworkManagerModel | undefined,
         model: Model,
         options?: { skipNetwork?: boolean; skipActivation?: boolean }
     ): Promise<{ success: boolean; results: string[]; singleNic: boolean }> {
