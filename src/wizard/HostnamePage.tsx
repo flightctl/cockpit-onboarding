@@ -1,11 +1,11 @@
-import React from 'react';
+import React from "react";
 
 import { TextInputGroup, TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
-import { useModelContext } from '../model-context';
-import { validateHostname } from '../validation';
+import { useModelContext } from "../model-context";
+import { validateHostname } from "../validation";
 
 export const HostnamePage: React.FunctionComponent = () => {
     const { model, isInitialized, updateModel } = useModelContext();
@@ -14,7 +14,7 @@ export const HostnamePage: React.FunctionComponent = () => {
     const setHostname = (value: string) => {
         const error = validateHostname(value);
         setValidationError(error);
-        updateModel('hostname', { value });
+        updateModel("hostname", { value });
     };
 
     return (
@@ -22,7 +22,15 @@ export const HostnamePage: React.FunctionComponent = () => {
             <StackItem>
                 <p>Configure the hostname for this system:</p>
                 <FormGroup label="Hostname" isRequired>
-                    <TextInputGroup validated={validationError ? ValidatedOptions.error : (model.hostname.value && !validationError ? ValidatedOptions.success : ValidatedOptions.warning)}>
+                    <TextInputGroup
+                        validated={
+                            validationError
+                                ? ValidatedOptions.error
+                                : model.hostname.value && !validationError
+                                  ? ValidatedOptions.success
+                                  : ValidatedOptions.warning
+                        }
+                    >
                         <TextInputGroupMain
                             id="hostname-input"
                             value={model.hostname.value}
@@ -32,7 +40,13 @@ export const HostnamePage: React.FunctionComponent = () => {
                         />
                     </TextInputGroup>
                     {validationError && (
-                        <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
+                        <div
+                            style={{
+                                color: "var(--pf-global--danger-color--100)",
+                                fontSize: "var(--pf-global--FontSize--sm)",
+                                marginTop: "0.25rem",
+                            }}
+                        >
                             {validationError}
                         </div>
                     )}

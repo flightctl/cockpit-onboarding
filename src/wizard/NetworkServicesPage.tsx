@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
@@ -9,20 +9,20 @@ import { FormSelect, FormSelectOption } from "@patternfly/react-core/dist/esm/co
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
-import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
-import { useModelContext } from '../model-context';
-import { validateHostnameOrIP, validatePort } from '../validation';
-import type { ProxyProtocol } from '../types';
+import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
+import { useModelContext } from "../model-context";
+import { validateHostnameOrIP, validatePort } from "../validation";
+import type { ProxyProtocol } from "../types";
 
 export const NetworkServicesPage: React.FunctionComponent = () => {
     const { model, updateNestedModel } = useModelContext();
-    const [ntpServerInput, setNtpServerInput] = useState<string>('');
+    const [ntpServerInput, setNtpServerInput] = useState<string>("");
     const [ntpValidationError, setNtpValidationError] = useState<string | null>(null);
     const [proxyHostnameError, setProxyHostnameError] = useState<string | null>(null);
     const [proxyPortError, setProxyPortError] = useState<string | null>(null);
 
     const setAutoNtp = (autoConfig: boolean) => {
-        updateNestedModel('networkServices', 'ntp', { autoConfig });
+        updateNestedModel("networkServices", "ntp", { autoConfig });
     };
 
     const handleNtpServerInputChange = (value: string) => {
@@ -50,20 +50,20 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
 
         if (!model.networkServices.ntp.servers.includes(trimmedInput)) {
             const newServers = [...model.networkServices.ntp.servers, trimmedInput];
-            updateNestedModel('networkServices', 'ntp', { servers: newServers.sort() });
-            setNtpServerInput('');
+            updateNestedModel("networkServices", "ntp", { servers: newServers.sort() });
+            setNtpServerInput("");
             setNtpValidationError(null);
         }
     };
 
     const removeNtpServer = (serverToRemove: string) => {
-        const newServers = model.networkServices.ntp.servers.filter(server => server !== serverToRemove);
-        updateNestedModel('networkServices', 'ntp', { servers: newServers });
+        const newServers = model.networkServices.ntp.servers.filter((server) => server !== serverToRemove);
+        updateNestedModel("networkServices", "ntp", { servers: newServers });
     };
 
     // Proxy configuration handlers
     const setProxyEnabled = (enabled: boolean) => {
-        updateNestedModel('networkServices', 'proxy', { enabled });
+        updateNestedModel("networkServices", "proxy", { enabled });
         if (!enabled) {
             // Clear validation errors when disabling proxy
             setProxyHostnameError(null);
@@ -72,32 +72,32 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
     };
 
     const handleProxyHostnameChange = (value: string) => {
-        updateNestedModel('networkServices', 'proxy', { hostname: value || null });
+        updateNestedModel("networkServices", "proxy", { hostname: value || null });
         const error = validateHostnameOrIP(value, false);
         setProxyHostnameError(error);
     };
 
     const handleProxyPortChange = (value: string) => {
         const port = value ? parseInt(value, 10) : null;
-        updateNestedModel('networkServices', 'proxy', { port });
+        updateNestedModel("networkServices", "proxy", { port });
         const error = validatePort(port, false);
         setProxyPortError(error);
     };
 
     const handleProxyUsernameChange = (value: string) => {
-        updateNestedModel('networkServices', 'proxy', { username: value || null });
+        updateNestedModel("networkServices", "proxy", { username: value || null });
     };
 
     const handleProxyPasswordChange = (value: string) => {
-        updateNestedModel('networkServices', 'proxy', { password: value || null });
+        updateNestedModel("networkServices", "proxy", { password: value || null });
     };
 
     const handleProxyProtocolChange = (value: string) => {
-        updateNestedModel('networkServices', 'proxy', { protocol: value as ProxyProtocol });
+        updateNestedModel("networkServices", "proxy", { protocol: value as ProxyProtocol });
     };
 
     const handleProxyNoProxyChange = (value: string) => {
-        updateNestedModel('networkServices', 'proxy', { noProxy: value });
+        updateNestedModel("networkServices", "proxy", { noProxy: value });
     };
 
     return (
@@ -112,18 +112,18 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                 />
             </StackItem>
             {!model.networkServices.ntp.autoConfig && (
-                <StackItem style={{ marginLeft: '1.5rem' }}>
+                <StackItem style={{ marginLeft: "1.5rem" }}>
                     <Stack hasGutter>
                         <StackItem>
                             <FormGroup label="NTP Server Hostname">
                                 <Flex>
-                                    <FlexItem flex={{ default: 'flex_1' }}>
+                                    <FlexItem flex={{ default: "flex_1" }}>
                                         <TextInputGroup
                                             {...(ntpValidationError
                                                 ? { validated: ValidatedOptions.error }
                                                 : ntpServerInput.trim()
-                                                    ? { validated: ValidatedOptions.success }
-                                                    : {})}
+                                                  ? { validated: ValidatedOptions.success }
+                                                  : {})}
                                         >
                                             <TextInputGroupMain
                                                 id="ntp-server-input"
@@ -131,14 +131,20 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                                 onChange={(_, value) => handleNtpServerInputChange(value)}
                                                 placeholder="pool.ntp.org"
                                                 onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') {
+                                                    if (e.key === "Enter") {
                                                         addNtpServer();
                                                     }
                                                 }}
                                             />
                                         </TextInputGroup>
                                         {ntpValidationError && (
-                                            <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
+                                            <div
+                                                style={{
+                                                    color: "var(--pf-global--danger-color--100)",
+                                                    fontSize: "var(--pf-global--FontSize--sm)",
+                                                    marginTop: "0.25rem",
+                                                }}
+                                            >
                                                 {ntpValidationError}
                                             </div>
                                         )}
@@ -165,8 +171,7 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                     </Tr>
                                 </Thead>
                                 <Tbody>
-                                    {model.networkServices.ntp.servers.length > 0
-? (
+                                    {model.networkServices.ntp.servers.length > 0 ? (
                                         model.networkServices.ntp.servers.map((server, index) => (
                                             <Tr key={index}>
                                                 <Td>{server}</Td>
@@ -181,11 +186,10 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                                 </Td>
                                             </Tr>
                                         ))
-                                    )
-: (
-    <Tr>
-        <Td colSpan={2}>No NTP servers configured</Td>
-    </Tr>
+                                    ) : (
+                                        <Tr>
+                                            <Td colSpan={2}>No NTP servers configured</Td>
+                                        </Tr>
                                     )}
                                 </Tbody>
                             </Table>
@@ -194,7 +198,7 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                 </StackItem>
             )}
 
-            <StackItem style={{ marginTop: '2rem' }}>
+            <StackItem style={{ marginTop: "2rem" }}>
                 <p>Configure HTTP proxy (optional):</p>
                 <Checkbox
                     id="proxy-enabled"
@@ -205,7 +209,7 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
             </StackItem>
 
             {model.networkServices.proxy.enabled && (
-                <StackItem style={{ marginLeft: '1.5rem' }}>
+                <StackItem style={{ marginLeft: "1.5rem" }}>
                     <Stack hasGutter>
                         <StackItem>
                             <FormGroup label="Protocol">
@@ -225,13 +229,25 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                             <FormGroup label="Proxy Hostname" isRequired>
                                 <TextInput
                                     id="proxy-hostname-input"
-                                    value={model.networkServices.proxy.hostname || ''}
+                                    value={model.networkServices.proxy.hostname || ""}
                                     onChange={(_, value) => handleProxyHostnameChange(value)}
                                     placeholder="proxy.example.com"
-                                    validated={proxyHostnameError ? ValidatedOptions.error : (model.networkServices.proxy.hostname ? ValidatedOptions.success : ValidatedOptions.default)}
+                                    validated={
+                                        proxyHostnameError
+                                            ? ValidatedOptions.error
+                                            : model.networkServices.proxy.hostname
+                                              ? ValidatedOptions.success
+                                              : ValidatedOptions.default
+                                    }
                                 />
                                 {proxyHostnameError && (
-                                    <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
+                                    <div
+                                        style={{
+                                            color: "var(--pf-global--danger-color--100)",
+                                            fontSize: "var(--pf-global--FontSize--sm)",
+                                            marginTop: "0.25rem",
+                                        }}
+                                    >
                                         {proxyHostnameError}
                                     </div>
                                 )}
@@ -243,13 +259,25 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                 <TextInput
                                     id="proxy-port-input"
                                     type="number"
-                                    value={model.networkServices.proxy.port?.toString() || ''}
+                                    value={model.networkServices.proxy.port?.toString() || ""}
                                     onChange={(_, value) => handleProxyPortChange(value)}
                                     placeholder="8080"
-                                    validated={proxyPortError ? ValidatedOptions.error : (model.networkServices.proxy.port ? ValidatedOptions.success : ValidatedOptions.default)}
+                                    validated={
+                                        proxyPortError
+                                            ? ValidatedOptions.error
+                                            : model.networkServices.proxy.port
+                                              ? ValidatedOptions.success
+                                              : ValidatedOptions.default
+                                    }
                                 />
                                 {proxyPortError && (
-                                    <div style={{ color: 'var(--pf-global--danger-color--100)', fontSize: 'var(--pf-global--FontSize--sm)', marginTop: '0.25rem' }}>
+                                    <div
+                                        style={{
+                                            color: "var(--pf-global--danger-color--100)",
+                                            fontSize: "var(--pf-global--FontSize--sm)",
+                                            marginTop: "0.25rem",
+                                        }}
+                                    >
                                         {proxyPortError}
                                     </div>
                                 )}
@@ -260,7 +288,7 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                             <FormGroup label="Proxy Username (optional)">
                                 <TextInput
                                     id="proxy-username-input"
-                                    value={model.networkServices.proxy.username || ''}
+                                    value={model.networkServices.proxy.username || ""}
                                     onChange={(_, value) => handleProxyUsernameChange(value)}
                                     placeholder="username"
                                 />
@@ -272,7 +300,7 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                 <TextInput
                                     id="proxy-password-input"
                                     type="password"
-                                    value={model.networkServices.proxy.password || ''}
+                                    value={model.networkServices.proxy.password || ""}
                                     onChange={(_, value) => handleProxyPasswordChange(value)}
                                     placeholder="password"
                                 />
@@ -287,7 +315,13 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                     onChange={(_, value) => handleProxyNoProxyChange(value)}
                                     placeholder="localhost,127.0.0.1,::1,*.internal.corp,10.0.0.0/8"
                                 />
-                                <div style={{ fontSize: 'var(--pf-global--FontSize--sm)', color: 'var(--pf-global--Color--200)', marginTop: '0.25rem' }}>
+                                <div
+                                    style={{
+                                        fontSize: "var(--pf-global--FontSize--sm)",
+                                        color: "var(--pf-global--Color--200)",
+                                        marginTop: "0.25rem",
+                                    }}
+                                >
                                     Comma-separated list of hosts, domains, or CIDRs that should bypass the proxy
                                 </div>
                             </FormGroup>

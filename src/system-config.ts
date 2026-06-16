@@ -1,10 +1,10 @@
-import { Interface } from '../pkg/networkmanager/interfaces.js';
-import { Model } from './model-context';
-import { getHostnameInfo, getFormattedHostname, setHostname } from './services/hostname';
-import { getDefaultInterface, getDhcpHostname, applyNetworkConfiguration } from './services/network';
-import { getNtpServers, configureNtpServers, closeServerTime } from './services/ntp';
-import { applyProxyConfiguration } from './services/proxy';
-import { applyLabelsConfiguration } from './services/labels';
+import { Interface, NetworkManagerModel } from "../pkg/networkmanager/interfaces.js";
+import { Model } from "./model-context";
+import { getHostnameInfo, getFormattedHostname, setHostname } from "./services/hostname";
+import { getDefaultInterface, getDhcpHostname, applyNetworkConfiguration } from "./services/network";
+import { getNtpServers, configureNtpServers, closeServerTime } from "./services/ntp";
+import { applyProxyConfiguration } from "./services/proxy";
+import { applyLabelsConfiguration } from "./services/labels";
 
 export interface SystemInfo {
     hostname: string;
@@ -17,24 +17,26 @@ export interface SystemInfo {
 
 export class SystemConfigurationService {
     async getSystemInfo(interfaces: Interface[]): Promise<SystemInfo> {
-        const hostnameInfo = await getHostnameInfo().catch((err): { hostname: string; prettyHostname?: string; staticHostname?: string } => {
-            console.error('Failed to get hostname info:', err);
-            return { hostname: '' };
-        });
+        const hostnameInfo = await getHostnameInfo().catch(
+            (err): { hostname: string; prettyHostname?: string; staticHostname?: string } => {
+                console.error("Failed to get hostname info:", err);
+                return { hostname: "" };
+            }
+        );
 
         const defaultInterface = await getDefaultInterface(interfaces).catch((err): string | null => {
-            console.error('Failed to get default interface:', err);
+            console.error("Failed to get default interface:", err);
             return null;
         });
 
         const ntpServers = await getNtpServers().catch((err) => {
-            console.error('Failed to get NTP servers:', err);
+            console.error("Failed to get NTP servers:", err);
             return [] as string[];
         });
 
         const dhcpHostname = await getDhcpHostname(interfaces).catch((err) => {
-            console.warn('Failed to get DHCP hostname:', err);
-            return '';
+            console.warn("Failed to get DHCP hostname:", err);
+            return "";
         });
 
         return {
@@ -43,12 +45,15 @@ export class SystemConfigurationService {
             staticHostname: hostnameInfo.staticHostname,
             dhcpHostname,
             defaultInterface,
-            ntpServers
+            ntpServers,
         };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async applySystemConfiguration(networkManager: any, model: Model, options?: { skipNetwork?: boolean; skipActivation?: boolean }): Promise<{ success: boolean; results: string[]; singleNic: boolean }> {
+    async applySystemConfiguration(
+        networkManager: NetworkManagerModel | undefined,
+        model: Model,
+        options?: { skipNetwork?: boolean; skipActivation?: boolean }
+    ): Promise<{ success: boolean; results: string[]; singleNic: boolean }> {
         const allResults: string[] = [];
         let hasErrors = false;
         let singleNic = false;
@@ -63,23 +68,27 @@ export class SystemConfigurationService {
                 hasErrors = true;
             }
         } else {
-            allResults.push('- Hostname: No changes required');
+            allResults.push("- Hostname: No changes required");
         }
 
         // 2. Apply network configuration
         if (options?.skipNetwork) {
-            allResults.push('- Network: deferred to systemd-run transient unit');
+            allResults.push("- Network: deferred to systemd-run transient unit");
         } else if (model.networkInterface.selectedInterface && networkManager) {
             try {
-                const networkApplyResult = await applyNetworkConfiguration(networkManager, model, options?.skipActivation);
-                networkApplyResult.results.forEach(result => allResults.push(`✓ ${result}`));
+                const networkApplyResult = await applyNetworkConfiguration(
+                    networkManager,
+                    model,
+                    options?.skipActivation
+                );
+                networkApplyResult.results.forEach((result) => allResults.push(`✓ ${result}`));
                 singleNic = networkApplyResult.singleNic;
             } catch (error) {
                 allResults.push(`✗ ${String(error)}`);
                 hasErrors = true;
             }
         } else {
-            allResults.push('- Network: No interface selected or NetworkManager unavailable');
+            allResults.push("- Network: No interface selected or NetworkManager unavailable");
         }
 
         // 3. Apply NTP configuration
@@ -88,7 +97,7 @@ export class SystemConfigurationService {
                 model.networkServices.ntp.servers,
                 model.networkServices.ntp.autoConfig
             );
-            ntpResults.forEach(result => allResults.push(`✓ ${result}`));
+            ntpResults.forEach((result) => allResults.push(`✓ ${result}`));
         } catch (error) {
             allResults.push(`✗ ${String(error)}`);
             hasErrors = true;
@@ -97,7 +106,7 @@ export class SystemConfigurationService {
         // 4. Apply proxy configuration
         try {
             const proxyResults = await applyProxyConfiguration(model.networkServices.proxy);
-            proxyResults.forEach(result => allResults.push(`✓ ${result}`));
+            proxyResults.forEach((result) => allResults.push(`✓ ${result}`));
         } catch (error) {
             allResults.push(`✗ ${String(error)}`);
             hasErrors = true;
@@ -106,7 +115,7 @@ export class SystemConfigurationService {
         // 5. Apply labels configuration
         try {
             const labelResults = await applyLabelsConfiguration(model.labels);
-            labelResults.forEach(result => allResults.push(`✓ ${result}`));
+            labelResults.forEach((result) => allResults.push(`✓ ${result}`));
         } catch (error) {
             allResults.push(`✗ ${String(error)}`);
             hasErrors = true;

@@ -105,8 +105,8 @@
 }
 
 /* --- Form inputs --- */
-.form-control[type=text],
-.form-control[type=password] {
+.form-control[type="text"],
+.form-control[type="password"] {
     background-color: #0f3460 !important;
     border-color: #7c4dff !important;
     color: #e0e0e0 !important;

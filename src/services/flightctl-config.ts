@@ -1,6 +1,6 @@
-import cockpit from 'cockpit';
+import cockpit from "cockpit";
 
-const FLIGHTCTL_CONFIG_PATH = '/etc/flightctl/config.yaml';
+const FLIGHTCTL_CONFIG_PATH = "/etc/flightctl/config.yaml";
 
 export interface FlightctlConfigInfo {
     exists: boolean;
@@ -24,7 +24,7 @@ export async function detectFlightctlConfig(): Promise<FlightctlConfigInfo> {
             hasCredentials: Boolean(certMatch && certMatch[1]),
         };
     } catch (error) {
-        console.warn('Failed to read flightctl config:', error);
+        console.warn("Failed to read flightctl config:", error);
         return { exists: false, serverUrl: null, hasCredentials: false };
     }
 }

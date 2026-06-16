@@ -17,15 +17,15 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-import React from 'react';
-import { createRoot } from 'react-dom/client';
+import React from "react";
+import { createRoot } from "react-dom/client";
 
 import "cockpit-dark-theme";
 
-import { Application } from './app.tsx';
+import { Application } from "./app.tsx";
 
 import "patternfly/patternfly-6-cockpit.scss";
-import './app.scss';
+import "./app.scss";
 
 document.addEventListener("DOMContentLoaded", () => {
     createRoot(document.getElementById("app")!).render(<Application />);

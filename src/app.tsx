@@ -17,19 +17,19 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-import cockpit from 'cockpit';
+import cockpit from "cockpit";
 
-import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { useEvent, useObject } from "hooks";
 
-import * as service from 'service.js';
-import { NetworkManagerModel, Interface } from '../pkg/networkmanager/interfaces.js';
+import * as service from "service.js";
+import { NetworkManagerModel, Interface } from "../pkg/networkmanager/interfaces.js";
 
 import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
-import { ModelProvider, useModelContext } from './model-context';
-import { loadConfig } from './config-loader';
-import { readAttemptedMarker, AttemptedMarkerData } from './attempted-marker';
-import { SystemOnboardingConfig } from './types';
+import { ModelProvider, useModelContext } from "./model-context";
+import { loadConfig } from "./config-loader";
+import { readAttemptedMarker, AttemptedMarkerData } from "./attempted-marker";
+import { SystemOnboardingConfig } from "./types";
 
 import { Alert, AlertActionCloseButton } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
@@ -37,16 +37,16 @@ import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
 import { Wizard, WizardStep } from "@patternfly/react-core/dist/esm/components/Wizard/index.js";
 
-import { HostnamePage } from './wizard/HostnamePage.tsx';
-import { NetworkInterfacePage } from './wizard/NetworkInterfacePage.tsx';
-import { NetworkAddressPage } from './wizard/NetworkAddressPage.tsx';
-import { NetworkServicesPage } from './wizard/NetworkServicesPage.tsx';
-import { EnrollmentPage } from './wizard/EnrollmentPage.tsx';
-import { ConnectivityTestPage } from './wizard/ConnectivityTestPage.tsx';
-import { LabelsPage } from './wizard/LabelsPage.tsx';
-import { ReviewPage } from './wizard/ReviewPage.tsx';
-import { EnrollmentProgressPage } from './wizard/EnrollmentProgressPage.tsx';
-import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from './paths';
+import { HostnamePage } from "./wizard/HostnamePage.tsx";
+import { NetworkInterfacePage } from "./wizard/NetworkInterfacePage.tsx";
+import { NetworkAddressPage } from "./wizard/NetworkAddressPage.tsx";
+import { NetworkServicesPage } from "./wizard/NetworkServicesPage.tsx";
+import { EnrollmentPage } from "./wizard/EnrollmentPage.tsx";
+import { ConnectivityTestPage } from "./wizard/ConnectivityTestPage.tsx";
+import { LabelsPage } from "./wizard/LabelsPage.tsx";
+import { ReviewPage } from "./wizard/ReviewPage.tsx";
+import { EnrollmentProgressPage } from "./wizard/EnrollmentProgressPage.tsx";
+import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from "./paths";
 import {
     validateHostnameStep,
     validateNetworkInterfaceStep,
@@ -55,14 +55,14 @@ import {
     validateEnrollmentStep,
     validateConnectivityTestStep,
     validateLabelsStep,
-} from './wizard/step-validation';
+} from "./wizard/step-validation";
 
 import { WithDialogs } from "dialogs.jsx";
 
 const _ = cockpit.gettext;
 
 interface WatchdogStatusData {
-    status: 'success' | 'app_failure' | 'network_failure';
+    status: "success" | "app_failure" | "network_failure";
     message: string;
     details?: {
         carrierDetected: boolean;
@@ -97,9 +97,7 @@ export const Application = () => {
     const [previousAttempt, setPreviousAttempt] = useState<AttemptedMarkerData | null>(null);
     const [watchdogStatus, setWatchdogStatus] = useState<WatchdogStatusData | null>(null);
 
-    const nmService = useObject(() => service.proxy("NetworkManager"),
-                                null,
-                                []);
+    const nmService = useObject(() => service.proxy("NetworkManager"), null, []);
     useEvent(nmService, "changed");
 
     const networkManager = useObject(() => new NetworkManagerModel(), null, []);
@@ -107,67 +105,69 @@ export const Application = () => {
 
     const nmRunning_ref = useRef<boolean | undefined>(undefined);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useEvent(networkManager.client as any, "owner", (_event, owner) => { nmRunning_ref.current = owner !== null });
+    useEvent(networkManager.client as any, "owner", (_event, owner) => {
+        nmRunning_ref.current = owner !== null;
+    });
 
     // Check for onboarding completion marker file
     useEffect(() => {
         const markerFile = cockpit.file(MARKER_COMPLETE);
 
-        markerFile.read()
-                .then(async (content) => {
-                    if (content !== null) {
-                        setOnboardingComplete(true);
-                        console.log('Onboarding already complete (marker file exists)');
-                    } else {
-                        setOnboardingComplete(false);
-                        console.log('Marker file does not exist - onboarding not complete');
-                        const attempt = await readAttemptedMarker();
-                        if (attempt) {
-                            console.log('Previous attempt data found, will pre-populate wizard');
-                            setPreviousAttempt(attempt);
+        markerFile
+            .read()
+            .then(async (content) => {
+                if (content !== null) {
+                    setOnboardingComplete(true);
+                    console.log("Onboarding already complete (marker file exists)");
+                } else {
+                    setOnboardingComplete(false);
+                    console.log("Marker file does not exist - onboarding not complete");
+                    const attempt = await readAttemptedMarker();
+                    if (attempt) {
+                        console.log("Previous attempt data found, will pre-populate wizard");
+                        setPreviousAttempt(attempt);
 
-                            try {
-                                const statusContent = await cockpit.file(WATCHDOG_STATUS).read();
-                                if (statusContent) {
-                                    const parsed = JSON.parse(statusContent) as WatchdogStatusData;
-                                    if (parsed.status === 'network_failure' || parsed.status === 'app_failure') {
-                                        setWatchdogStatus(parsed);
-                                    }
+                        try {
+                            const statusContent = await cockpit.file(WATCHDOG_STATUS).read();
+                            if (statusContent) {
+                                const parsed = JSON.parse(statusContent) as WatchdogStatusData;
+                                if (parsed.status === "network_failure" || parsed.status === "app_failure") {
+                                    setWatchdogStatus(parsed);
                                 }
-                            } catch {
-                                // No watchdog status file or parse error — not a rollback scenario
                             }
+                        } catch {
+                            // No watchdog status file or parse error — not a rollback scenario
                         }
                     }
-                })
-                .catch((error) => {
-                    console.log('Error checking marker file:', error);
-                    setOnboardingComplete(false);
-                })
-                .finally(() => {
-                    setCheckingMarker(false);
-                    markerFile.close();
-                });
+                }
+            })
+            .catch((error) => {
+                console.log("Error checking marker file:", error);
+                setOnboardingComplete(false);
+            })
+            .finally(() => {
+                setCheckingMarker(false);
+                markerFile.close();
+            });
     }, []);
 
     // Load configuration on mount
     useEffect(() => {
         loadConfig()
-                .then(loadedConfig => {
-                    setConfig(loadedConfig);
-                    setIsConfigLoaded(true);
-                    console.log('Configuration loaded successfully:', loadedConfig);
-                })
-                .catch(error => {
-                    console.error('Failed to load configuration:', error);
-                    setConfigError(error.message || 'Unknown error loading configuration');
-                    setIsConfigLoaded(true); // Mark as loaded even on error to show error state
-                });
+            .then((loadedConfig) => {
+                setConfig(loadedConfig);
+                setIsConfigLoaded(true);
+                console.log("Configuration loaded successfully:", loadedConfig);
+            })
+            .catch((error) => {
+                console.error("Failed to load configuration:", error);
+                setConfigError(error.message || "Unknown error loading configuration");
+                setIsConfigLoaded(true); // Mark as loaded even on error to show error state
+            });
     }, []);
 
     // Show loading while checking marker file or loading configuration
-    if (checkingMarker || !isConfigLoaded || networkManager.ready === undefined)
-        return <EmptyStatePanel loading />;
+    if (checkingMarker || !isConfigLoaded || networkManager.ready === undefined) {return <EmptyStatePanel loading />}
 
     // Show message if onboarding is already complete
     if (onboardingComplete) {
@@ -199,45 +199,42 @@ export const Application = () => {
             return (
                 <div id="networking-nm-crashed">
                     <EmptyStatePanel
-icon={ ExclamationCircleIcon }
-                                     title={ _("NetworkManager is not running") }
-                                     action={nmService.exists ? _("Start service") : null}
-                                     onAction={ () => nmService.start() }
-                                     secondary={
-                                         <Button
-component="a"
-                                                 variant="secondary"
-                                                 onClick={() => cockpit.jump("/system/services#/NetworkManager.service", cockpit.transport.host)}
-                                         >
-                                             {_("Troubleshoot…")}
-                                         </Button>
-                                     }
+                        icon={ExclamationCircleIcon}
+                        title={_("NetworkManager is not running")}
+                        action={nmService.exists ? _("Start service") : null}
+                        onAction={() => nmService.start()}
+                        secondary={
+                            <Button
+                                component="a"
+                                variant="secondary"
+                                onClick={() =>
+                                    cockpit.jump("/system/services#/NetworkManager.service", cockpit.transport.host)
+                                }
+                            >
+                                {_("Troubleshoot…")}
+                            </Button>
+                        }
                     />
                 </div>
             );
         } else if (!nmService.exists) {
             return (
                 <div id="networking-nm-not-found">
-                    <EmptyStatePanel
-icon={ ExclamationCircleIcon }
-                                     title={ _("NetworkManager is not installed") }
-                    />
-
+                    <EmptyStatePanel icon={ExclamationCircleIcon} title={_("NetworkManager is not installed")} />
                 </div>
             );
         } else {
             return (
                 <div id="networking-nm-disabled">
                     <EmptyStatePanel
-icon={ ExclamationCircleIcon }
-                                     title={ _("Network devices and graphs require NetworkManager") }
-                                     action={nmService.exists ? _("Enable service") : null}
-                                     onAction={() => {
-                                         nmService.enable();
-                                         nmService.start();
-                                     }}
+                        icon={ExclamationCircleIcon}
+                        title={_("Network devices and graphs require NetworkManager")}
+                        action={nmService.exists ? _("Enable service") : null}
+                        onAction={() => {
+                            nmService.enable();
+                            nmService.start();
+                        }}
                     />
-
                 </div>
             );
         }
@@ -250,7 +247,11 @@ icon={ ExclamationCircleIcon }
         <ConfigContext.Provider value={{ config, isConfigLoaded, configError }}>
             <ModelProvider networkManager={networkManager} config={config} previousAttempt={previousAttempt}>
                 <WithDialogs key="1">
-                    <SystemOnboardingWizardWrapper interfaces={interfaces} previousAttempt={previousAttempt} watchdogStatus={watchdogStatus} />
+                    <SystemOnboardingWizardWrapper
+                        interfaces={interfaces}
+                        previousAttempt={previousAttempt}
+                        watchdogStatus={watchdogStatus}
+                    />
                 </WithDialogs>
             </ModelProvider>
         </ConfigContext.Provider>
@@ -258,14 +259,24 @@ icon={ ExclamationCircleIcon }
 };
 
 // Wrapper to wait for model initialization before showing wizard
-const SystemOnboardingWizardWrapper: React.FunctionComponent<{ interfaces: Interface[]; previousAttempt?: AttemptedMarkerData | null; watchdogStatus?: WatchdogStatusData | null }> = ({ interfaces, previousAttempt, watchdogStatus }) => {
+const SystemOnboardingWizardWrapper: React.FunctionComponent<{
+    interfaces: Interface[];
+    previousAttempt?: AttemptedMarkerData | null;
+    watchdogStatus?: WatchdogStatusData | null;
+}> = ({ interfaces, previousAttempt, watchdogStatus }) => {
     const { isInitialized } = useModelContext();
 
     if (!isInitialized) {
         return <EmptyStatePanel loading />;
     }
 
-    return <SystemOnboardingWizard interfaces={interfaces} previousAttempt={previousAttempt} watchdogStatus={watchdogStatus} />;
+    return (
+        <SystemOnboardingWizard
+            interfaces={interfaces}
+            previousAttempt={previousAttempt}
+            watchdogStatus={watchdogStatus}
+        />
+    );
 };
 
 interface SystemOnboardingWizardProps {
@@ -274,7 +285,11 @@ interface SystemOnboardingWizardProps {
     watchdogStatus?: WatchdogStatusData | null | undefined;
 }
 
-export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({ interfaces, previousAttempt, watchdogStatus }) => {
+export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({
+    interfaces,
+    previousAttempt,
+    watchdogStatus,
+}) => {
     const { config } = useConfig();
     const { model, cancelEnrollmentRef } = useModelContext();
     const [currentStepIndex, setCurrentStepIndex] = useState(1);
@@ -313,8 +328,8 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     // Handle step navigation - using PatternFly Wizard's correct signature
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
     const handleStepChange = (_event: any, currentStep: any, _prevStep: any) => {
-        const stepId = typeof currentStep.id === 'string' ? currentStep.id : '';
-        const stepNumber = parseInt(stepId.split('-').pop() || '1', 10);
+        const stepId = typeof currentStep.id === "string" ? currentStep.id : "";
+        const stepNumber = parseInt(stepId.split("-").pop() || "1", 10);
 
         setCurrentStepIndex(stepNumber);
 
@@ -344,7 +359,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     // Dynamic footer configuration for EnrollmentProgressPage
     const enrollmentExecutionState = model.enrollmentProgress.executionState;
     const getProgressPageFooter = () => {
-        if (enrollmentExecutionState === 'running') {
+        if (enrollmentExecutionState === "running") {
             // While running: disable Back, enable Next as "Cancel"
             return {
                 isBackDisabled: true,
@@ -355,16 +370,17 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         cancelEnrollmentRef.current();
                     }
                 },
-                isCancelHidden: true
+                isCancelHidden: true,
             };
-        } else if (enrollmentExecutionState === 'success') {
+        } else if (enrollmentExecutionState === "success") {
             // On success: navigate to completion page immediately, then run cleanup
             // after a short delay. Cleanup tears down the WiFi AP, so we must show
             // the user feedback first before the connection drops.
             const wantReboot = config?.autoReboot === true;
             const runCleanup = () =>
-                cockpit.spawn(['sudo', SCRIPT_CLEANUP], { err: 'message' })
-                        .catch(error => console.warn('Cleanup failed:', error));
+                cockpit
+                    .spawn(["sudo", SCRIPT_CLEANUP], { err: "message" })
+                    .catch((error) => console.warn("Cleanup failed:", error));
             const handleFinish = () => {
                 // Marker file is already written — reload shows the "Onboarding complete" page
                 window.location.reload();
@@ -373,65 +389,85 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
             };
             const handleFinishAndReboot = () => {
                 // Reboot triggers systemd ExecStop which runs cleanup automatically
-                cockpit.spawn(['sudo', 'shutdown', '-r', 'now'], { err: 'message' })
-                        .catch(error => console.error('Failed to trigger reboot:', error));
+                cockpit
+                    .spawn(["sudo", "shutdown", "-r", "now"], { err: "message" })
+                    .catch((error) => console.error("Failed to trigger reboot:", error));
             };
             return {
                 isBackDisabled: true,
                 isNextDisabled: false,
                 nextButtonText: wantReboot ? _("Finish & Reboot") : _("Finish"),
                 onNext: wantReboot ? handleFinishAndReboot : handleFinish,
-                isCancelHidden: true
+                isCancelHidden: true,
             };
-        } else if (enrollmentExecutionState === 'failed') {
+        } else if (enrollmentExecutionState === "failed") {
             // On failure: enable Back, disable Next
             return {
                 isBackDisabled: false,
                 isNextDisabled: true,
                 nextButtonText: _("Finish"),
-                isCancelHidden: true
+                isCancelHidden: true,
             };
         } else {
             // Default/idle state
             return {
                 isBackDisabled: true,
                 nextButtonText: _("Finish"),
-                isCancelHidden: true
+                isCancelHidden: true,
             };
         }
     };
 
     return (
-        <Page className='no-masthead-sidebar' isContentFilled id="system-onboarding-wizard">
+        <Page className="no-masthead-sidebar" isContentFilled id="system-onboarding-wizard">
             {showRestoredAlert && (
                 <PageSection>
                     <Alert
-                        variant={watchdogStatus?.status === 'network_failure' ? "warning" : "info"}
-                        title={watchdogStatus?.status === 'network_failure'
-                            ? _("Network configuration rolled back")
-                            : watchdogStatus?.status === 'app_failure'
-                                ? _("Enrollment did not complete")
-                                : _("Previous configuration restored")}
+                        variant={watchdogStatus?.status === "network_failure" ? "warning" : "info"}
+                        title={
+                            watchdogStatus?.status === "network_failure"
+                                ? _("Network configuration rolled back")
+                                : watchdogStatus?.status === "app_failure"
+                                  ? _("Enrollment did not complete")
+                                  : _("Previous configuration restored")
+                        }
                         isInline
                         actionClose={<AlertActionCloseButton onClose={() => setShowRestoredAlert(false)} />}
                     >
-                        {watchdogStatus?.status === 'network_failure'
-                            ? _("The watchdog timer rolled back your configuration because network connectivity could not be established.") +
+                        {watchdogStatus?.status === "network_failure"
+                            ? _(
+                                  "The watchdog timer rolled back your configuration because network connectivity could not be established."
+                              ) +
                               (watchdogStatus.details
-                                  ? ` ${!watchdogStatus.details.carrierDetected
-                                      ? _("No network carrier was detected on any interface.")
-                                      : !watchdogStatus.details.dnsResolved
-                                          ? cockpit.format(_("DNS resolution failed for $0."), watchdogStatus.details.testedHost)
-                                          : _("Network connectivity check failed.")}`
-                                  : '') +
-                              ' ' + _("Review and modify the settings as needed before re-applying.")
-                            : watchdogStatus?.status === 'app_failure'
-                                ? _("Network connectivity is working, but enrollment did not complete. You can retry without changing network settings.")
-                                : _("Your previous onboarding configuration has been restored. Review and modify the settings as needed before re-applying.")}
+                                  ? ` ${
+                                        !watchdogStatus.details.carrierDetected
+                                            ? _("No network carrier was detected on any interface.")
+                                            : !watchdogStatus.details.dnsResolved
+                                              ? cockpit.format(
+                                                    _("DNS resolution failed for $0."),
+                                                    watchdogStatus.details.testedHost
+                                                )
+                                              : _("Network connectivity check failed.")
+                                    }`
+                                  : "") +
+                              " " +
+                              _("Review and modify the settings as needed before re-applying.")
+                            : watchdogStatus?.status === "app_failure"
+                              ? _(
+                                    "Network connectivity is working, but enrollment did not complete. You can retry without changing network settings."
+                                )
+                              : _(
+                                    "Your previous onboarding configuration has been restored. Review and modify the settings as needed before re-applying."
+                                )}
                     </Alert>
                 </PageSection>
             )}
-            <PageSection hasBodyWrapper={false} type={PageSectionTypes.wizard} padding={{ default: 'noPadding' }} aria-label="Wizard container">
+            <PageSection
+                hasBodyWrapper={false}
+                type={PageSectionTypes.wizard}
+                padding={{ default: "noPadding" }}
+                aria-label="Wizard container"
+            >
                 <Wizard onStepChange={handleStepChange}>
                     <WizardStep
                         name={_("Hostname")}
@@ -495,15 +531,17 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         name={_("Review")}
                         id={(() => {
                             let n = 7;
-                            if (hasEnrollmentServices) n++;
+                            if (hasEnrollmentServices) {n++}
                             return `wizard-step-${n}`;
                         })()}
                         footer={{ nextButtonText: reviewButtonText, isCancelHidden: true }}
-                        isDisabled={canNavigateToStep((() => {
-                            let n = 7;
-                            if (hasEnrollmentServices) n++;
-                            return n;
-                        })())}
+                        isDisabled={canNavigateToStep(
+                            (() => {
+                                let n = 7;
+                                if (hasEnrollmentServices) {n++}
+                                return n;
+                            })()
+                        )}
                     >
                         <ReviewPage hasEnrollmentScripts={hasEnrollmentServices} />
                     </WizardStep>
@@ -511,15 +549,17 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         name={finalStepName}
                         id={(() => {
                             let n = 8;
-                            if (hasEnrollmentServices) n++;
+                            if (hasEnrollmentServices) {n++}
                             return `wizard-step-${n}`;
                         })()}
                         footer={getProgressPageFooter()}
-                        isDisabled={canNavigateToStep((() => {
-                            let n = 8;
-                            if (hasEnrollmentServices) n++;
-                            return n;
-                        })())}
+                        isDisabled={canNavigateToStep(
+                            (() => {
+                                let n = 8;
+                                if (hasEnrollmentServices) {n++}
+                                return n;
+                            })()
+                        )}
                     >
                         <EnrollmentProgressPage />
                     </WizardStep>

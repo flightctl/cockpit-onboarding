@@ -5,8 +5,20 @@
  * controlling whether users can proceed to the next step.
  */
 
-import { Model } from '../model-context';
-import { validateHostname, validateIPv4, validateSubnetMask, validateIPv6, validateIP, validateHostnameOrIP, validatePort, validateLabelKey, validateLabelValue, validateIPv4GatewaySubnet, validateIPv6GatewaySubnet } from '../validation';
+import { Model } from "../model-context";
+import {
+    validateHostname,
+    validateIPv4,
+    validateSubnetMask,
+    validateIPv6,
+    validateIP,
+    validateHostnameOrIP,
+    validatePort,
+    validateLabelKey,
+    validateLabelValue,
+    validateIPv4GatewaySubnet,
+    validateIPv6GatewaySubnet,
+} from "../validation";
 
 /**
  * Validate the hostname step
@@ -34,14 +46,14 @@ export const validateNetworkInterfaceStep = (model: Model): boolean => {
     }
 
     // If WiFi is selected and security is not 'none', password is required
-    if (model.networkInterface.interfaceType === 'wifi') {
+    if (model.networkInterface.interfaceType === "wifi") {
         // WiFi SSID must be selected
         if (!model.networkInterface.wifiSsid) {
             return false;
         }
 
         // If WiFi requires authentication (not 'none'), password must be provided
-        if (model.networkInterface.wifiSecurity && model.networkInterface.wifiSecurity !== 'none') {
+        if (model.networkInterface.wifiSecurity && model.networkInterface.wifiSecurity !== "none") {
             if (!model.networkInterface.wifiPassword || !model.networkInterface.wifiPassword.trim()) {
                 return false;
             }
@@ -60,12 +72,12 @@ export const validateNetworkAddressStep = (model: Model): boolean => {
     const { ipv4, ipv6 } = model.networkAddress;
 
     // At least one protocol must be enabled
-    if (ipv4.method === 'disabled' && ipv6.method === 'disabled') {
+    if (ipv4.method === "disabled" && ipv6.method === "disabled") {
         return false;
     }
 
     // IPv4 validation
-    if (ipv4.method === 'static') {
+    if (ipv4.method === "static") {
         // Static IPv4 requires address, subnet mask, and gateway
         if (!ipv4.address || validateIPv4(ipv4.address) !== null) {
             return false;
@@ -98,7 +110,7 @@ export const validateNetworkAddressStep = (model: Model): boolean => {
     // DHCP/auto and disabled don't require additional validation
 
     // IPv6 validation (optional, but if static must be complete)
-    if (ipv6.method === 'static') {
+    if (ipv6.method === "static") {
         // Static IPv6 requires address with prefix and gateway
         if (!ipv6.address || validateIPv6(ipv6.address, true) !== null) {
             return false;
@@ -201,7 +213,7 @@ export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[])
     for (const serviceId of selectedServices) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const service = enrollmentServices.find((s: any) => s.id === serviceId);
-        if (!service) continue;
+        if (!service) {continue}
 
         // When using existing credentials, skip endpoint and credential validation
         if (model.enrollment.useExisting?.[serviceId]) {
@@ -225,7 +237,7 @@ export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[])
         const credSchema = service.credentialsSchema;
         let required: string[] = [];
         if (credSchema?.oneOf && credSchema.oneOf.length > 0) {
-            const variantIndex = typeof serviceCreds._variantIndex === 'number' ? serviceCreds._variantIndex : 0;
+            const variantIndex = typeof serviceCreds._variantIndex === "number" ? serviceCreds._variantIndex : 0;
             const variant = credSchema.oneOf[variantIndex] || credSchema.oneOf[0];
             required = variant.required || [];
         } else {
@@ -233,7 +245,7 @@ export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[])
         }
         for (const fieldName of required) {
             const value = serviceCreds[fieldName];
-            if (value === undefined || value === null || value === '') {
+            if (value === undefined || value === null || value === "") {
                 return false;
             }
         }
@@ -252,23 +264,23 @@ export const validateLabelsStep = (model: Model): boolean => {
         const hasValue = value.trim().length > 0;
 
         if (hasKey || hasValue) {
-            if (!hasKey) return false;
-            if (validateLabelKey(key) !== null) return false;
-            if (validateLabelValue(value) !== null) return false;
+            if (!hasKey) {return false}
+            if (validateLabelKey(key) !== null) {return false}
+            if (validateLabelValue(value) !== null) {return false}
         }
     }
 
     for (const { labelKey, systemInfoField } of model.labels.systemInfoMappings) {
         const hasKey = labelKey.trim().length > 0;
-        const isCustomInfo = systemInfoField.startsWith('customInfo.');
+        const isCustomInfo = systemInfoField.startsWith("customInfo.");
         const hasField = isCustomInfo
-            ? systemInfoField.slice('customInfo.'.length).trim().length > 0
+            ? systemInfoField.slice("customInfo.".length).trim().length > 0
             : systemInfoField.trim().length > 0;
 
         if (hasKey || hasField) {
-            if (!hasKey) return false;
-            if (!hasField) return false;
-            if (validateLabelKey(labelKey) !== null) return false;
+            if (!hasKey) {return false}
+            if (!hasField) {return false}
+            if (validateLabelKey(labelKey) !== null) {return false}
         }
     }
 

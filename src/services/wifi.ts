@@ -1,11 +1,11 @@
-import cockpit from 'cockpit';
-import { waitForProxy } from './dbus-helpers';
+import cockpit from "cockpit";
+import { waitForProxy } from "./dbus-helpers";
 
 export interface WifiConnection {
     ssid: string;
     bssid: string;
     password: string;
-    security: 'none' | 'wep' | 'wpa';
+    security: "none" | "wep" | "wpa";
 }
 
 export interface WifiNetwork {
@@ -14,27 +14,30 @@ export interface WifiNetwork {
     security: string;
     frequency: number;
     channel: number;
-    band: '2.4 GHz' | '5 GHz' | 'unknown';
+    band: "2.4 GHz" | "5 GHz" | "unknown";
     rate: number;
     bssid: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function findWifiDevice(nmClient: any, interfaceName: string): Promise<{ devicePath: string; activeConnectionPath?: string } | null> {
+async function findWifiDevice(
+    nmClient: cockpit.DBusClient,
+    interfaceName: string
+): Promise<{ devicePath: string; activeConnectionPath?: string } | null> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const nmManager = nmClient.proxy('org.freedesktop.NetworkManager', '/org/freedesktop/NetworkManager');
+    const nmManager = nmClient.proxy("org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager");
     await waitForProxy(nmManager);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const devicePaths = (nmManager.data as any).Devices || [];
 
     for (const path of devicePaths) {
-        const devProxy = nmClient.proxy('org.freedesktop.NetworkManager.Device', path);
+        const devProxy = nmClient.proxy("org.freedesktop.NetworkManager.Device", path);
         await waitForProxy(devProxy);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const devData = devProxy.data as any;
-        if (devData.Interface === interfaceName && devData.DeviceType === 2) { // 2 = WiFi
+        if (devData.Interface === interfaceName && devData.DeviceType === 2) {
+            // 2 = WiFi
             return {
                 devicePath: path,
                 activeConnectionPath: devData.ActiveConnection,
@@ -48,83 +51,87 @@ async function findWifiDevice(nmClient: any, interfaceName: string): Promise<{ d
 export async function getCurrentWifiConnection(interfaceName: string): Promise<WifiConnection | null> {
     try {
         // polkit rule authorizes the onboarding user
-        const nmClient = cockpit.dbus('org.freedesktop.NetworkManager');
+        const nmClient = cockpit.dbus("org.freedesktop.NetworkManager");
         const device = await findWifiDevice(nmClient, interfaceName);
 
-        if (!device || !device.activeConnectionPath || device.activeConnectionPath === '/') {
+        if (!device || !device.activeConnectionPath || device.activeConnectionPath === "/") {
             nmClient.close();
             return null;
         }
 
         // Get active connection details
-        const activeConnProxy = nmClient.proxy('org.freedesktop.NetworkManager.Connection.Active', device.activeConnectionPath);
+        const activeConnProxy = nmClient.proxy(
+            "org.freedesktop.NetworkManager.Connection.Active",
+            device.activeConnectionPath
+        );
         await waitForProxy(activeConnProxy);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const activeConnData = activeConnProxy.data as any;
         const connectionPath = activeConnData.Connection;
 
-        if (!connectionPath || connectionPath === '/') {
+        if (!connectionPath || connectionPath === "/") {
             nmClient.close();
             return null;
         }
 
-        const connectionProxy = nmClient.proxy('org.freedesktop.NetworkManager.Settings.Connection', connectionPath);
+        const connectionProxy = nmClient.proxy("org.freedesktop.NetworkManager.Settings.Connection", connectionPath);
         await waitForProxy(connectionProxy);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const settingsResult = await (connectionProxy as any).call('GetSettings', []);
+        const settingsResult = await (connectionProxy as any).call("GetSettings", []);
         const settings = settingsResult[0];
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let secrets: any = {};
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const secretsResult = await (connectionProxy as any).call('GetSecrets', ['802-11-wireless-security']);
+            const secretsResult = await (connectionProxy as any).call("GetSecrets", ["802-11-wireless-security"]);
             secrets = secretsResult[0];
         } catch (secretsError) {
-            console.warn('Failed to get WiFi secrets, password will not be available:', secretsError);
+            console.warn("Failed to get WiFi secrets, password will not be available:", secretsError);
         }
 
         // Extract SSID
-        const ssidRaw = settings['802-11-wireless']?.ssid;
-        let ssid = '';
+        const ssidRaw = settings["802-11-wireless"]?.ssid;
+        let ssid = "";
         if (ssidRaw?.v) {
             const ssidBytes = ssidRaw.v;
             if (Array.isArray(ssidBytes)) {
                 ssid = new TextDecoder().decode(new Uint8Array(ssidBytes));
-            } else if (typeof ssidBytes === 'string') {
+            } else if (typeof ssidBytes === "string") {
                 try {
                     ssid = atob(ssidBytes);
                 } catch (e) {
-                    console.error('Failed to decode base64 SSID:', e);
+                    console.error("Failed to decode base64 SSID:", e);
                     ssid = ssidBytes;
                 }
             }
         }
 
         // Extract BSSID
-        const bssidRaw = settings['802-11-wireless']?.bssid?.v;
-        const bssid = bssidRaw || '';
+        const bssidRaw = settings["802-11-wireless"]?.bssid?.v;
+        const bssid = bssidRaw || "";
 
         // Extract password from secrets
-        let password = '';
-        const securitySettings = secrets['802-11-wireless-security'];
+        let password = "";
+        const securitySettings = secrets["802-11-wireless-security"];
         if (securitySettings) {
-            password = securitySettings.psk?.v ||
-                      securitySettings['wep-key0']?.v ||
-                      securitySettings['leap-password']?.v ||
-                      '';
+            password =
+                securitySettings.psk?.v ||
+                securitySettings["wep-key0"]?.v ||
+                securitySettings["leap-password"]?.v ||
+                "";
         }
 
         // Determine security type
-        let security: 'none' | 'wep' | 'wpa' = 'none';
-        const keyMgmt = settings['802-11-wireless-security']?.['key-mgmt']?.v;
+        let security: "none" | "wep" | "wpa" = "none";
+        const keyMgmt = settings["802-11-wireless-security"]?.["key-mgmt"]?.v;
         if (keyMgmt) {
-            if (keyMgmt === 'none') {
-                security = 'wep';
-            } else if (keyMgmt.includes('wpa') || keyMgmt.includes('sae')) {
-                security = 'wpa';
+            if (keyMgmt === "none") {
+                security = "wep";
+            } else if (keyMgmt.includes("wpa") || keyMgmt.includes("sae")) {
+                security = "wpa";
             }
         }
 
@@ -132,7 +139,7 @@ export async function getCurrentWifiConnection(interfaceName: string): Promise<W
 
         return { ssid, bssid, password, security };
     } catch (error) {
-        console.error('Failed to get current WiFi connection:', error);
+        console.error("Failed to get current WiFi connection:", error);
         return null;
     }
 }
@@ -143,40 +150,40 @@ function parseWifiSecurity(flags: number, wpaFlags: number, rsnFlags: number): s
     // WPA3 (SAE)
     const NM_802_11_AP_SEC_KEY_MGMT_SAE = 0x400;
     if (rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_SAE) {
-        securityMethods.push('WPA3');
+        securityMethods.push("WPA3");
     }
 
     // WPA2 (RSN with PSK or 802.1X)
     const NM_802_11_AP_SEC_KEY_MGMT_PSK = 0x100;
     const NM_802_11_AP_SEC_KEY_MGMT_802_1X = 0x200;
-    if (rsnFlags !== 0 && (rsnFlags & (NM_802_11_AP_SEC_KEY_MGMT_PSK | NM_802_11_AP_SEC_KEY_MGMT_802_1X))) {
-        if (!securityMethods.includes('WPA3') || (rsnFlags & ~NM_802_11_AP_SEC_KEY_MGMT_SAE)) {
-            securityMethods.push('WPA2');
+    if (rsnFlags !== 0 && rsnFlags & (NM_802_11_AP_SEC_KEY_MGMT_PSK | NM_802_11_AP_SEC_KEY_MGMT_802_1X)) {
+        if (!securityMethods.includes("WPA3") || rsnFlags & ~NM_802_11_AP_SEC_KEY_MGMT_SAE) {
+            securityMethods.push("WPA2");
         }
     }
 
     // WPA (older)
     if (wpaFlags !== 0) {
-        securityMethods.push('WPA');
+        securityMethods.push("WPA");
     }
 
     // WEP (privacy flag set but no WPA/RSN)
     const NM_802_11_AP_FLAGS_PRIVACY = 0x1;
-    if (securityMethods.length === 0 && (flags & NM_802_11_AP_FLAGS_PRIVACY)) {
-        securityMethods.push('WEP');
+    if (securityMethods.length === 0 && flags & NM_802_11_AP_FLAGS_PRIVACY) {
+        securityMethods.push("WEP");
     }
 
     if (securityMethods.length === 0) {
-        return 'None';
+        return "None";
     } else if (securityMethods.length > 1) {
-        return securityMethods.join('/');
+        return securityMethods.join("/");
     }
     return securityMethods[0];
 }
 
 function frequencyToChannel(frequency: number): number {
     if (frequency >= 2412 && frequency <= 2484) {
-        if (frequency === 2484) return 14;
+        if (frequency === 2484) {return 14}
         return Math.floor((frequency - 2407) / 5);
     } else if (frequency >= 5000) {
         return Math.floor((frequency - 5000) / 5);
@@ -184,44 +191,44 @@ function frequencyToChannel(frequency: number): number {
     return 0;
 }
 
-function channelToBand(channel: number): '2.4 GHz' | '5 GHz' | 'unknown' {
-    if (channel >= 1 && channel <= 14) return '2.4 GHz';
-    if (channel >= 32 && channel <= 177) return '5 GHz';
-    return 'unknown';
+function channelToBand(channel: number): "2.4 GHz" | "5 GHz" | "unknown" {
+    if (channel >= 1 && channel <= 14) {return "2.4 GHz"}
+    if (channel >= 32 && channel <= 177) {return "5 GHz"}
+    return "unknown";
 }
 
 function decodeSsid(ssidData: unknown): string {
-    if (typeof ssidData === 'string') {
+    if (typeof ssidData === "string") {
         try {
             return atob(ssidData);
         } catch (e) {
-            console.error('Failed to decode Base64 SSID:', e);
-            return '';
+            console.error("Failed to decode Base64 SSID:", e);
+            return "";
         }
     } else if (Array.isArray(ssidData)) {
         return new TextDecoder().decode(new Uint8Array(ssidData));
     }
-    return '';
+    return "";
 }
 
 export async function scanWifiNetworks(interfaceName: string): Promise<WifiNetwork[]> {
     try {
         // polkit rule authorizes the onboarding user
-        const nmClient = cockpit.dbus('org.freedesktop.NetworkManager');
+        const nmClient = cockpit.dbus("org.freedesktop.NetworkManager");
         const device = await findWifiDevice(nmClient, interfaceName);
 
         if (!device) {
             throw new Error(`WiFi device ${interfaceName} not found`);
         }
 
-        const deviceProxy = nmClient.proxy('org.freedesktop.NetworkManager.Device.Wireless', device.devicePath);
+        const deviceProxy = nmClient.proxy("org.freedesktop.NetworkManager.Device.Wireless", device.devicePath);
         await waitForProxy(deviceProxy);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (deviceProxy as any).call('RequestScan', [{}]);
+        await (deviceProxy as any).call("RequestScan", [{}]);
 
         // Wait for scan to complete (typical scan takes 2-3 seconds)
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise((resolve) => setTimeout(resolve, 3000));
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const deviceData = deviceProxy.data as any;
@@ -230,28 +237,24 @@ export async function scanWifiNetworks(interfaceName: string): Promise<WifiNetwo
 
         for (const apPath of apPaths) {
             try {
-                const apProxy = nmClient.proxy('org.freedesktop.NetworkManager.AccessPoint', apPath);
+                const apProxy = nmClient.proxy("org.freedesktop.NetworkManager.AccessPoint", apPath);
                 await waitForProxy(apProxy);
 
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const apData = apProxy.data as any;
 
-                const ssid = decodeSsid(apData.Ssid || '');
+                const ssid = decodeSsid(apData.Ssid || "");
                 if (!ssid || ssid.trim().length === 0) {
                     continue;
                 }
 
                 const strength = apData.Strength || 0;
                 const frequency = apData.Frequency || 0;
-                const bssid = apData.HwAddress || '';
+                const bssid = apData.HwAddress || "";
                 const rate = Math.floor((apData.MaxBitrate || 0) / 1000);
                 const channel = frequencyToChannel(frequency);
                 const band = channelToBand(channel);
-                const security = parseWifiSecurity(
-                    apData.Flags || 0,
-                    apData.WpaFlags || 0,
-                    apData.RsnFlags || 0
-                );
+                const security = parseWifiSecurity(apData.Flags || 0, apData.WpaFlags || 0, apData.RsnFlags || 0);
 
                 aps.push({ ssid, strength, security, frequency, channel, band, rate, bssid });
             } catch (error) {
@@ -267,7 +270,7 @@ export async function scanWifiNetworks(interfaceName: string): Promise<WifiNetwo
 
         return aps;
     } catch (error) {
-        console.error('WiFi scan failed:', error);
+        console.error("WiFi scan failed:", error);
         throw new Error(`WiFi network scan failed: ${String(error)}`);
     }
 }

@@ -6,21 +6,21 @@
  * 2. Default: /usr/share/cockpit/system-onboarding/config.json (fallback)
  */
 
-import cockpit from 'cockpit';
-import { SystemOnboardingConfig } from './types';
+import cockpit from "cockpit";
+import { SystemOnboardingConfig } from "./types";
 
 // Configuration file paths
-const DEFAULT_CONFIG_PATH = '/usr/share/cockpit/system-onboarding/config.json';
-const USER_CONFIG_PATH = '/etc/cockpit/system-onboarding/config.json';
+const DEFAULT_CONFIG_PATH = "/usr/share/cockpit/system-onboarding/config.json";
+const USER_CONFIG_PATH = "/etc/cockpit/system-onboarding/config.json";
 
 const ALLOWED_SCRIPT_DIRS = [
-    '/usr/share/cockpit/system-onboarding/system-onboarding.d/',
-    '/etc/cockpit/system-onboarding.d/',
+    "/usr/share/cockpit/system-onboarding/system-onboarding.d/",
+    "/etc/cockpit/system-onboarding.d/",
 ];
 
 // Default configuration if no files are found
 const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
-    version: '1.0',
+    version: "1.0",
     runOnce: true,
     keepCockpit: false,
     hideModules: true,
@@ -29,20 +29,20 @@ const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
     network: {
         ethernet: {
             enabled: true,
-            staticIp: '192.168.100.1',
+            staticIp: "192.168.100.1",
         },
         wifiAp: {
             enabled: false,
-            ssidPrefix: 'setup-',
-            interface: '',
-            password: 'onboarding',
+            ssidPrefix: "setup-",
+            interface: "",
+            password: "onboarding",
         },
     },
     led: {
         enabled: false,
     },
     connectivityTest: {
-        host: 'www.google.com',
+        host: "www.google.com",
     },
 };
 
@@ -64,7 +64,7 @@ export async function loadConfig(): Promise<SystemOnboardingConfig> {
             defaultConfig = content as Partial<SystemOnboardingConfig>;
         }
     } catch (error) {
-        console.warn('Default config not found or could not be read, using built-in defaults:', error);
+        console.warn("Default config not found or could not be read, using built-in defaults:", error);
     }
 
     // Try to load user override configuration
@@ -75,7 +75,7 @@ export async function loadConfig(): Promise<SystemOnboardingConfig> {
             userConfig = content as Partial<SystemOnboardingConfig>;
         }
     } catch (error) {
-        console.info('User config not found, using defaults:', error);
+        console.info("User config not found, using defaults:", error);
     }
 
     // Merge configurations: built-in defaults < default file < user override
@@ -139,10 +139,10 @@ export async function loadConfig(): Promise<SystemOnboardingConfig> {
 export function validateConfig(config: SystemOnboardingConfig): void {
     // Check required fields
     if (!config.version) {
-        throw new Error('Configuration validation failed: version is required');
+        throw new Error("Configuration validation failed: version is required");
     }
 
-    if (config.version !== '1.0') {
+    if (config.version !== "1.0") {
         throw new Error(`Configuration validation failed: version must be '1.0', got '${config.version}'`);
     }
 
@@ -150,15 +150,17 @@ export function validateConfig(config: SystemOnboardingConfig): void {
     if (config.enrollmentServices && Array.isArray(config.enrollmentServices)) {
         config.enrollmentServices.forEach((service, index) => {
             // Required fields
-            if (!service.id || typeof service.id !== 'string') {
+            if (!service.id || typeof service.id !== "string") {
                 throw new Error(`Enrollment service at index ${index}: 'id' is required and must be a string`);
             }
 
             if (!/^[a-z0-9-]+$/.test(service.id)) {
-                throw new Error(`Enrollment service '${service.id}': id must contain only lowercase letters, numbers, and hyphens`);
+                throw new Error(
+                    `Enrollment service '${service.id}': id must contain only lowercase letters, numbers, and hyphens`
+                );
             }
 
-            if (!service.name || typeof service.name !== 'string') {
+            if (!service.name || typeof service.name !== "string") {
                 throw new Error(`Enrollment service '${service.id}': 'name' is required and must be a string`);
             }
 
@@ -166,11 +168,11 @@ export function validateConfig(config: SystemOnboardingConfig): void {
                 throw new Error(`Enrollment service '${service.id}': name length must be between 1 and 100 characters`);
             }
 
-            if (!service.endpoint || typeof service.endpoint !== 'object') {
+            if (!service.endpoint || typeof service.endpoint !== "object") {
                 throw new Error(`Enrollment service '${service.id}': 'endpoint' is required and must be an object`);
             }
 
-            if (typeof service.endpoint.url !== 'string') {
+            if (typeof service.endpoint.url !== "string") {
                 throw new Error(`Enrollment service '${service.id}': endpoint.url must be a string`);
             }
 
@@ -179,33 +181,39 @@ export function validateConfig(config: SystemOnboardingConfig): void {
                 throw new Error(`Enrollment service '${service.id}': endpoint.url must start with http:// or https://`);
             }
 
-            if (!service.credentialsSchema || typeof service.credentialsSchema !== 'object') {
-                throw new Error(`Enrollment service '${service.id}': 'credentialsSchema' is required and must be an object`);
+            if (!service.credentialsSchema || typeof service.credentialsSchema !== "object") {
+                throw new Error(
+                    `Enrollment service '${service.id}': 'credentialsSchema' is required and must be an object`
+                );
             }
 
-            if (service.credentialsSchema.type !== 'object') {
+            if (service.credentialsSchema.type !== "object") {
                 throw new Error(`Enrollment service '${service.id}': credentialsSchema.type must be 'object'`);
             }
 
             // credentialsSchema must have either top-level properties or oneOf variants
-            const hasProperties = service.credentialsSchema.properties && typeof service.credentialsSchema.properties === 'object';
-            const hasOneOf = Array.isArray(service.credentialsSchema.oneOf) && service.credentialsSchema.oneOf.length > 0;
+            const hasProperties =
+                service.credentialsSchema.properties && typeof service.credentialsSchema.properties === "object";
+            const hasOneOf =
+                Array.isArray(service.credentialsSchema.oneOf) && service.credentialsSchema.oneOf.length > 0;
             if (!hasProperties && !hasOneOf) {
-                throw new Error(`Enrollment service '${service.id}': credentialsSchema must have 'properties' or 'oneOf'`);
-            }
-
-            if (!service.scriptPath || typeof service.scriptPath !== 'string') {
-                throw new Error(`Enrollment service '${service.id}': 'scriptPath' is required and must be a string`);
-            }
-
-            if (!ALLOWED_SCRIPT_DIRS.some(dir => service.scriptPath.startsWith(dir))) {
                 throw new Error(
-                    `Enrollment service '${service.id}': scriptPath must be within an allowed directory ` +
-                    `(${ALLOWED_SCRIPT_DIRS.join(' or ')}), got '${service.scriptPath}'`
+                    `Enrollment service '${service.id}': credentialsSchema must have 'properties' or 'oneOf'`
                 );
             }
 
-            if (service.scriptPath.includes('..')) {
+            if (!service.scriptPath || typeof service.scriptPath !== "string") {
+                throw new Error(`Enrollment service '${service.id}': 'scriptPath' is required and must be a string`);
+            }
+
+            if (!ALLOWED_SCRIPT_DIRS.some((dir) => service.scriptPath.startsWith(dir))) {
+                throw new Error(
+                    `Enrollment service '${service.id}': scriptPath must be within an allowed directory ` +
+                        `(${ALLOWED_SCRIPT_DIRS.join(" or ")}), got '${service.scriptPath}'`
+                );
+            }
+
+            if (service.scriptPath.includes("..")) {
                 throw new Error(`Enrollment service '${service.id}': scriptPath must not contain '..'`);
             }
 
@@ -214,17 +222,25 @@ export function validateConfig(config: SystemOnboardingConfig): void {
                     throw new Error(`Enrollment service '${service.id}': 'skipWhen' must be an array`);
                 }
                 service.skipWhen.forEach((condition, condIndex) => {
-                    if (!condition.action || (condition.action !== 'skip' && condition.action !== 'connectivityOnly')) {
-                        throw new Error(`Enrollment service '${service.id}': skipWhen[${condIndex}].action must be 'skip' or 'connectivityOnly'`);
+                    if (!condition.action || (condition.action !== "skip" && condition.action !== "connectivityOnly")) {
+                        throw new Error(
+                            `Enrollment service '${service.id}': skipWhen[${condIndex}].action must be 'skip' or 'connectivityOnly'`
+                        );
                     }
-                    if (!condition.reason || typeof condition.reason !== 'string') {
-                        throw new Error(`Enrollment service '${service.id}': skipWhen[${condIndex}].reason is required`);
+                    if (!condition.reason || typeof condition.reason !== "string") {
+                        throw new Error(
+                            `Enrollment service '${service.id}': skipWhen[${condIndex}].reason is required`
+                        );
                     }
                     if (condition.allPathsExist !== undefined && !Array.isArray(condition.allPathsExist)) {
-                        throw new Error(`Enrollment service '${service.id}': skipWhen[${condIndex}].allPathsExist must be an array`);
+                        throw new Error(
+                            `Enrollment service '${service.id}': skipWhen[${condIndex}].allPathsExist must be an array`
+                        );
                     }
                     if (condition.anyPathExists !== undefined && !Array.isArray(condition.anyPathExists)) {
-                        throw new Error(`Enrollment service '${service.id}': skipWhen[${condIndex}].anyPathExists must be an array`);
+                        throw new Error(
+                            `Enrollment service '${service.id}': skipWhen[${condIndex}].anyPathExists must be an array`
+                        );
                     }
                 });
             }
@@ -237,38 +253,46 @@ export function validateConfig(config: SystemOnboardingConfig): void {
             const wifiAp = config.network.wifiAp;
 
             if (wifiAp.ssidPrefix !== undefined) {
-                if (typeof wifiAp.ssidPrefix !== 'string' || wifiAp.ssidPrefix.length < 1 || wifiAp.ssidPrefix.length > 20) {
-                    throw new Error('WiFi AP ssidPrefix must be a string between 1 and 20 characters');
+                if (
+                    typeof wifiAp.ssidPrefix !== "string" ||
+                    wifiAp.ssidPrefix.length < 1 ||
+                    wifiAp.ssidPrefix.length > 20
+                ) {
+                    throw new Error("WiFi AP ssidPrefix must be a string between 1 and 20 characters");
                 }
 
                 if (!/^[a-zA-Z0-9_-]+$/.test(wifiAp.ssidPrefix)) {
-                    throw new Error('WiFi AP ssidPrefix must contain only alphanumeric characters, underscores, and hyphens');
+                    throw new Error(
+                        "WiFi AP ssidPrefix must contain only alphanumeric characters, underscores, and hyphens"
+                    );
                 }
             }
 
-            if (wifiAp.interface !== undefined && wifiAp.interface !== '') {
-                if (typeof wifiAp.interface !== 'string' || wifiAp.interface.length > 15) {
-                    throw new Error('WiFi AP interface must be a string of at most 15 characters');
+            if (wifiAp.interface !== undefined && wifiAp.interface !== "") {
+                if (typeof wifiAp.interface !== "string" || wifiAp.interface.length > 15) {
+                    throw new Error("WiFi AP interface must be a string of at most 15 characters");
                 }
                 if (!/^[a-zA-Z0-9._-]+$/.test(wifiAp.interface)) {
-                    throw new Error('WiFi AP interface must contain only alphanumeric characters, dots, underscores, and hyphens');
+                    throw new Error(
+                        "WiFi AP interface must contain only alphanumeric characters, dots, underscores, and hyphens"
+                    );
                 }
             }
 
             if (wifiAp.password !== undefined) {
-                if (typeof wifiAp.password !== 'string') {
-                    throw new Error('WiFi AP password must be a string');
+                if (typeof wifiAp.password !== "string") {
+                    throw new Error("WiFi AP password must be a string");
                 }
                 // Empty string means open network (no password); non-empty must be 8-63 chars (WPA2 requirement)
                 if (wifiAp.password.length > 0 && (wifiAp.password.length < 8 || wifiAp.password.length > 63)) {
-                    throw new Error('WiFi AP password must be empty (open network) or between 8 and 63 characters');
+                    throw new Error("WiFi AP password must be empty (open network) or between 8 and 63 characters");
                 }
             }
         }
 
         if (config.network.ethernet?.staticIp !== undefined) {
             const staticIp = config.network.ethernet.staticIp;
-            if (typeof staticIp !== 'string' || !isValidIPv4(staticIp)) {
+            if (typeof staticIp !== "string" || !isValidIPv4(staticIp)) {
                 throw new Error(`Ethernet staticIp must be a valid IPv4 address, got '${staticIp}'`);
             }
         }
@@ -276,8 +300,8 @@ export function validateConfig(config: SystemOnboardingConfig): void {
 
     // Validate LED configuration
     if (config.led?.enabled === true) {
-        if (!config.led.tool || typeof config.led.tool !== 'string') {
-            throw new Error('LED configuration: tool path is required when LED is enabled');
+        if (!config.led.tool || typeof config.led.tool !== "string") {
+            throw new Error("LED configuration: tool path is required when LED is enabled");
         }
     }
 }
@@ -289,10 +313,10 @@ export function validateConfig(config: SystemOnboardingConfig): void {
  * @returns boolean - true if valid IPv4 address
  */
 function isValidIPv4(ip: string): boolean {
-    const parts = ip.split('.');
-    if (parts.length !== 4) return false;
+    const parts = ip.split(".");
+    if (parts.length !== 4) {return false}
 
-    return parts.every(part => {
+    return parts.every((part) => {
         const num = parseInt(part, 10);
         return !isNaN(num) && num >= 0 && num <= 255 && part === String(num);
     });

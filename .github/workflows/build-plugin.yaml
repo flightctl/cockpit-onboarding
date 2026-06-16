@@ -30,6 +30,9 @@ jobs:
       - name: Fix git ownership
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
+      - name: Run static analysis
+        run: make codecheck
+
       - name: Build RPM
         run: make rpm
 

@@ -5,7 +5,7 @@
  * Dynamically renders credential forms based on each service's JSON schema.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from "react";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { FormGroup, FormHelperText } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
@@ -15,11 +15,11 @@ import { Card, CardBody, CardTitle } from "@patternfly/react-core/dist/esm/compo
 import { Alert, AlertVariant } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
 import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/components/HelperText/index.js";
-import { useModelContext } from '../model-context';
-import { useConfig } from '../app';
-import { validateURL } from '../validation';
-import { evaluateSkipConditions, SkipResult } from '../services/skip-conditions';
-import type { EnrollmentService } from '../types';
+import { useModelContext } from "../model-context";
+import { useConfig } from "../app";
+import { validateURL } from "../validation";
+import { evaluateSkipConditions, SkipResult } from "../services/skip-conditions";
+import type { EnrollmentService } from "../types";
 
 /**
  * JSON Schema Form Renderer
@@ -57,43 +57,38 @@ interface JsonSchemaFormProps {
 /**
  * Validate a single field against its schema and required list.
  */
-function validateField(
-    fieldName: string,
-    value: unknown,
-    fieldSchema: FieldSchema,
-    required: string[]
-): string | null {
+function validateField(fieldName: string, value: unknown, fieldSchema: FieldSchema, required: string[]): string | null {
     if (required.includes(fieldName)) {
-        if (value === undefined || value === null || value === '') {
-            return 'This field is required';
+        if (value === undefined || value === null || value === "") {
+            return "This field is required";
         }
     }
 
-    if (value !== undefined && value !== null && value !== '') {
+    if (value !== undefined && value !== null && value !== "") {
         switch (fieldSchema.type) {
-        case 'string': {
-            const strValue = String(value);
-            if (fieldSchema.minLength && strValue.length < fieldSchema.minLength) {
-                return `Minimum length is ${fieldSchema.minLength}`;
+            case "string": {
+                const strValue = String(value);
+                if (fieldSchema.minLength && strValue.length < fieldSchema.minLength) {
+                    return `Minimum length is ${fieldSchema.minLength}`;
+                }
+                if (fieldSchema.maxLength && strValue.length > fieldSchema.maxLength) {
+                    return `Maximum length is ${fieldSchema.maxLength}`;
+                }
+                break;
             }
-            if (fieldSchema.maxLength && strValue.length > fieldSchema.maxLength) {
-                return `Maximum length is ${fieldSchema.maxLength}`;
+            case "number": {
+                const numValue = Number(value);
+                if (isNaN(numValue)) {
+                    return "Must be a valid number";
+                }
+                if (fieldSchema.minimum !== undefined && numValue < fieldSchema.minimum) {
+                    return `Minimum value is ${fieldSchema.minimum}`;
+                }
+                if (fieldSchema.maximum !== undefined && numValue > fieldSchema.maximum) {
+                    return `Maximum value is ${fieldSchema.maximum}`;
+                }
+                break;
             }
-            break;
-        }
-        case 'number': {
-            const numValue = Number(value);
-            if (isNaN(numValue)) {
-                return 'Must be a valid number';
-            }
-            if (fieldSchema.minimum !== undefined && numValue < fieldSchema.minimum) {
-                return `Minimum value is ${fieldSchema.minimum}`;
-            }
-            if (fieldSchema.maximum !== undefined && numValue > fieldSchema.maximum) {
-                return `Maximum value is ${fieldSchema.maximum}`;
-            }
-            break;
-        }
         }
     }
 
@@ -122,77 +117,81 @@ const SchemaFields: React.FC<{
 
                 const validationState = error
                     ? ValidatedOptions.error
-                    : (value && String(value).trim())
-                        ? ValidatedOptions.success
-                        : isRequired
-                            ? ValidatedOptions.warning
-                            : ValidatedOptions.default;
+                    : value && String(value).trim()
+                      ? ValidatedOptions.success
+                      : isRequired
+                        ? ValidatedOptions.warning
+                        : ValidatedOptions.default;
 
                 switch (fieldSchema.type) {
-                case 'string':
-                    return (
-                        <StackItem key={fieldName}>
-                            <FormGroup label={label} isRequired={isRequired}>
-                                <TextInput
+                    case "string":
+                        return (
+                            <StackItem key={fieldName}>
+                                <FormGroup label={label} isRequired={isRequired}>
+                                    <TextInput
+                                        id={`field-${fieldName}`}
+                                        type={fieldSchema.format === "password" ? "password" : "text"}
+                                        value={String(value || "")}
+                                        onChange={(_event, val) => onFieldChange(fieldName, val)}
+                                        validated={validationState}
+                                        isRequired={isRequired}
+                                    />
+                                    {showError && (
+                                        <FormHelperText>
+                                            <HelperText>
+                                                <HelperTextItem variant="error">{error}</HelperTextItem>
+                                            </HelperText>
+                                        </FormHelperText>
+                                    )}
+                                </FormGroup>
+                            </StackItem>
+                        );
+
+                    case "number":
+                        return (
+                            <StackItem key={fieldName}>
+                                <FormGroup label={label} isRequired={isRequired}>
+                                    <TextInput
+                                        id={`field-${fieldName}`}
+                                        type="number"
+                                        value={String(value || "")}
+                                        onChange={(_event, val) => onFieldChange(fieldName, Number(val))}
+                                        validated={validationState}
+                                        isRequired={isRequired}
+                                    />
+                                    {showError && (
+                                        <FormHelperText>
+                                            <HelperText>
+                                                <HelperTextItem variant="error">{error}</HelperTextItem>
+                                            </HelperText>
+                                        </FormHelperText>
+                                    )}
+                                </FormGroup>
+                            </StackItem>
+                        );
+
+                    case "boolean":
+                        return (
+                            <StackItem key={fieldName}>
+                                <Checkbox
                                     id={`field-${fieldName}`}
-                                    type={fieldSchema.format === 'password' ? 'password' : 'text'}
-                                    value={String(value || '')}
-                                    onChange={(_event, val) => onFieldChange(fieldName, val)}
-                                    validated={validationState}
-                                    isRequired={isRequired}
+                                    label={label}
+                                    isChecked={Boolean(value)}
+                                    onChange={(_event, checked) => onFieldChange(fieldName, checked)}
                                 />
-                                {showError && (
-                                    <FormHelperText>
-                                        <HelperText>
-                                            <HelperTextItem variant="error">{error}</HelperTextItem>
-                                        </HelperText>
-                                    </FormHelperText>
-                                )}
-                            </FormGroup>
-                        </StackItem>
-                    );
+                            </StackItem>
+                        );
 
-                case 'number':
-                    return (
-                        <StackItem key={fieldName}>
-                            <FormGroup label={label} isRequired={isRequired}>
-                                <TextInput
-                                    id={`field-${fieldName}`}
-                                    type="number"
-                                    value={String(value || '')}
-                                    onChange={(_event, val) => onFieldChange(fieldName, Number(val))}
-                                    validated={validationState}
-                                    isRequired={isRequired}
+                    default:
+                        return (
+                            <StackItem key={fieldName}>
+                                <Alert
+                                    variant={AlertVariant.warning}
+                                    isInline
+                                    title={`Unsupported field type: ${fieldSchema.type}`}
                                 />
-                                {showError && (
-                                    <FormHelperText>
-                                        <HelperText>
-                                            <HelperTextItem variant="error">{error}</HelperTextItem>
-                                        </HelperText>
-                                    </FormHelperText>
-                                )}
-                            </FormGroup>
-                        </StackItem>
-                    );
-
-                case 'boolean':
-                    return (
-                        <StackItem key={fieldName}>
-                            <Checkbox
-                                id={`field-${fieldName}`}
-                                label={label}
-                                isChecked={Boolean(value)}
-                                onChange={(_event, checked) => onFieldChange(fieldName, checked)}
-                            />
-                        </StackItem>
-                    );
-
-                default:
-                    return (
-                        <StackItem key={fieldName}>
-                            <Alert variant={AlertVariant.warning} isInline title={`Unsupported field type: ${fieldSchema.type}`} />
-                        </StackItem>
-                    );
+                            </StackItem>
+                        );
                 }
             })}
         </>
@@ -204,7 +203,7 @@ const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onCha
     const [touched, setTouched] = useState<Record<string, boolean>>({});
 
     // Track which oneOf variant is selected (stored as _variantIndex in formData)
-    const selectedVariant = typeof formData._variantIndex === 'number' ? formData._variantIndex as number : 0;
+    const selectedVariant = typeof formData._variantIndex === "number" ? (formData._variantIndex as number) : 0;
 
     // Resolve the active properties and required fields
     const { activeProperties, activeRequired } = useMemo(() => {
@@ -225,12 +224,12 @@ const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onCha
         const newFormData = { ...formData, [fieldName]: value };
         onChange(newFormData);
 
-        setTouched(prev => ({ ...prev, [fieldName]: true }));
+        setTouched((prev) => ({ ...prev, [fieldName]: true }));
 
         const fieldSchema = activeProperties[fieldName];
         if (fieldSchema) {
             const error = validateField(fieldName, value, fieldSchema, activeRequired);
-            setErrors(prev => ({ ...prev, [fieldName]: error || '' }));
+            setErrors((prev) => ({ ...prev, [fieldName]: error || "" }));
         }
     };
 
@@ -285,7 +284,10 @@ export const EnrollmentPage: React.FunctionComponent = () => {
     const { model, updateModel } = useModelContext();
 
     const enrollmentServices = useMemo(() => config?.enrollmentServices || [], [config?.enrollmentServices]);
-    const selectedServices = useMemo(() => model.enrollment.selectedServices || [], [model.enrollment.selectedServices]);
+    const selectedServices = useMemo(
+        () => model.enrollment.selectedServices || [],
+        [model.enrollment.selectedServices]
+    );
     const credentials = model.enrollment.credentials || {};
     const endpoints = useMemo(() => model.enrollment.endpoints || {}, [model.enrollment.endpoints]);
     const useExisting = useMemo(() => model.enrollment.useExisting || {}, [model.enrollment.useExisting]);
@@ -300,7 +302,7 @@ export const EnrollmentPage: React.FunctionComponent = () => {
     // Capture which services had existing credentials detected at init time
     useEffect(() => {
         setDetectedExisting({ ...useExisting });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Evaluate skipWhen conditions on mount
@@ -318,20 +320,22 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                 // step validation does not require credentials.
                 const updates: Record<string, boolean> = {};
                 for (const service of enrollmentServices) {
-                    if (results[service.id]?.action === 'connectivityOnly') {
+                    if (results[service.id]?.action === "connectivityOnly") {
                         updates[service.id] = true;
                     }
                 }
                 if (Object.keys(updates).length > 0) {
-                    updateModel('enrollment', {
+                    updateModel("enrollment", {
                         useExisting: { ...useExisting, ...updates },
                     });
                 }
             }
         };
         evaluate();
-        return () => { cancelled = true };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [enrollmentServices]);
 
     // Validate endpoints on mount and when they change
@@ -341,7 +345,7 @@ export const EnrollmentPage: React.FunctionComponent = () => {
             if (useExisting[serviceId]) {
                 continue;
             }
-            const service = enrollmentServices.find(s => s.id === serviceId);
+            const service = enrollmentServices.find((s) => s.id === serviceId);
             if (service) {
                 const endpoint = endpoints[serviceId] || service.endpoint.url;
                 const error = validateURL(endpoint, true);
@@ -355,16 +359,16 @@ export const EnrollmentPage: React.FunctionComponent = () => {
 
     const toggleServiceSelection = (serviceId: string) => {
         const newSelectedServices = selectedServices.includes(serviceId)
-            ? selectedServices.filter(id => id !== serviceId)
+            ? selectedServices.filter((id) => id !== serviceId)
             : [...selectedServices, serviceId];
 
-        updateModel('enrollment', {
+        updateModel("enrollment", {
             selectedServices: newSelectedServices,
         });
     };
 
     const updateServiceCredentials = (serviceId: string, credentialsData: Record<string, unknown>) => {
-        updateModel('enrollment', {
+        updateModel("enrollment", {
             credentials: {
                 ...credentials,
                 [serviceId]: credentialsData,
@@ -373,12 +377,12 @@ export const EnrollmentPage: React.FunctionComponent = () => {
     };
 
     const updateServiceEndpoint = (serviceId: string, endpoint: string) => {
-        setEndpointTouched(prev => ({ ...prev, [serviceId]: true }));
+        setEndpointTouched((prev) => ({ ...prev, [serviceId]: true }));
 
         const error = validateURL(endpoint, true);
-        setEndpointErrors(prev => ({ ...prev, [serviceId]: error || '' }));
+        setEndpointErrors((prev) => ({ ...prev, [serviceId]: error || "" }));
 
-        updateModel('enrollment', {
+        updateModel("enrollment", {
             endpoints: {
                 ...endpoints,
                 [serviceId]: endpoint,
@@ -387,7 +391,7 @@ export const EnrollmentPage: React.FunctionComponent = () => {
     };
 
     const setUseExisting = (serviceId: string, value: boolean) => {
-        updateModel('enrollment', {
+        updateModel("enrollment", {
             useExisting: {
                 ...useExisting,
                 [serviceId]: value,
@@ -400,13 +404,9 @@ export const EnrollmentPage: React.FunctionComponent = () => {
         return (
             <Stack hasGutter>
                 <StackItem>
-                    <Alert
-                        variant={AlertVariant.info}
-                        isInline
-                        title="No enrollment services configured"
-                    >
-                        No enrollment services are currently configured. You can skip this step or configure
-                        services in <code>/etc/cockpit/system-onboarding/config.json</code>.
+                    <Alert variant={AlertVariant.info} isInline title="No enrollment services configured">
+                        No enrollment services are currently configured. You can skip this step or configure services in{" "}
+                        <code>/etc/cockpit/system-onboarding/config.json</code>.
                     </Alert>
                 </StackItem>
             </Stack>
@@ -422,7 +422,7 @@ export const EnrollmentPage: React.FunctionComponent = () => {
             {enrollmentServices.map((service: EnrollmentService) => {
                 const skip = skipResults[service.id];
 
-                if (skip?.action === 'skip') {
+                if (skip?.action === "skip") {
                     return (
                         <StackItem key={service.id}>
                             <Alert variant={AlertVariant.info} isInline title={service.name}>
@@ -433,7 +433,7 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                 }
 
                 const isSelected = selectedServices.includes(service.id);
-                const isConnectivityOnly = skip?.action === 'connectivityOnly';
+                const isConnectivityOnly = skip?.action === "connectivityOnly";
                 const isUsingExisting = useExisting[service.id] ?? false;
                 const serviceCredentials = credentials[service.id] || {};
                 // Use nullish coalescing to only fall back to default if undefined/null, not empty string
@@ -446,8 +446,8 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                 const endpointValidated = endpointError
                     ? ValidatedOptions.error
                     : serviceEndpoint?.trim()
-                        ? ValidatedOptions.success
-                        : ValidatedOptions.warning;
+                      ? ValidatedOptions.success
+                      : ValidatedOptions.warning;
 
                 return (
                     <StackItem key={service.id}>
@@ -462,7 +462,7 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                                 />
                             </CardTitle>
 
-                            {isSelected && isConnectivityOnly && skip?.action === 'connectivityOnly' && (
+                            {isSelected && isConnectivityOnly && skip?.action === "connectivityOnly" && (
                                 <CardBody>
                                     <Alert variant={AlertVariant.info} isInline title="Existing credentials detected">
                                         {skip.reason}
@@ -505,26 +505,33 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                                             <>
                                                 {/* Endpoint URL (with optional override) */}
                                                 <StackItem>
-                                                    <FormGroup
-                                                        label="Service Endpoint"
-                                                        isRequired
-                                                    >
+                                                    <FormGroup label="Service Endpoint" isRequired>
                                                         <TextInput
                                                             id={`endpoint-${service.id}`}
                                                             value={serviceEndpoint}
-                                                            onChange={(_event, value) => updateServiceEndpoint(service.id, value)}
+                                                            onChange={(_event, value) =>
+                                                                updateServiceEndpoint(service.id, value)
+                                                            }
                                                             isDisabled={!service.endpoint.allowUserOverride}
                                                             validated={endpointValidated}
                                                         />
                                                         {showEndpointError && (
                                                             <FormHelperText>
                                                                 <HelperText>
-                                                                    <HelperTextItem variant="error">{endpointError}</HelperTextItem>
+                                                                    <HelperTextItem variant="error">
+                                                                        {endpointError}
+                                                                    </HelperTextItem>
                                                                 </HelperText>
                                                             </FormHelperText>
                                                         )}
                                                         {!service.endpoint.allowUserOverride && (
-                                                            <div style={{ fontSize: 'var(--pf-global--FontSize--sm)', color: 'var(--pf-global--Color--200)', marginTop: '0.25rem' }}>
+                                                            <div
+                                                                style={{
+                                                                    fontSize: "var(--pf-global--FontSize--sm)",
+                                                                    color: "var(--pf-global--Color--200)",
+                                                                    marginTop: "0.25rem",
+                                                                }}
+                                                            >
                                                                 Endpoint is configured by the administrator
                                                             </div>
                                                         )}
@@ -537,7 +544,9 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                                                         <JsonSchemaForm
                                                             schema={service.credentialsSchema}
                                                             formData={serviceCredentials}
-                                                            onChange={(data) => updateServiceCredentials(service.id, data)}
+                                                            onChange={(data) =>
+                                                                updateServiceCredentials(service.id, data)
+                                                            }
                                                         />
                                                     </FormGroup>
                                                 </StackItem>

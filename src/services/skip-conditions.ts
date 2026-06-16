@@ -6,17 +6,17 @@
  * first match wins.
  */
 
-import cockpit from 'cockpit';
-import { SkipWhenCondition } from '../types';
+import cockpit from "cockpit";
+import { SkipWhenCondition } from "../types";
 
 export type SkipResult =
-    | { action: 'none' }
-    | { action: 'skip'; reason: string }
-    | { action: 'connectivityOnly'; reason: string };
+    | { action: "none" }
+    | { action: "skip"; reason: string }
+    | { action: "connectivityOnly"; reason: string };
 
 async function fileExists(path: string): Promise<boolean> {
     try {
-        await cockpit.spawn(['test', '-f', path], { err: 'ignore' });
+        await cockpit.spawn(["test", "-f", path], { err: "ignore" });
         return true;
     } catch {
         return false;
@@ -48,11 +48,9 @@ async function evaluateSingleCondition(condition: SkipWhenCondition): Promise<bo
  * from the first condition whose file-existence checks pass, or
  * { action: 'none' } if no condition matches.
  */
-export async function evaluateSkipConditions(
-    conditions: SkipWhenCondition[] | undefined
-): Promise<SkipResult> {
+export async function evaluateSkipConditions(conditions: SkipWhenCondition[] | undefined): Promise<SkipResult> {
     if (!conditions || conditions.length === 0) {
-        return { action: 'none' };
+        return { action: "none" };
     }
 
     for (const condition of conditions) {
@@ -62,5 +60,5 @@ export async function evaluateSkipConditions(
         }
     }
 
-    return { action: 'none' };
+    return { action: "none" };
 }

@@ -1,6 +1,6 @@
-import cockpit from 'cockpit';
-import type { EnrollmentService } from '../types';
-import type { SkipResult } from './skip-conditions';
+import cockpit from "cockpit";
+import type { EnrollmentService } from "../types";
+import type { SkipResult } from "./skip-conditions";
 
 export interface CancellationSignal {
     cancelled: boolean;
@@ -17,7 +17,7 @@ export async function testNetworkConnectivity(
     testHost: string,
     iface: string | undefined,
     signal?: CancellationSignal,
-    onOutput?: (output: string) => void,
+    onOutput?: (output: string) => void
 ): Promise<ConnectivityResult> {
     try {
         // DNS resolution
@@ -25,18 +25,18 @@ export async function testNetworkConnectivity(
             const dnsLabel = iface ? `${testHost} via ${iface}` : testHost;
             onOutput?.(`• Resolving ${dnsLabel} via DNS...`);
             const dnsArgs = iface
-                ? ['resolvectl', 'query', `--interface=${iface}`, testHost]
-                : ['getent', 'hosts', testHost];
-            const dnsProc = cockpit.spawn(dnsArgs, { err: 'ignore' });
-            if (signal) signal.process = dnsProc;
+                ? ["resolvectl", "query", `--interface=${iface}`, testHost]
+                : ["getent", "hosts", testHost];
+            const dnsProc = cockpit.spawn(dnsArgs, { err: "ignore" });
+            if (signal) {signal.process = dnsProc}
             await dnsProc;
-            if (signal) signal.process = undefined;
-            onOutput?.(' Success.');
+            if (signal) {signal.process = undefined}
+            onOutput?.(" Success.");
         } catch (dnsError) {
-            if (signal) signal.process = undefined;
+            if (signal) {signal.process = undefined}
 
-            let errorDetail = '';
-            if (dnsError && typeof dnsError === 'object') {
+            let errorDetail = "";
+            if (dnsError && typeof dnsError === "object") {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const err = dnsError as any;
                 if (err.exit_status !== undefined) {
@@ -53,27 +53,27 @@ export async function testNetworkConnectivity(
         try {
             const pingLabel = iface ? `${testHost} via ${iface}` : testHost;
             onOutput?.(`• Pinging ${pingLabel}...`);
-            const pingArgs = ['timeout', '10', 'ping', '-c', '1', '-W', '5'];
+            const pingArgs = ["timeout", "10", "ping", "-c", "1", "-W", "5"];
             if (iface) {
-                pingArgs.push('-I', iface);
+                pingArgs.push("-I", iface);
             }
             pingArgs.push(testHost);
-            const pingProc = cockpit.spawn(pingArgs, { err: 'ignore' });
-            if (signal) signal.process = pingProc;
+            const pingProc = cockpit.spawn(pingArgs, { err: "ignore" });
+            if (signal) {signal.process = pingProc}
             await pingProc;
-            if (signal) signal.process = undefined;
-            onOutput?.(' Success.');
+            if (signal) {signal.process = undefined}
+            onOutput?.(" Success.");
             return { success: true, output: "success" };
         } catch (pingError) {
-            if (signal) signal.process = undefined;
+            if (signal) {signal.process = undefined}
             console.warn(`Ping failed for ${testHost}:`, pingError);
-            const warningMsg = ' Failed.\n  However, pings may be simply blocked by firewall.';
+            const warningMsg = " Failed.\n  However, pings may be simply blocked by firewall.";
             onOutput?.(warningMsg);
             return { success: true, output: warningMsg };
         }
     } catch (error) {
-        if (signal) signal.process = undefined;
-        console.error('Connectivity test error:', error);
+        if (signal) {signal.process = undefined}
+        console.error("Connectivity test error:", error);
         const errorMsg = error instanceof Error ? error.message : String(error);
         const fullErrorMsg = `Network connectivity test failed: ${errorMsg}`;
         onOutput?.(fullErrorMsg);
@@ -86,14 +86,14 @@ export async function verifyServiceConnectivity(
     endpoint: string,
     skipInfo: SkipResult | undefined,
     signal?: CancellationSignal,
-    onOutput?: (output: string) => void,
+    onOutput?: (output: string) => void
 ): Promise<ConnectivityResult> {
-    if (skipInfo?.action === 'connectivityOnly') {
+    if (skipInfo?.action === "connectivityOnly") {
         onOutput?.(`${skipInfo.reason}\n`);
     }
 
     if (!endpoint) {
-        const msg = 'No endpoint configured — cannot verify connectivity.';
+        const msg = "No endpoint configured — cannot verify connectivity.";
         onOutput?.(msg);
         return { success: false, output: msg };
     }
@@ -110,13 +110,13 @@ export async function verifyServiceConnectivity(
     // DNS resolution
     try {
         onOutput?.(`• Resolving ${hostname}...`);
-        const dnsProc = cockpit.spawn(['getent', 'hosts', hostname], { err: 'ignore' });
-        if (signal) signal.process = dnsProc;
+        const dnsProc = cockpit.spawn(["getent", "hosts", hostname], { err: "ignore" });
+        if (signal) {signal.process = dnsProc}
         await dnsProc;
-        if (signal) signal.process = undefined;
-        onOutput?.(' Success.');
+        if (signal) {signal.process = undefined}
+        onOutput?.(" Success.");
     } catch {
-        if (signal) signal.process = undefined;
+        if (signal) {signal.process = undefined}
         const msg = ` Failed.\n  Cannot resolve ${hostname}. Check DNS configuration.`;
         onOutput?.(msg);
         return { success: false, output: msg };
@@ -126,16 +126,27 @@ export async function verifyServiceConnectivity(
     try {
         onOutput?.(`• Connecting to ${endpoint}...`);
         const curlProc = cockpit.spawn(
-            ['curl', '-sf', '--max-time', '10', '-k', '-o', '/dev/null', '-w', '%{http_code}', `${endpoint}/api/v1/version`],
-            { err: 'ignore' }
+            [
+                "curl",
+                "-sf",
+                "--max-time",
+                "10",
+                "-k",
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                `${endpoint}/api/v1/version`,
+            ],
+            { err: "ignore" }
         );
-        if (signal) signal.process = curlProc;
+        if (signal) {signal.process = curlProc}
         await curlProc;
-        if (signal) signal.process = undefined;
-        onOutput?.(' Success.');
-        return { success: true, output: 'Connectivity verified' };
+        if (signal) {signal.process = undefined}
+        onOutput?.(" Success.");
+        return { success: true, output: "Connectivity verified" };
     } catch {
-        if (signal) signal.process = undefined;
+        if (signal) {signal.process = undefined}
         const msg = ` Failed.\n  Cannot connect to ${endpoint}. The server may be unreachable.`;
         onOutput?.(msg);
         return { success: false, output: msg };
