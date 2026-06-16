@@ -199,7 +199,9 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         onOutput?: (output: string) => void
     ): Promise<{ success: boolean; output: string; deviceUrl?: string }> => {
         const step = steps.find((s) => s.id === stepId);
-        if (!step) {return { success: false, output: "Step not found" }}
+        if (!step) {
+            return { success: false, output: "Step not found" };
+        }
 
         // Update step to running
         setSteps((prev) => prev.map((s) => (s.id === stepId ? { ...s, status: "running" } : s)));
@@ -293,8 +295,13 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         onOutput?: (output: string) => void
     ): Promise<{ success: boolean; output: string }> => {
         const testHost = model.connectivityTestHost || "www.google.com";
-        const iface = model.networkInterface.selectedInterface;
-        return testNetworkConnectivity(testHost, iface ?? undefined, signalRef.current, onOutput);
+        const parentIface = model.networkInterface.selectedInterface || "";
+        const vlanId = model.networkInterface.vlanId;
+        const iface =
+            vlanId !== null && parentIface && model.networkInterface.interfaceType !== "wifi"
+                ? `${parentIface}.${vlanId}`
+                : parentIface;
+        return testNetworkConnectivity(testHost, iface, signalRef.current, onOutput);
     };
 
     // Detect whether the user is configuring the same NIC that serves this
@@ -365,9 +372,13 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
 
         // -- Write master params JSON for apply-and-enroll.sh --
         const ifaceName = model.networkInterface.selectedInterface || "";
+        const vlanId = model.networkInterface.vlanId;
+        const isVlan = vlanId !== null && model.networkInterface.interfaceType !== "wifi";
+        const effectiveIfaceName = isVlan ? `${ifaceName}.${vlanId}` : ifaceName;
         const masterParams = {
-            connectionId: `flightctl-onboarding-${ifaceName}`,
+            connectionId: `flightctl-onboarding-${effectiveIfaceName}`,
             interfaceName: ifaceName,
+            effectiveIfaceName,
             enrollmentScripts: enrollmentScriptEntries,
             hostname: model.hostname.value,
             connectivityTestHost: model.connectivityTestHost || "www.google.com",
@@ -378,7 +389,9 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         // -- Mark remaining steps as delegated --
         setSteps((prev) =>
             prev.map((s) => {
-                if (s.id === "apply-config") {return s}
+                if (s.id === "apply-config") {
+                    return s;
+                }
                 return { ...s, status: "delegated" };
             })
         );

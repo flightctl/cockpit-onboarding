@@ -39,10 +39,14 @@ export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageP
 
     const filteredInterfaces = interfaces.filter((iface) => {
         // Skip loopback
-        if (iface.Name === "lo" || (iface.Device && iface.Device.DeviceType === "loopback")) {return false}
+        if (iface.Name === "lo" || (iface.Device && iface.Device.DeviceType === "loopback")) {
+            return false;
+        }
 
         // Skip members
-        if (hasGroup(iface)) {return false}
+        if (hasGroup(iface)) {
+            return false;
+        }
 
         return true;
     });
@@ -86,10 +90,12 @@ export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageP
                     <NetworkWifiSelector interfaceName={selectedIface.Name} />
                 </StackItem>
             )}
-            <StackItem>
-                <p>Optionally, specify the VLAN ID to use on this interface:</p>
-                <NetworkVlanSelector />
-            </StackItem>
+            {!isWifiSelected && (
+                <StackItem>
+                    <p>Optionally, specify the VLAN ID to use on this interface:</p>
+                    <NetworkVlanSelector />
+                </StackItem>
+            )}
         </Stack>
     );
 };
@@ -111,8 +117,12 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
     };
 
     const isIfaceSelectable = (iface: import("../../pkg/networkmanager/interfaces.js").Interface) => {
-        if (!iface.Device) {return false}
-        if (iface.Device.DeviceType === "802-11-wireless") {return true}
+        if (!iface.Device) {
+            return false;
+        }
+        if (iface.Device.DeviceType === "802-11-wireless") {
+            return true;
+        }
         return is_managed(iface.Device);
     };
 
@@ -146,6 +156,7 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
             wifiSsid: isWifi ? model.networkInterface.wifiSsid : null,
             wifiPassword: isWifi ? model.networkInterface.wifiPassword : null,
             wifiSecurity: isWifi ? model.networkInterface.wifiSecurity : null,
+            vlanId: isWifi ? null : model.networkInterface.vlanId,
         });
         // Switch to the configuration of the newly selected interface
         switchToInterfaceConfig(name);
@@ -359,10 +370,18 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
     };
 
     const getSignalIcon = (strength: number) => {
-        if (strength >= 80) {return "▂▄▆█"}
-        if (strength >= 60) {return "▂▄▆_"}
-        if (strength >= 40) {return "▂▄__"}
-        if (strength >= 20) {return "▂___"}
+        if (strength >= 80) {
+            return "▂▄▆█";
+        }
+        if (strength >= 60) {
+            return "▂▄▆_";
+        }
+        if (strength >= 40) {
+            return "▂▄__";
+        }
+        if (strength >= 20) {
+            return "▂___";
+        }
         return "____";
     };
 
