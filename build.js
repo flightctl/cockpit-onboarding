@@ -1,45 +1,49 @@
 #!/usr/bin/env node
 
-import fs from 'node:fs';
-import path from 'node:path';
-import process from 'node:process';
-import os from 'node:os';
+import fs from "node:fs";
+import path from "node:path";
+import process from "node:process";
 
-import { sassPlugin } from 'esbuild-sass-plugin';
+import { sassPlugin } from "esbuild-sass-plugin";
 
-import { cleanPlugin } from './pkg/lib/esbuild-cleanup-plugin.js';
-import { cockpitCompressPlugin } from './pkg/lib/esbuild-compress-plugin.js';
-import { cockpitPoEsbuildPlugin } from './pkg/lib/cockpit-po-plugin.js';
-import { cockpitRsyncEsbuildPlugin } from './pkg/lib/cockpit-rsync-plugin.js';
+import { cleanPlugin } from "./pkg/lib/esbuild-cleanup-plugin.js";
+import { cockpitCompressPlugin } from "./pkg/lib/esbuild-compress-plugin.js";
+import { cockpitPoEsbuildPlugin } from "./pkg/lib/cockpit-po-plugin.js";
+import { cockpitRsyncEsbuildPlugin } from "./pkg/lib/cockpit-rsync-plugin.js";
 
-const production = process.env.NODE_ENV === 'production';
+const production = process.env.NODE_ENV === "production";
 // Prefer native esbuild; fall back to esbuild-wasm only if the native package fails to load
 let esbuild;
 try {
-    esbuild = (await import('esbuild')).default;
+    esbuild = (await import("esbuild")).default;
 } catch (e) {
-    esbuild = (await import('esbuild-wasm')).default;
+    esbuild = (await import("esbuild-wasm")).default;
 }
 
-const parser = (await import('argparse')).default.ArgumentParser();
-parser.add_argument('-r', '--rsync', { help: "rsync bundles to ssh target after build", metavar: "HOST" });
-parser.add_argument('-w', '--watch', { action: 'store_true', help: "Enable watch mode", default: process.env.ESBUILD_WATCH === "true" });
-parser.add_argument('-m', '--metafile', { help: "Enable bundle size information file", metavar: "FILE" });
+const parser = (await import("argparse")).default.ArgumentParser();
+parser.add_argument("-r", "--rsync", { help: "rsync bundles to ssh target after build", metavar: "HOST" });
+parser.add_argument("-w", "--watch", {
+    action: "store_true",
+    help: "Enable watch mode",
+    default: process.env.ESBUILD_WATCH === "true",
+});
+parser.add_argument("-m", "--metafile", { help: "Enable bundle size information file", metavar: "FILE" });
 const args = parser.parse_args();
 
-if (args.rsync)
+if (args.rsync) {
     process.env.RSYNC = args.rsync;
+}
 
 // List of directories to use when using import statements
-const nodePaths = ['pkg/lib'];
-const outdir = 'dist';
+const nodePaths = ["pkg/lib"];
+const outdir = "dist";
 
 // Obtain package name from package.json
-const packageJson = JSON.parse(fs.readFileSync('package.json'));
+const packageJson = JSON.parse(fs.readFileSync("package.json"));
 
 function notifyEndPlugin() {
     return {
-        name: 'notify-end',
+        name: "notify-end",
         setup(build) {
             let startTime;
 
@@ -49,10 +53,10 @@ function notifyEndPlugin() {
 
             build.onEnd(() => {
                 const endTime = new Date();
-                const timeStamp = endTime.toTimeString().split(' ')[0];
+                const timeStamp = endTime.toTimeString().split(" ")[0];
                 console.log(`${timeStamp}: Build finished in ${endTime - startTime} ms`);
             });
-        }
+        },
     };
 }
 
@@ -61,7 +65,7 @@ function watch_dirs(dir, on_change) {
     const callback = (ev, dir, fname) => {
         // only listen for "change" events, as renames are noisy
         // ignore hidden files
-        if (ev !== "change" || fname.startsWith('.')) {
+        if (ev !== "change" || fname.startsWith(".")) {
             return;
         }
         on_change(path.join(dir, fname));
@@ -74,51 +78,52 @@ function watch_dirs(dir, on_change) {
     let dirent;
 
     while ((dirent = d.readSync()) !== null) {
-        if (dirent.isDirectory())
+        if (dirent.isDirectory()) {
             watch_dirs(path.join(dir, dirent.name), on_change);
+        }
     }
     d.closeSync();
 }
 
 const context = await esbuild.context({
-    ...!production ? { sourcemap: "linked" } : {},
+    ...(!production ? { sourcemap: "linked" } : {}),
     bundle: true,
-    entryPoints: ['./src/index.js'],
-    external: ['*.woff', '*.woff2', '*.jpg', '*.svg', '../../assets*'], // Allow external font files which live in ../../static/fonts
-    legalComments: 'external', // Move all legal comments to a .LEGAL.txt file
+    entryPoints: ["./src/index.js"],
+    external: ["*.woff", "*.woff2", "*.jpg", "*.svg", "../../assets*"], // Allow external font files which live in ../../static/fonts
+    legalComments: "external", // Move all legal comments to a .LEGAL.txt file
     loader: { ".js": "jsx", ".py": "text" },
     metafile: !!args.metafile,
     minify: production,
     nodePaths,
     outdir,
-    target: ['es2020'],
+    target: ["es2020"],
     plugins: [
         cleanPlugin(),
 
         // Esbuild will only copy assets that are explicitly imported and used in the code.
         // Copy the other files here.
         {
-            name: 'copy-assets',
+            name: "copy-assets",
             setup(build) {
                 build.onEnd(() => {
-                    fs.copyFileSync('./src/manifest.json', './dist/manifest.json');
-                    fs.copyFileSync('./src/index.html', './dist/index.html');
-                    fs.copyFileSync('./src/config.json', './dist/config.json');
+                    fs.copyFileSync("./src/manifest.json", "./dist/manifest.json");
+                    fs.copyFileSync("./src/index.html", "./dist/index.html");
+                    fs.copyFileSync("./src/config.json", "./dist/config.json");
                 });
-            }
+            },
         },
 
         sassPlugin({
-            loadPaths: [...nodePaths, 'node_modules'],
+            loadPaths: [...nodePaths, "node_modules"],
             filter: /\.scss/,
             quietDeps: true,
         }),
 
         cockpitPoEsbuildPlugin(),
-        ...production ? [cockpitCompressPlugin()] : [],
+        ...(production ? [cockpitCompressPlugin()] : []),
         cockpitRsyncEsbuildPlugin({ dest: packageJson.name }),
         notifyEndPlugin(),
-    ]
+    ],
 });
 
 try {
@@ -127,13 +132,14 @@ try {
         fs.writeFileSync(args.metafile, JSON.stringify(result.metafile));
     }
 } catch (e) {
-    if (!args.watch)
+    if (!args.watch) {
         process.exit(1);
+    }
     // ignore errors in watch mode
 }
 
 if (args.watch) {
-    const on_change = async path => {
+    const on_change = async (path) => {
         console.log("change detected:", path);
         await context.cancel();
 
@@ -142,7 +148,7 @@ if (args.watch) {
         } catch (e) {} // ignore in watch mode
     };
 
-    watch_dirs('src', on_change);
+    watch_dirs("src", on_change);
 
     // wait forever until Control-C
     await new Promise(() => {});
