@@ -19,7 +19,7 @@
 
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
-import { Alert, AlertActionCloseButton, Button, Page, PageSection, PageSectionTypes, Wizard, WizardBasicStep, WizardStep, WizardStepType } from "@patternfly/react-core";
+import { Button, Page, PageSection, PageSectionTypes, Wizard, WizardBasicStep, WizardStep } from "@patternfly/react-core";
 
 import cockpit from "cockpit";
 import * as service from "service.js";
@@ -43,6 +43,7 @@ import { ConnectivityTestPage } from "./wizard/ConnectivityTestPage.tsx";
 import { LabelsPage } from "./wizard/LabelsPage.tsx";
 import { ReviewPage } from "./wizard/ReviewPage.tsx";
 import { EnrollmentProgressPage } from "./wizard/EnrollmentProgressPage.tsx";
+import { RestoredConfigurationAlert, WatchdogStatusData } from "./wizard/RestoredConfigurationAlert.tsx";
 import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from "./paths";
 import {
     validateHostnameStep,
@@ -56,18 +57,6 @@ import {
 
 
 const _ = cockpit.gettext;
-
-interface WatchdogStatusData {
-    status: "success" | "app_failure" | "network_failure";
-    message: string;
-    details?: {
-        carrierDetected: boolean;
-        dnsResolved: boolean;
-        pingSucceeded: boolean;
-        testedHost: string;
-        activeConnections: string;
-    };
-}
 
 // Configuration context to provide loaded configuration throughout the app
 interface ConfigContextType {
@@ -283,7 +272,6 @@ interface SystemOnboardingWizardProps {
     watchdogStatus?: WatchdogStatusData | null | undefined;
 }
 
-
 const stepIds = [
     "hostnameStep",
     "networkInterfaceStep",
@@ -304,7 +292,6 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     const { config } = useConfig();
     const { model, cancelEnrollmentRef } = useModelContext();
     const [maxReachedStep, setMaxReachedStep] = useState(stepIds[0]);
-    const [showRestoredAlert, setShowRestoredAlert] = useState(Boolean(previousAttempt));
 
     // Check if enrollment services are configured (controls whether step 5 is shown)
     const hasEnrollmentServices = Boolean(config && config.enrollmentServices && config.enrollmentServices.length > 0);
@@ -431,48 +418,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
 
     return (
         <Page className="no-masthead-sidebar" isContentFilled id="system-onboarding-wizard">
-            {showRestoredAlert && (
-                <PageSection>
-                    <Alert
-                        variant={watchdogStatus?.status === "network_failure" ? "warning" : "info"}
-                        title={
-                            watchdogStatus?.status === "network_failure"
-                                ? _("Network configuration rolled back")
-                                : watchdogStatus?.status === "app_failure"
-                                  ? _("Enrollment did not complete")
-                                  : _("Previous configuration restored")
-                        }
-                        isInline
-                        actionClose={<AlertActionCloseButton onClose={() => setShowRestoredAlert(false)} />}
-                    >
-                        {watchdogStatus?.status === "network_failure"
-                            ? _(
-                                  "The watchdog timer rolled back your configuration because network connectivity could not be established."
-                              ) +
-                              (watchdogStatus.details
-                                  ? ` ${
-                                        !watchdogStatus.details.carrierDetected
-                                            ? _("No network carrier was detected on any interface.")
-                                            : !watchdogStatus.details.dnsResolved
-                                              ? cockpit.format(
-                                                    _("DNS resolution failed for $0."),
-                                                    watchdogStatus.details.testedHost
-                                                )
-                                              : _("Network connectivity check failed.")
-                                    }`
-                                  : "") +
-                              " " +
-                              _("Review and modify the settings as needed before re-applying.")
-                            : watchdogStatus?.status === "app_failure"
-                              ? _(
-                                    "Network connectivity is working, but enrollment did not complete. You can retry without changing network settings."
-                                )
-                              : _(
-                                    "Your previous onboarding configuration has been restored. Review and modify the settings as needed before re-applying."
-                                )}
-                    </Alert>
-                </PageSection>
-            )}
+            <RestoredConfigurationAlert hasPreviousAttempt={Boolean(previousAttempt)} watchdogStatus={watchdogStatus} />
             <PageSection
                 hasBodyWrapper={false}
                 type={PageSectionTypes.wizard}
