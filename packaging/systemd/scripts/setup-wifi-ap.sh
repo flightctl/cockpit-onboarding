@@ -73,7 +73,12 @@ if [ -f "$DMI_SERIAL_FILE" ]; then
 fi
 
 if [ -z "$SSID_SUFFIX" ]; then
-    MAC_RAW=$(tr -d ':' < "/sys/class/net/${WIFI_INTERFACE}/address")
+    # Read the permanent hardware MAC via udev to avoid NM's MAC randomization.
+    # ID_NET_NAME_MAC embeds the burned-in MAC as "wlx<12 hex digits>".
+    MAC_RAW=$(udevadm info -q property "/sys/class/net/${WIFI_INTERFACE}" 2>/dev/null | sed -n 's/^ID_NET_NAME_MAC=wlx//p')
+    if [ -z "$MAC_RAW" ]; then
+        MAC_RAW=$(tr -d ':' < "/sys/class/net/${WIFI_INTERFACE}/address")
+    fi
     SSID_SUFFIX=$(printf '%s' "$MAC_RAW" | tail -c 6)
 fi
 
