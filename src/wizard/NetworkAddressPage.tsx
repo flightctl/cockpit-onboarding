@@ -98,7 +98,9 @@ export const NetworkConfigIPv4: React.FunctionComponent<{ isSetupInterface?: boo
     const checkIpAvailability = async () => {
         const ipAddress = model.networkAddress.ipv4.address;
         const interfaceName = model.networkInterface.selectedInterface;
-        if (!ipAddress || !interfaceName) {return}
+        if (!ipAddress || !interfaceName) {
+            return;
+        }
 
         setArpingRunning(true);
         setArpingResult(null);
@@ -125,7 +127,9 @@ export const NetworkConfigIPv4: React.FunctionComponent<{ isSetupInterface?: boo
     const checkGatewayReachability = async () => {
         const gateway = model.networkAddress.ipv4.gateway;
         const interfaceName = model.networkInterface.selectedInterface;
-        if (!gateway || !interfaceName) {return}
+        if (!gateway || !interfaceName) {
+            return;
+        }
 
         setGatewayArpingRunning(true);
         setGatewayArpingResult(null);
@@ -472,7 +476,9 @@ export const NetworkConfigIPv6: React.FunctionComponent<{ isSetupInterface?: boo
     const checkIpv6Availability = async () => {
         const address = model.networkAddress.ipv6.address;
         const interfaceName = model.networkInterface.selectedInterface;
-        if (!address || !interfaceName) {return}
+        if (!address || !interfaceName) {
+            return;
+        }
 
         setIpCheckRunning(true);
         setIpCheckResult(null);
@@ -497,7 +503,9 @@ export const NetworkConfigIPv6: React.FunctionComponent<{ isSetupInterface?: boo
     const checkIpv6Gateway = async () => {
         const gateway = model.networkAddress.ipv6.gateway;
         const interfaceName = model.networkInterface.selectedInterface;
-        if (!gateway || !interfaceName) {return}
+        if (!gateway || !interfaceName) {
+            return;
+        }
 
         setGwCheckRunning(true);
         setGwCheckResult(null);

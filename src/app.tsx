@@ -19,7 +19,15 @@
 
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
-import { Button, Page, PageSection, PageSectionTypes, Wizard, WizardBasicStep, WizardStep } from "@patternfly/react-core";
+import {
+    Button,
+    Page,
+    PageSection,
+    PageSectionTypes,
+    Wizard,
+    WizardBasicStep,
+    WizardStep,
+} from "@patternfly/react-core";
 
 import cockpit from "cockpit";
 import * as service from "service.js";
@@ -54,7 +62,6 @@ import {
     validateConnectivityTestStep,
     validateLabelsStep,
 } from "./wizard/step-validation";
-
 
 const _ = cockpit.gettext;
 
@@ -153,7 +160,7 @@ export const Application = () => {
 
     // Show loading while checking marker file or loading configuration
     if (checkingMarker || !isConfigLoaded || networkManager.ready === undefined) {
-        return <EmptyStatePanel loading />
+        return <EmptyStatePanel loading />;
     }
 
     // Show message if onboarding is already complete
@@ -311,17 +318,16 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
 
     // Map step index to validation state
     const stepValidations = [
-        isHostnameStepValid, 
-        isNetworkInterfaceStepValid, 
-        isNetworkAddressStepValid, 
-        isNetworkServicesStepValid, 
-        isEnrollmentStepValid, 
-        isConnectivityTestStepValid, 
-        isLabelsStepValid, 
-        true, 
-        true, 
+        isHostnameStepValid,
+        isNetworkInterfaceStepValid,
+        isNetworkAddressStepValid,
+        isNetworkServicesStepValid,
+        isEnrollmentStepValid,
+        isConnectivityTestStepValid,
+        isLabelsStepValid,
+        true,
+        true,
     ];
-
 
     // Handle step navigation - using PatternFly Wizard's correct signature
     const handleStepChange = (_event: React.MouseEvent<HTMLButtonElement>, currentStep: WizardBasicStep) => {

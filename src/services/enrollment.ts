@@ -15,7 +15,9 @@ const EXIT_CODE_MESSAGES: Record<number, string> = {
 
 function getExitCodeMessage(exitCode: number, endpoint?: string): string | null {
     const template = EXIT_CODE_MESSAGES[exitCode];
-    if (!template) {return null}
+    if (!template) {
+        return null;
+    }
     if (exitCode === 3 && endpoint) {
         return `${template} at ${endpoint}`;
     }
@@ -76,7 +78,9 @@ export async function executeEnrollmentScript(
         const proc = cockpit.spawn(["sudo", scriptPath, paramsFile], {
             err: "out",
         });
-        if (signal) {signal.process = proc}
+        if (signal) {
+            signal.process = proc;
+        }
 
         proc.stream((data) => {
             capturedOutput += data;
@@ -84,7 +88,9 @@ export async function executeEnrollmentScript(
         });
 
         await proc;
-        if (signal) {signal.process = undefined}
+        if (signal) {
+            signal.process = undefined;
+        }
         console.log(`Script ${scriptPath} completed successfully`);
 
         const deviceUrlMatch = capturedOutput.match(/^DEVICE_URL:\s*(.+)$/m);
@@ -105,7 +111,9 @@ export async function executeEnrollmentScript(
             output: capturedOutput || "Script completed successfully",
         };
     } catch (error) {
-        if (signal) {signal.process = undefined}
+        if (signal) {
+            signal.process = undefined;
+        }
         console.error(`Script ${scriptPath} failed:`, error);
 
         let errorMsg = "";

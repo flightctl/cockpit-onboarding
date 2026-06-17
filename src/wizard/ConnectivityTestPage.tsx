@@ -16,7 +16,9 @@ export const ConnectivityTestPage: React.FunctionComponent = () => {
     const userEditedRef = useRef(false);
 
     useEffect(() => {
-        if (userEditedRef.current) {return}
+        if (userEditedRef.current) {
+            return;
+        }
 
         const selectedServices = model.enrollment.selectedServices || [];
         const enrollmentServices = config?.enrollmentServices || [];

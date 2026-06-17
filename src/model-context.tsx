@@ -587,7 +587,9 @@ export const ModelProvider: React.FunctionComponent<{
     }, [networkManager, networkManager?.ready, isInitialized]);
 
     useEffect(() => {
-        if (!isInitialized || !previousAttempt) {return}
+        if (!isInitialized || !previousAttempt) {
+            return;
+        }
 
         setModel((prev) => ({
             ...prev,

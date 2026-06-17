@@ -213,7 +213,9 @@ export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[])
     for (const serviceId of selectedServices) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const service = enrollmentServices.find((s: any) => s.id === serviceId);
-        if (!service) {continue}
+        if (!service) {
+            continue;
+        }
 
         // When using existing credentials, skip endpoint and credential validation
         if (model.enrollment.useExisting?.[serviceId]) {
@@ -264,9 +266,15 @@ export const validateLabelsStep = (model: Model): boolean => {
         const hasValue = value.trim().length > 0;
 
         if (hasKey || hasValue) {
-            if (!hasKey) {return false}
-            if (validateLabelKey(key) !== null) {return false}
-            if (validateLabelValue(value) !== null) {return false}
+            if (!hasKey) {
+                return false;
+            }
+            if (validateLabelKey(key) !== null) {
+                return false;
+            }
+            if (validateLabelValue(value) !== null) {
+                return false;
+            }
         }
     }
 
@@ -278,9 +286,15 @@ export const validateLabelsStep = (model: Model): boolean => {
             : systemInfoField.trim().length > 0;
 
         if (hasKey || hasField) {
-            if (!hasKey) {return false}
-            if (!hasField) {return false}
-            if (validateLabelKey(labelKey) !== null) {return false}
+            if (!hasKey) {
+                return false;
+            }
+            if (!hasField) {
+                return false;
+            }
+            if (validateLabelKey(labelKey) !== null) {
+                return false;
+            }
         }
     }
 

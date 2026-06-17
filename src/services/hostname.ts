@@ -13,9 +13,11 @@ export async function getHostnameInfo(): Promise<HostnameInfo> {
         const hostnameProxy = hostnameClient.proxy("org.freedesktop.hostname1", "/org/freedesktop/hostname1");
         await waitForProxy(hostnameProxy);
 
-        const hostnameData = (hostnameProxy as cockpit.DBusProxy & {
-            data: { Hostname?: string; PrettyHostname?: string; StaticHostname?: string };
-        }).data;
+        const hostnameData = (
+            hostnameProxy as cockpit.DBusProxy & {
+                data: { Hostname?: string; PrettyHostname?: string; StaticHostname?: string };
+            }
+        ).data;
         const info: HostnameInfo = {
             hostname: hostnameData.Hostname || "",
         };
