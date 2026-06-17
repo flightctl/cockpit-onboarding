@@ -314,7 +314,9 @@ export function validateConfig(config: SystemOnboardingConfig): void {
  */
 function isValidIPv4(ip: string): boolean {
     const parts = ip.split(".");
-    if (parts.length !== 4) {return false}
+    if (parts.length !== 4) {
+        return false;
+    }
 
     return parts.every((part) => {
         const num = parseInt(part, 10);

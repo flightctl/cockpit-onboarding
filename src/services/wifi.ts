@@ -183,7 +183,9 @@ function parseWifiSecurity(flags: number, wpaFlags: number, rsnFlags: number): s
 
 function frequencyToChannel(frequency: number): number {
     if (frequency >= 2412 && frequency <= 2484) {
-        if (frequency === 2484) {return 14}
+        if (frequency === 2484) {
+            return 14;
+        }
         return Math.floor((frequency - 2407) / 5);
     } else if (frequency >= 5000) {
         return Math.floor((frequency - 5000) / 5);
@@ -192,8 +194,12 @@ function frequencyToChannel(frequency: number): number {
 }
 
 function channelToBand(channel: number): "2.4 GHz" | "5 GHz" | "unknown" {
-    if (channel >= 1 && channel <= 14) {return "2.4 GHz"}
-    if (channel >= 32 && channel <= 177) {return "5 GHz"}
+    if (channel >= 1 && channel <= 14) {
+        return "2.4 GHz";
+    }
+    if (channel >= 32 && channel <= 177) {
+        return "5 GHz";
+    }
     return "unknown";
 }
 
