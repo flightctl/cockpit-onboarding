@@ -85,6 +85,16 @@ fi
 SSID="${SSID_PREFIX}${SSID_SUFFIX}"
 echo "WiFi AP SSID: $SSID"
 
+# Remove stale AP address from any other interface. A previous AP service
+# may have failed without cleaning up, leaving the address on a different
+# interface and causing a routing conflict.
+for iface in $(ip -o addr show to "${DEFAULT_AP_ADDRESS}/${DEFAULT_AP_NETMASK}" | awk '{print $2}'); do
+    if [ "$iface" != "$WIFI_INTERFACE" ]; then
+        echo "Removing stale AP address from $iface"
+        ip addr del "${DEFAULT_AP_ADDRESS}/${DEFAULT_AP_NETMASK}" dev "$iface" 2>/dev/null || true
+    fi
+done
+
 # Create runtime directory
 mkdir -p "$RUNTIME_DIR"
 

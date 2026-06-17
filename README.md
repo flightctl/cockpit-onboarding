@@ -195,6 +195,23 @@ hack/test-vm-reset.sh [vm-ip]
 
 Removes all onboarding profiles, cleans up VLAN subinterfaces, clears completion markers, and restarts Cockpit.
 
+## Captive Portal Detection
+
+The WiFi AP includes a captive portal handler on port 80 that works with the wildcard DNS (`address=/#/<AP_IP>`) to trigger the native sign-in prompt on client devices. Each OS uses a different detection mechanism:
+
+| OS | Probe URL | Expected behavior |
+|----|-----------|-------------------|
+| Windows | `http://www.msftconnecttest.com/connecttest.txt` | Wildcard DNS redirects lookup to AP; 302 response triggers captive portal popup |
+| Apple (iOS/macOS) | `http://captive.apple.com/hotspot-detect.html` | 302 redirect to device-info page triggers Captive Network Assistant sheet |
+| Android | `http://connectivitycheck.gstatic.com/generate_204` | 302 response triggers sign-in notification |
+| Linux (GNOME/NM) | `http://fedoraproject.org/static/hotspot.txt` (Fedora) | NM checks for `OK` response; wildcard DNS must intercept the lookup |
+
+### VPN and competing DNS
+
+Captive portal detection depends on the AP's wildcard DNS intercepting the connectivity check URL. When a VPN or another network interface forces DNS through a different server, the check URL resolves to its real IP address, bypassing the AP's wildcard DNS entirely. The client either reaches the real server (reporting full connectivity) or fails to connect (reporting no internet) — neither triggers the captive portal prompt.
+
+Disconnecting the VPN before connecting to the AP resolves this.
+
 ## Security Considerations
 
 ### Proxy credential handling
