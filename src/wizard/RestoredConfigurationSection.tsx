@@ -1,15 +1,9 @@
-import React, { useState } from "react";
-import {
-    Alert,
-    AlertActionCloseButton,
-    AlertVariant,
-    Content,
-    ContentVariants,
-    List,
-    ListItem,
-    Stack,
-    StackItem,
-} from "@patternfly/react-core";
+import React from "react";
+import { Alert, AlertActionCloseButton, AlertVariant } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
+import { Content, ContentVariants } from "@patternfly/react-core/dist/esm/components/Content/index.js";
+import { List, ListItem } from "@patternfly/react-core/dist/esm/components/List/index.js";
+import { PageSection } from "@patternfly/react-core/dist/esm/components/Page/index.js";
+import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 
 import cockpit from "cockpit";
 
@@ -30,7 +24,7 @@ export interface WatchdogStatusData {
 }
 
 interface RestoredConfigurationAlertProps {
-    hasPreviousAttempt: boolean;
+    onDismiss: VoidFunction;
     watchdogStatus?: WatchdogStatusData | null | undefined;
 }
 
@@ -124,39 +118,36 @@ const getAlertContent = (watchdogStatus?: WatchdogStatusData | null) => {
     }
 };
 
-export const RestoredConfigurationAlert = ({ hasPreviousAttempt, watchdogStatus }: RestoredConfigurationAlertProps) => {
-    const [isVisible, setIsVisible] = useState(hasPreviousAttempt);
-    if (!isVisible) {
-        return null;
-    }
-
+const RestoredConfigurationSection = ({ watchdogStatus, onDismiss }: RestoredConfigurationAlertProps) => {
     const { variant, title, body, extraDetails } = getAlertContent(watchdogStatus);
     return (
-        <Alert
-            variant={variant as AlertVariant}
-            title={title}
-            isInline
-            actionClose={<AlertActionCloseButton onClose={() => setIsVisible(false)} />}
-        >
-            <Stack hasGutter>
-                <StackItem>{body}</StackItem>
-                {extraDetails.length > 0 && (
-                    <StackItem>
-                        <details>
-                            <summary>
-                                {_("Additional details")}:
-                            </summary>
-                            <List>
-                                {extraDetails.map((detail) => (
-                                    <ListItem key={detail}>
-                                        <Content component={ContentVariants.small}>{detail}</Content>
-                                    </ListItem>
-                                ))}
-                            </List>
-                        </details>
-                    </StackItem>
-                )}
-            </Stack>
-        </Alert>
+        <PageSection>
+            <Alert
+                variant={variant as AlertVariant}
+                title={title}
+                isInline
+                actionClose={<AlertActionCloseButton onClose={onDismiss} />}
+            >
+                <Stack hasGutter>
+                    <StackItem>{body}</StackItem>
+                    {extraDetails.length > 0 && (
+                        <StackItem>
+                            <details>
+                                <summary>{_("Additional details")}:</summary>
+                                <List>
+                                    {extraDetails.map((detail) => (
+                                        <ListItem key={detail}>
+                                            <Content component={ContentVariants.small}>{detail}</Content>
+                                        </ListItem>
+                                    ))}
+                                </List>
+                            </details>
+                        </StackItem>
+                    )}
+                </Stack>
+            </Alert>
+        </PageSection>
     );
 };
+
+export default RestoredConfigurationSection;

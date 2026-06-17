@@ -56,7 +56,6 @@ export interface Model {
         canCancel: boolean; // whether cancellation is possible
         overallProgress: number; // 0-100 percentage
     };
-    wizardStep: number;
 }
 
 // Default network address configuration (internal format)
@@ -149,7 +148,6 @@ const initialModel: Model = {
         canCancel: false,
         overallProgress: 0,
     },
-    wizardStep: 1,
 };
 
 // Context type combining existing NetworkManager model and application model
