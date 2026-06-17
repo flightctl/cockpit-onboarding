@@ -19,9 +19,11 @@
 
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
-import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
+import { Button, ButtonVariant } from "@patternfly/react-core/dist/esm/components/Button/index.js";
+import { ActionList, ActionListGroup, ActionListItem } from "@patternfly/react-core/dist/esm/components/ActionList/index.js";
+import { Modal, ModalBody, ModalFooter, ModalHeader } from "@patternfly/react-core/dist/esm/components/Modal/index.js";
 import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist/esm/components/Page/index.js";
-import { Wizard, WizardBasicStep, WizardStep } from "@patternfly/react-core/dist/esm/components/Wizard/index.js";
+import { Wizard, WizardBasicStep, WizardFooterWrapper, WizardStep } from "@patternfly/react-core/dist/esm/components/Wizard/index.js";
 
 import cockpit from "cockpit";
 import * as service from "service.js";
@@ -294,6 +296,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     const { model, cancelEnrollmentRef } = useModelContext();
     const [maxReachedStep, setMaxReachedStep] = useState(stepIds[0]);
     const [showRestoredConfigurationSection, setShowRestoredConfigurationSection] = useState(hasPreviousAttempt);
+    const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
 
     // Check if enrollment services are configured (controls whether step 5 is shown)
     const hasEnrollmentServices = Boolean(config && config.enrollmentServices && config.enrollmentServices.length > 0);
@@ -370,20 +373,41 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
 
     // Dynamic footer configuration for EnrollmentProgressPage
     const enrollmentExecutionState = model.enrollmentProgress.executionState;
+
+    useEffect(() => {
+        if (enrollmentExecutionState !== "running") {
+            setIsCancelConfirmOpen(false);
+        }
+    }, [enrollmentExecutionState]);
+
+    const confirmApplyCancel = () => {
+        setIsCancelConfirmOpen(false);
+        if (cancelEnrollmentRef.current) {
+            cancelEnrollmentRef.current();
+        }
+    };
+
     const getProgressPageFooter = () => {
         if (enrollmentExecutionState === "running") {
-            // While running: disable Back, enable Next as "Cancel"
-            return {
-                isBackDisabled: true,
-                isNextDisabled: false,
-                nextButtonText: _("Cancel"),
-                onNext: () => {
-                    if (cancelEnrollmentRef.current) {
-                        cancelEnrollmentRef.current();
-                    }
-                },
-                isCancelHidden: true,
-            };
+            // While running: disable Back, show a danger Cancel button that asks for confirmation
+            return (
+                <WizardFooterWrapper>
+                    <ActionList>
+                        <ActionListGroup>
+                            <ActionListItem>
+                                <Button variant={ButtonVariant.secondary} isDisabled>
+                                    {_("Back")}
+                                </Button>
+                            </ActionListItem>
+                            <ActionListItem>
+                                <Button variant={ButtonVariant.danger} onClick={() => setIsCancelConfirmOpen(true)}>
+                                    {_("Cancel")}
+                                </Button>
+                            </ActionListItem>
+                        </ActionListGroup>
+                    </ActionList>
+                </WizardFooterWrapper>
+            );
         } else if (enrollmentExecutionState === "success") {
             // On success: navigate to completion page immediately, then run cleanup
             // after a short delay. Cleanup tears down the WiFi AP, so we must show
@@ -520,6 +544,32 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     </WizardStep>
                 </Wizard>
             </PageSection>
+            <Modal
+                isOpen={isCancelConfirmOpen}
+                onClose={() => setIsCancelConfirmOpen(false)}
+                variant="small"
+                aria-labelledby="cancel-apply-title"
+                aria-describedby="cancel-apply-body"
+            >
+                <ModalHeader
+                    title={_("Cancel applying changes?")}
+                    titleIconVariant="warning"
+                    labelId="cancel-apply-title"
+                />
+                <ModalBody id="cancel-apply-body">
+                    {_(
+                        "Applying changes is in progress. Cancelling will stop the process and roll back network changes."
+                    )}
+                </ModalBody>
+                <ModalFooter>
+                    <Button key="confirm" variant={ButtonVariant.danger} onClick={confirmApplyCancel}>
+                        {_("Cancel applying changes")}
+                    </Button>
+                    <Button key="back" variant={ButtonVariant.link} onClick={() => setIsCancelConfirmOpen(false)}>
+                        {_("Keep applying")}
+                    </Button>
+                </ModalFooter>
+            </Modal>
         </Page>
     );
 };
