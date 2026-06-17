@@ -221,7 +221,8 @@ describe("validateHostname - RFC 1123 Validation", () => {
 
         test("accepts hostname with maximum number of labels", () => {
             // Create a hostname with many labels (all within bounds)
-            const labels = Array(10).fill("label").join(".");
+            const labels = Array(10).fill("label")
+.join(".");
             expect(validateHostname(labels)).toBeNull();
         });
     });

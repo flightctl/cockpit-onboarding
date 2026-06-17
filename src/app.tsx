@@ -19,15 +19,9 @@
 
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import { ExclamationCircleIcon } from "@patternfly/react-icons";
-import {
-    Button,
-    Page,
-    PageSection,
-    PageSectionTypes,
-    Wizard,
-    WizardBasicStep,
-    WizardStep,
-} from "@patternfly/react-core";
+import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
+import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist/esm/components/Page/index.js";
+import { Wizard, WizardBasicStep, WizardStep } from "@patternfly/react-core/dist/esm/components/Wizard/index.js";
 
 import cockpit from "cockpit";
 import * as service from "service.js";
@@ -51,7 +45,8 @@ import { ConnectivityTestPage } from "./wizard/ConnectivityTestPage.tsx";
 import { LabelsPage } from "./wizard/LabelsPage.tsx";
 import { ReviewPage } from "./wizard/ReviewPage.tsx";
 import { EnrollmentProgressPage } from "./wizard/EnrollmentProgressPage.tsx";
-import { RestoredConfigurationAlert, WatchdogStatusData } from "./wizard/RestoredConfigurationAlert.tsx";
+import RestoredConfigurationSection, { WatchdogStatusData } from "./wizard/RestoredConfigurationSection.tsx";
+
 import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from "./paths";
 import {
     validateHostnameStep,
@@ -96,8 +91,7 @@ export const Application = () => {
     useEvent(networkManager, "changed");
 
     const nmRunning_ref = useRef<boolean | undefined>(undefined);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useEvent(networkManager.client as any, "owner", (_event, owner) => {
+    useEvent(networkManager.client, "owner", (_event, owner) => {
         nmRunning_ref.current = owner !== null;
     });
 
@@ -243,7 +237,7 @@ export const Application = () => {
                 <WithDialogs key="1">
                     <SystemOnboardingWizardWrapper
                         interfaces={interfaces}
-                        previousAttempt={previousAttempt}
+                        hasPreviousAttempt={Boolean(previousAttempt)}
                         watchdogStatus={watchdogStatus}
                     />
                 </WithDialogs>
@@ -255,9 +249,9 @@ export const Application = () => {
 // Wrapper to wait for model initialization before showing wizard
 const SystemOnboardingWizardWrapper: React.FunctionComponent<{
     interfaces: Interface[];
-    previousAttempt?: AttemptedMarkerData | null;
+    hasPreviousAttempt: boolean;
     watchdogStatus?: WatchdogStatusData | null;
-}> = ({ interfaces, previousAttempt, watchdogStatus }) => {
+}> = ({ interfaces, hasPreviousAttempt, watchdogStatus }) => {
     const { isInitialized } = useModelContext();
 
     if (!isInitialized) {
@@ -267,7 +261,7 @@ const SystemOnboardingWizardWrapper: React.FunctionComponent<{
     return (
         <SystemOnboardingWizard
             interfaces={interfaces}
-            previousAttempt={previousAttempt}
+            hasPreviousAttempt={hasPreviousAttempt}
             watchdogStatus={watchdogStatus}
         />
     );
@@ -275,7 +269,7 @@ const SystemOnboardingWizardWrapper: React.FunctionComponent<{
 
 interface SystemOnboardingWizardProps {
     interfaces: Interface[];
-    previousAttempt?: AttemptedMarkerData | null | undefined;
+    hasPreviousAttempt?: boolean;
     watchdogStatus?: WatchdogStatusData | null | undefined;
 }
 
@@ -293,12 +287,13 @@ const stepIds = [
 
 export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({
     interfaces,
-    previousAttempt,
+    hasPreviousAttempt,
     watchdogStatus,
 }) => {
     const { config } = useConfig();
     const { model, cancelEnrollmentRef } = useModelContext();
     const [maxReachedStep, setMaxReachedStep] = useState(stepIds[0]);
+    const [showRestoredConfigurationSection, setShowRestoredConfigurationSection] = useState(hasPreviousAttempt);
 
     // Check if enrollment services are configured (controls whether step 5 is shown)
     const hasEnrollmentServices = Boolean(config && config.enrollmentServices && config.enrollmentServices.length > 0);
@@ -329,30 +324,43 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
         true,
     ];
 
+    const visibleStepIds = hasEnrollmentServices
+        ? stepIds
+        : stepIds.filter((id) => id !== "enrollmentStep");
+
+    const getStepValidation = (stepId: string): boolean => {
+        const index = stepIds.indexOf(stepId);
+        return index >= 0 ? stepValidations[index] : false;
+    };
+
     // Handle step navigation - using PatternFly Wizard's correct signature
     const handleStepChange = (_event: React.MouseEvent<HTMLButtonElement>, currentStep: WizardBasicStep) => {
         const stepId = currentStep.id.toString();
-        const stepNumber = stepIds.indexOf(stepId);
-        const maxReachStepNumber = stepIds.indexOf(maxReachedStep);
+        const stepIndex = visibleStepIds.indexOf(stepId);
+        const maxReachIndex = visibleStepIds.indexOf(maxReachedStep);
 
         // Update max reached step if user progresses forward with valid data
-        if (stepNumber > maxReachStepNumber && stepValidations[maxReachStepNumber]) {
+        if (stepIndex > maxReachIndex && getStepValidation(visibleStepIds[maxReachIndex])) {
             setMaxReachedStep(stepId);
         }
     };
 
     // Users can only navigate to steps they've reached or the next step if current is valid
     const isStepDisabled = (stepId: string): boolean => {
-        const stepNumber = stepIds.indexOf(stepId);
-        const maxReachStepNumber = stepIds.indexOf(maxReachedStep);
+        const stepIndex = visibleStepIds.indexOf(stepId);
+        const maxReachIndex = visibleStepIds.indexOf(maxReachedStep);
+
+        if (stepIndex === -1) {
+            return true;
+        }
 
         // Users can go back to a step that has already been reached
-        if (stepNumber <= maxReachStepNumber) {
+        if (stepIndex <= maxReachIndex) {
             return false;
         }
 
         // Users can proceed to the next step only if the furthest reached step is valid
-        if (stepNumber === maxReachStepNumber + 1 && stepValidations[maxReachStepNumber]) {
+        if (stepIndex === maxReachIndex + 1 && getStepValidation(visibleStepIds[maxReachIndex])) {
             return false;
         }
 
@@ -424,12 +432,12 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
 
     return (
         <Page className="no-masthead-sidebar" isContentFilled id="system-onboarding-wizard">
-            <PageSection>
-                <RestoredConfigurationAlert
-                    hasPreviousAttempt={Boolean(previousAttempt)}
+            {showRestoredConfigurationSection && (
+                <RestoredConfigurationSection
+                    onDismiss={() => setShowRestoredConfigurationSection(false)}
                     watchdogStatus={watchdogStatus}
                 />
-            </PageSection>
+            )}
             <PageSection
                 hasBodyWrapper={false}
                 type={PageSectionTypes.wizard}
