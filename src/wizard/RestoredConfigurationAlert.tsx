@@ -1,5 +1,15 @@
 import React, { useState } from "react";
-import { Alert, AlertActionCloseButton, AlertVariant, PageSection } from "@patternfly/react-core";
+import {
+    Alert,
+    AlertActionCloseButton,
+    AlertVariant,
+    Content,
+    ContentVariants,
+    List,
+    ListItem,
+    Stack,
+    StackItem,
+} from "@patternfly/react-core";
 
 import cockpit from "cockpit";
 
@@ -8,8 +18,10 @@ const _ = cockpit.gettext;
 export interface WatchdogStatusData {
     status: "success" | "app_failure" | "network_failure";
     message: string;
+    timestamp?: string;
     details?: {
         carrierDetected: boolean;
+        carrierInterfaces?: string;
         dnsResolved: boolean;
         pingSucceeded: boolean;
         testedHost: string;
@@ -22,7 +34,7 @@ interface RestoredConfigurationAlertProps {
     watchdogStatus?: WatchdogStatusData | null | undefined;
 }
 
-function getNetworkFailureDetail(details: WatchdogStatusData["details"]): string {
+const getNetworkFailureDetail = (details: WatchdogStatusData["details"]): string => {
     if (!details) {
         return "";
     }
@@ -33,9 +45,46 @@ function getNetworkFailureDetail(details: WatchdogStatusData["details"]): string
         return cockpit.format(_("DNS resolution failed for $0."), details.testedHost);
     }
     return _("Network connectivity check failed.");
-}
+};
 
-function getAlertContent(watchdogStatus?: WatchdogStatusData | null) {
+const getExtraDetails = (watchdogStatus: WatchdogStatusData): string[] => {
+    const lines: string[] = [];
+
+    const { status, timestamp, details } = watchdogStatus;
+    if (timestamp) {
+        const checkedAt = new Date(timestamp);
+        if (!Number.isNaN(checkedAt.getTime())) {
+            lines.push(cockpit.format(_("Checked at $0."), checkedAt.toLocaleString()));
+        }
+    }
+
+    if (!details) {
+        return lines;
+    }
+
+    const testedHost = details.testedHost?.trim();
+    if (testedHost && status === "network_failure" && !details.carrierDetected) {
+        lines.push(cockpit.format(_("Connectivity test host: $0."), testedHost));
+    }
+
+    const carrierInterfaces = details.carrierInterfaces?.trim();
+    if (carrierInterfaces) {
+        lines.push(cockpit.format(_("Interfaces with carrier: $0."), carrierInterfaces));
+    }
+
+    const activeConnections = details.activeConnections?.trim();
+    if (activeConnections) {
+        lines.push(cockpit.format(_("Active connections: $0."), activeConnections));
+    }
+
+    if (status === "app_failure" && testedHost && !details.pingSucceeded) {
+        lines.push(cockpit.format(_("Ping to $0 failed."), testedHost));
+    }
+
+    return lines;
+};
+
+const getAlertContent = (watchdogStatus?: WatchdogStatusData | null) => {
     switch (watchdogStatus?.status) {
         case "network_failure": {
             const detail = getNetworkFailureDetail(watchdogStatus.details);
@@ -51,6 +100,7 @@ function getAlertContent(watchdogStatus?: WatchdogStatusData | null) {
                 ]
                     .filter(Boolean)
                     .join(" "),
+                extraDetails: getExtraDetails(watchdogStatus),
             };
         }
         case "app_failure":
@@ -60,6 +110,7 @@ function getAlertContent(watchdogStatus?: WatchdogStatusData | null) {
                 body: _(
                     "Network connectivity is working, but enrollment did not complete. You can retry without changing network settings."
                 ),
+                extraDetails: getExtraDetails(watchdogStatus),
             };
         default:
             return {
@@ -68,31 +119,44 @@ function getAlertContent(watchdogStatus?: WatchdogStatusData | null) {
                 body: _(
                     "Your previous onboarding configuration has been restored. Review and modify the settings as needed before re-applying."
                 ),
+                extraDetails: [],
             };
     }
-}
+};
 
-export const RestoredConfigurationAlert: React.FunctionComponent<RestoredConfigurationAlertProps> = ({
-    hasPreviousAttempt,
-    watchdogStatus,
-}) => {
+export const RestoredConfigurationAlert = ({ hasPreviousAttempt, watchdogStatus }: RestoredConfigurationAlertProps) => {
     const [isVisible, setIsVisible] = useState(hasPreviousAttempt);
-
     if (!isVisible) {
         return null;
     }
 
-    const { variant, title, body } = getAlertContent(watchdogStatus);
+    const { variant, title, body, extraDetails } = getAlertContent(watchdogStatus);
     return (
-        <PageSection>
-            <Alert
-                variant={variant as AlertVariant}
-                title={title}
-                isInline
-                actionClose={<AlertActionCloseButton onClose={() => setIsVisible(false)} />}
-            >
-                {body}
-            </Alert>
-        </PageSection>
+        <Alert
+            variant={variant as AlertVariant}
+            title={title}
+            isInline
+            actionClose={<AlertActionCloseButton onClose={() => setIsVisible(false)} />}
+        >
+            <Stack hasGutter>
+                <StackItem>{body}</StackItem>
+                {extraDetails.length > 0 && (
+                    <StackItem>
+                        <details>
+                            <summary>
+                                {_("Additional details")}:
+                            </summary>
+                            <List>
+                                {extraDetails.map((detail) => (
+                                    <ListItem key={detail}>
+                                        <Content component={ContentVariants.small}>{detail}</Content>
+                                    </ListItem>
+                                ))}
+                            </List>
+                        </details>
+                    </StackItem>
+                )}
+            </Stack>
+        </Alert>
     );
 };

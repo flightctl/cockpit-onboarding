@@ -424,7 +424,12 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
 
     return (
         <Page className="no-masthead-sidebar" isContentFilled id="system-onboarding-wizard">
-            <RestoredConfigurationAlert hasPreviousAttempt={Boolean(previousAttempt)} watchdogStatus={watchdogStatus} />
+            <PageSection>
+                <RestoredConfigurationAlert
+                    hasPreviousAttempt={Boolean(previousAttempt)}
+                    watchdogStatus={watchdogStatus}
+                />
+            </PageSection>
             <PageSection
                 hasBodyWrapper={false}
                 type={PageSectionTypes.wizard}
