@@ -155,7 +155,7 @@ interface ModelContextType {
     networkManager?: NetworkManagerModel | undefined;
     model: Model;
     isInitialized: boolean;
-    updateModel: (section: keyof Model, updates: Partial<Model[keyof Model]>) => void;
+    updateModel: <T extends keyof Model>(section: T, updates: Partial<Model[T]>) => void;
     updateNestedModel: <T extends keyof Model, K extends keyof Model[T]>(
         section: T,
         subsection: K,
@@ -360,7 +360,7 @@ export const ModelProvider: React.FunctionComponent<{
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
     const cancelEnrollmentRef = useRef<(() => void) | null>(null);
 
-    const updateModel = (section: keyof Model, updates: Partial<Model[keyof Model]>) => {
+    const updateModel = <T extends keyof Model>(section: T, updates: Partial<Model[T]>) => {
         setModel((prev) => {
             if (typeof updates !== "object" || updates === null) {
                 return { ...prev, [section]: updates };

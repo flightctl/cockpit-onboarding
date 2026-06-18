@@ -5,7 +5,7 @@ import { Divider } from "@patternfly/react-core/dist/esm/components/Divider/inde
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 
-import { NetworkInterfacePage } from "./NetworkInterfacePage.tsx";
+import { NetworkInterfaceSection } from "./NetworkInterfaceSection.tsx";
 import { NetworkAddressPage } from "./NetworkAddressPage.tsx";
 import { NetworkServicesPage } from "./NetworkServicesPage.tsx";
 
@@ -20,11 +20,11 @@ export const NetworkPage: React.FunctionComponent<NetworkPageProps> = ({ interfa
         <Stack hasGutter>
             <StackItem>
                 <Title headingLevel="h3" size="lg">
-                    {_("Network interface")}
+                    {_("Network")}
                 </Title>
             </StackItem>
             <StackItem>
-                <NetworkInterfacePage interfaces={interfaces} />
+                <NetworkInterfaceSection interfaces={interfaces} />
             </StackItem>
 
             <StackItem>
@@ -32,8 +32,8 @@ export const NetworkPage: React.FunctionComponent<NetworkPageProps> = ({ interfa
             </StackItem>
 
             <StackItem>
-                <Title headingLevel="h3" size="lg">
-                    {_("Network address")}
+                <Title headingLevel="h4" size="lg">
+                    {_("IP settings")}
                 </Title>
             </StackItem>
             <StackItem>
@@ -45,7 +45,7 @@ export const NetworkPage: React.FunctionComponent<NetworkPageProps> = ({ interfa
             </StackItem>
 
             <StackItem>
-                <Title headingLevel="h3" size="lg">
+                <Title headingLevel="h4" size="lg">
                     {_("Network services")}
                 </Title>
             </StackItem>

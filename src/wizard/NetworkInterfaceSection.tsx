@@ -13,21 +13,19 @@ import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/
 import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
 import { WifiIcon, ConnectedIcon, DisconnectedIcon } from "@patternfly/react-icons";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
-import { useModelContext } from "../model-context";
-import { getSetupInterface } from "../services/network";
-import { getCurrentWifiConnection, scanWifiNetworks } from "../services/wifi";
-import { device_state_text, is_managed } from "../../pkg/networkmanager/interfaces.js";
+import { useModelContext } from "../model-context.js";
+import { getSetupInterface } from "../services/network.js";
+import { getCurrentWifiConnection, scanWifiNetworks, WifiConnection } from "../services/wifi.js";
+import { device_state_text, is_managed, type Interface } from "../../pkg/networkmanager/interfaces.js";
+import { WifiSecurity } from "../types.js";
 
 const _ = cockpit.gettext;
 
-interface NetworkInterfacePageProps {
-    interfaces: import("../../pkg/networkmanager/interfaces.js").Interface[];
-}
 
-export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageProps> = ({ interfaces }) => {
+export const NetworkInterfaceSection = ({ interfaces }: { interfaces: Interface[] }) => {
     const { model } = useModelContext();
 
-    function hasGroup(iface: import("../../pkg/networkmanager/interfaces.js").Interface) {
+    function hasGroup(iface: Interface) {
         return (
             (iface.Device &&
                 iface.Device.ActiveConnection &&
@@ -100,23 +98,22 @@ export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageP
     );
 };
 
-interface NetworkInterfaceSelectorProps {
-    interfaces: import("../../pkg/networkmanager/interfaces.js").Interface[];
-}
 
-export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceSelectorProps> = ({ interfaces }) => {
+export const NetworkInterfaceSelector = ({ interfaces }: {
+    interfaces: Interface[];
+}) => {
     const { model, updateModel, switchToInterfaceConfig } = useModelContext();
 
     const columnNames = {
-        name: "Name",
-        type: "Type",
-        mac: "MAC address",
-        model: "Vendor and model",
-        speed: "Speed",
-        state: "State",
+        name: _("Name"),
+        type: _("Type"),
+        mac: _("MAC address"),
+        model: _("Vendor and model"),
+        speed: _("Speed"),
+        state: _("State"),
     };
 
-    const isIfaceSelectable = (iface: import("../../pkg/networkmanager/interfaces.js").Interface) => {
+    const isIfaceSelectable = (iface: Interface) => {
         if (!iface.Device) {
             return false;
         }
@@ -236,7 +233,7 @@ interface WifiNetwork {
     bssid: string;
 }
 
-export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorProps> = ({ interfaceName }) => {
+export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps) => {
     const { model, updateModel } = useModelContext();
     const [isScanning, setIsScanning] = React.useState(false);
     const [networks, setNetworks] = React.useState<WifiNetwork[]>([]);
@@ -244,12 +241,7 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
     const [selectedBssid, setSelectedBssid] = React.useState<string | null>(null);
     const hasPreSelected = React.useRef(false);
     // Store current connection details in a ref so it can be accessed in handleNetworkSelection
-    const currentConnectionRef = React.useRef<{
-        ssid: string;
-        bssid: string;
-        password: string;
-        security: "none" | "wep" | "wpa";
-    } | null>(null);
+    const currentConnectionRef = React.useRef<WifiConnection | null>(null);
 
     // Get current WiFi connection details and scan networks
     React.useEffect(() => {
@@ -285,7 +277,7 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
                         setSelectedBssid(matchingNetwork.bssid);
 
                         // Map security string to the model's expected type
-                        let securityType: "none" | "wep" | "wpa" = "wpa";
+                        let securityType: WifiSecurity = "wpa";
                         if (matchingNetwork.security === "None") {
                             securityType = "none";
                         } else if (matchingNetwork.security === "WEP") {
@@ -325,7 +317,7 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
         if (selectedNetwork) {
             // Map security string to the model's expected type
             // The model expects 'none' | 'wep' | 'wpa', so we simplify complex types
-            let securityType: "none" | "wep" | "wpa" = "wpa";
+            let securityType: WifiSecurity = "wpa";
             if (selectedNetwork.security === "None") {
                 securityType = "none";
             } else if (selectedNetwork.security === "WEP") {

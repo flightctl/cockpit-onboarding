@@ -1,11 +1,12 @@
 import cockpit from "cockpit";
 import { waitForProxy } from "./dbus-helpers";
+import { WifiSecurity } from "../types";
 
 export interface WifiConnection {
     ssid: string;
     bssid: string;
     password: string;
-    security: "none" | "wep" | "wpa";
+    security: WifiSecurity;
 }
 
 export interface WifiNetwork {
@@ -125,7 +126,7 @@ export async function getCurrentWifiConnection(interfaceName: string): Promise<W
         }
 
         // Determine security type
-        let security: "none" | "wep" | "wpa" = "none";
+        let security: WifiSecurity = "none";
         const keyMgmt = settings["802-11-wireless-security"]?.["key-mgmt"]?.v;
         if (keyMgmt) {
             if (keyMgmt === "none") {

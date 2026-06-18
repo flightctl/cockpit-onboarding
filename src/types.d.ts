@@ -106,12 +106,14 @@ export interface HostnameState {
     dhcpHostname?: string;
 }
 
+export type WifiSecurity = "none" | "wep" | "wpa";
+
 export interface NetworkInterfaceState {
     selectedInterface: string | null;
     interfaceType: "ethernet" | "wifi" | null;
     wifiSsid: string | null;
     wifiPassword: string | null;
-    wifiSecurity: "none" | "wep" | "wpa" | null;
+    wifiSecurity: WifiSecurity | null;
     vlanId: number | null;
 }
 
@@ -188,7 +190,7 @@ export interface NetworkInterface {
 export interface WifiNetwork {
     ssid: string;
     strength: number;
-    security: "none" | "wep" | "wpa";
+    security: WifiSecurity;
     frequency: number;
 }
 
