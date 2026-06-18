@@ -1,4 +1,5 @@
 import { Model } from "../model-context";
+import { EnrollmentService } from "../types";
 import {
     validateHostname,
     validateIPv4,
@@ -206,8 +207,7 @@ export const validateNetworkServicesStep = (model: Model): boolean => {
  * Note: This function needs access to the config to validate properly.
  * For now, we do basic validation. Full validation is done in the UI component.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[]): boolean => {
+export const validateEnrollmentStep = (model: Model, enrollmentServices?: EnrollmentService[]): boolean => {
     const { selectedServices, credentials, endpoints } = model.enrollment;
 
     // If no services are selected, step is valid (enrollment is optional)
@@ -228,8 +228,7 @@ export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[])
 
     // Full validation with config
     for (const serviceId of selectedServices) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const service = enrollmentServices.find((s: any) => s.id === serviceId);
+        const service = enrollmentServices.find((s) => s.id === serviceId);
         if (!service) {
             continue;
         }

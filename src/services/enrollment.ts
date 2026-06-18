@@ -123,17 +123,12 @@ export async function executeEnrollmentScript(
             errorMsg = capturedOutput.trim();
         }
 
-        if (error && typeof error === "object") {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const processError = error as any;
+        if (error instanceof cockpit.ProcessError && error.exit_status !== null) {
+            const exitCode = error.exit_status;
+            friendlyMsg = getExitCodeMessage(exitCode, endpoint) || "";
 
-            if (processError.exit_status !== undefined) {
-                const exitCode = processError.exit_status;
-                friendlyMsg = getExitCodeMessage(exitCode, endpoint) || "";
-
-                const statusMsg = `Script exited with status ${exitCode}`;
-                errorMsg = errorMsg ? `${errorMsg}\n${statusMsg}` : statusMsg;
-            }
+            const statusMsg = `Script exited with status ${exitCode}`;
+            errorMsg = errorMsg ? `${errorMsg}\n${statusMsg}` : statusMsg;
         }
 
         const fullMsg = friendlyMsg ? `${friendlyMsg}\n\n${errorMsg}` : errorMsg || "Script failed with unknown error";

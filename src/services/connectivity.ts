@@ -4,8 +4,7 @@ import type { SkipResult } from "./skip-conditions";
 
 export interface CancellationSignal {
     cancelled: boolean;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    process?: any;
+    process?: cockpit.Spawn<string> | undefined;
 }
 
 export interface ConnectivityResult {
@@ -42,12 +41,8 @@ export async function testNetworkConnectivity(
             }
 
             let errorDetail = "";
-            if (dnsError && typeof dnsError === "object") {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const err = dnsError as any;
-                if (err.exit_status !== undefined) {
-                    errorDetail = ` (exit status ${err.exit_status})`;
-                }
+            if (dnsError instanceof cockpit.ProcessError && dnsError.exit_status !== null) {
+                errorDetail = ` (exit status ${dnsError.exit_status})`;
             }
 
             const errorMsg = ` Failed${errorDetail}.\n  Please check network configuration.`;

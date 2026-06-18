@@ -20,28 +20,83 @@ export interface WifiNetwork {
     bssid: string;
 }
 
+interface DbusVariant<T = unknown> {
+    v?: T;
+}
+
+interface NetworkManagerData {
+    Devices?: string[];
+}
+
+interface NetworkManagerDeviceData {
+    Interface?: string;
+    DeviceType?: number;
+    ActiveConnection?: string;
+}
+
+interface ActiveConnectionData {
+    Connection?: string;
+}
+
+interface WirelessDeviceData {
+    AccessPoints?: string[];
+}
+
+interface AccessPointData {
+    Ssid?: unknown;
+    Strength?: number;
+    Frequency?: number;
+    HwAddress?: string;
+    MaxBitrate?: number;
+    Flags?: number;
+    WpaFlags?: number;
+    RsnFlags?: number;
+}
+
+const WIFI_CONNECTION_SETTINGS_KEY = "802-11-wireless";
+const WIFI_CONNECTION_SECRETS_KEY = "802-11-wireless-security";
+
+interface WifiConnectionSettings {
+    [WIFI_CONNECTION_SETTINGS_KEY]?: {
+        ssid?: DbusVariant<string | number[]>;
+        bssid?: DbusVariant<string>;
+    };
+    [WIFI_CONNECTION_SECRETS_KEY]?: {
+        "key-mgmt"?: DbusVariant<string>;
+    };
+}
+
+interface WifiConnectionSecrets {
+    [WIFI_CONNECTION_SECRETS_KEY]?: {
+        psk?: DbusVariant<string>;
+        "wep-key0"?: DbusVariant<string>;
+        "leap-password"?: DbusVariant<string>;
+    };
+}
+
 async function findWifiDevice(
     nmClient: cockpit.DBusClient,
     interfaceName: string
 ): Promise<{ devicePath: string; activeConnectionPath?: string } | null> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const nmManager = nmClient.proxy("org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager");
-    await waitForProxy(nmManager);
+    const nmManager = await waitForProxy<NetworkManagerData>(
+        nmClient.proxy("org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager")
+    );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const devicePaths = (nmManager.data as any).Devices || [];
+    const devicePaths = nmManager.data.Devices || [];
 
     for (const path of devicePaths) {
-        const devProxy = nmClient.proxy("org.freedesktop.NetworkManager.Device", path);
-        await waitForProxy(devProxy);
+        const devProxy = await waitForProxy<NetworkManagerDeviceData>(
+            nmClient.proxy("org.freedesktop.NetworkManager.Device", path)
+        );
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const devData = devProxy.data as any;
+        const devData = devProxy.data;
         if (devData.Interface === interfaceName && devData.DeviceType === 2) {
             // 2 = WiFi
             return {
                 devicePath: path,
-                activeConnectionPath: devData.ActiveConnection,
+                ...(devData.ActiveConnection !== undefined && {
+                    activeConnectionPath: devData.ActiveConnection,
+                }),
             };
         }
     }
@@ -61,40 +116,33 @@ export async function getCurrentWifiConnection(interfaceName: string): Promise<W
         }
 
         // Get active connection details
-        const activeConnProxy = nmClient.proxy(
-            "org.freedesktop.NetworkManager.Connection.Active",
-            device.activeConnectionPath
+        const activeConnProxy = await waitForProxy<ActiveConnectionData>(
+            nmClient.proxy("org.freedesktop.NetworkManager.Connection.Active", device.activeConnectionPath)
         );
-        await waitForProxy(activeConnProxy);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const activeConnData = activeConnProxy.data as any;
-        const connectionPath = activeConnData.Connection;
-
+        const connectionPath = activeConnProxy.data.Connection;
         if (!connectionPath || connectionPath === "/") {
             nmClient.close();
             return null;
         }
 
-        const connectionProxy = nmClient.proxy("org.freedesktop.NetworkManager.Settings.Connection", connectionPath);
-        await waitForProxy(connectionProxy);
+        const connectionProxy = await waitForProxy(
+            nmClient.proxy("org.freedesktop.NetworkManager.Settings.Connection", connectionPath)
+        );
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const settingsResult = await (connectionProxy as any).call("GetSettings", []);
-        const settings = settingsResult[0];
+        const settingsResult = await connectionProxy.call("GetSettings", []);
+        const settings = settingsResult[0] as WifiConnectionSettings;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let secrets: any = {};
+        let secrets: WifiConnectionSecrets = {};
         try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const secretsResult = await (connectionProxy as any).call("GetSecrets", ["802-11-wireless-security"]);
-            secrets = secretsResult[0];
+            const secretsResult = await connectionProxy.call("GetSecrets", [WIFI_CONNECTION_SECRETS_KEY]);
+            secrets = secretsResult[0] as WifiConnectionSecrets;
         } catch (secretsError) {
             console.warn("Failed to get WiFi secrets, password will not be available:", secretsError);
         }
 
         // Extract SSID
-        const ssidRaw = settings["802-11-wireless"]?.ssid;
+        const ssidRaw = settings[WIFI_CONNECTION_SETTINGS_KEY]?.ssid;
         let ssid = "";
         if (ssidRaw?.v) {
             const ssidBytes = ssidRaw.v;
@@ -111,12 +159,12 @@ export async function getCurrentWifiConnection(interfaceName: string): Promise<W
         }
 
         // Extract BSSID
-        const bssidRaw = settings["802-11-wireless"]?.bssid?.v;
+        const bssidRaw = settings[WIFI_CONNECTION_SETTINGS_KEY]?.bssid?.v;
         const bssid = bssidRaw || "";
 
         // Extract password from secrets
         let password = "";
-        const securitySettings = secrets["802-11-wireless-security"];
+        const securitySettings = secrets[WIFI_CONNECTION_SECRETS_KEY];
         if (securitySettings) {
             password =
                 securitySettings.psk?.v ||
@@ -127,7 +175,7 @@ export async function getCurrentWifiConnection(interfaceName: string): Promise<W
 
         // Determine security type
         let security: WifiSecurity = "none";
-        const keyMgmt = settings["802-11-wireless-security"]?.["key-mgmt"]?.v;
+        const keyMgmt = settings[WIFI_CONNECTION_SECRETS_KEY]?.["key-mgmt"]?.v;
         if (keyMgmt) {
             if (keyMgmt === "none") {
                 security = "wep";
@@ -228,27 +276,25 @@ export async function scanWifiNetworks(interfaceName: string): Promise<WifiNetwo
             throw new Error(`WiFi device ${interfaceName} not found`);
         }
 
-        const deviceProxy = nmClient.proxy("org.freedesktop.NetworkManager.Device.Wireless", device.devicePath);
-        await waitForProxy(deviceProxy);
+        const deviceProxy = await waitForProxy<WirelessDeviceData>(
+            nmClient.proxy("org.freedesktop.NetworkManager.Device.Wireless", device.devicePath)
+        );
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (deviceProxy as any).call("RequestScan", [{}]);
+        await deviceProxy.call("RequestScan", [{}]);
 
         // Wait for scan to complete (typical scan takes 2-3 seconds)
         await new Promise((resolve) => setTimeout(resolve, 3000));
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const deviceData = deviceProxy.data as any;
-        const apPaths = deviceData.AccessPoints || [];
+        const apPaths = deviceProxy.data.AccessPoints || [];
         const aps: WifiNetwork[] = [];
 
         for (const apPath of apPaths) {
             try {
-                const apProxy = nmClient.proxy("org.freedesktop.NetworkManager.AccessPoint", apPath);
-                await waitForProxy(apProxy);
+                const apProxy = await waitForProxy<AccessPointData>(
+                    nmClient.proxy("org.freedesktop.NetworkManager.AccessPoint", apPath)
+                );
 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const apData = apProxy.data as any;
+                const apData = apProxy.data;
 
                 const ssid = decodeSsid(apData.Ssid || "");
                 if (!ssid || ssid.trim().length === 0) {

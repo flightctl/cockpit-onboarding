@@ -34,11 +34,9 @@ export const ConnectivityTestPage: React.FunctionComponent = () => {
                 if (endpoint) {
                     try {
                         const url = new URL(endpoint);
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        updateModel("connectivityTestHost", url.hostname as any);
+                        updateModel("connectivityTestHost", url.hostname);
                     } catch {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        updateModel("connectivityTestHost", endpoint as any);
+                        updateModel("connectivityTestHost", endpoint);
                     }
                     return;
                 }
@@ -46,15 +44,13 @@ export const ConnectivityTestPage: React.FunctionComponent = () => {
         }
 
         const configHost = config?.connectivityTest?.host || "www.google.com";
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        updateModel("connectivityTestHost", configHost as any);
+        updateModel("connectivityTestHost", configHost);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [model.enrollment.selectedServices, model.enrollment.endpoints, model.enrollment.useExisting]);
 
     const setHost = (value: string) => {
         userEditedRef.current = true;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        updateModel("connectivityTestHost", value as any);
+        updateModel("connectivityTestHost", value);
     };
 
     return (
