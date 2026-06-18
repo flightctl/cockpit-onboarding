@@ -194,23 +194,19 @@ provision_vm() {
     run_ssh "${vm_ip}" "sudo dnf install -y make rpm-build nodejs npm gettext libappstream-glib"
 
     echo "Building and installing cockpit-system-onboarding RPM..."
-    local tarball
-    tarball=$(ls "${PROJECT_DIR}"/cockpit-system-onboarding-*.tar.xz 2>/dev/null | head -1)
-    local node_cache
-    node_cache=$(ls "${PROJECT_DIR}"/cockpit-system-onboarding-node-*.tar.xz 2>/dev/null | head -1)
-    local specfile="${PROJECT_DIR}/cockpit-system-onboarding.spec"
-
-    if [[ -z "${tarball}" || -z "${node_cache}" || ! -f "${specfile}" ]]; then
-        echo "Building RPM tarball and spec from source..."
-        make -C "${PROJECT_DIR}" rpm
-    fi
+    make -C "${PROJECT_DIR}" rpm \
+        BRAND_NAME="${BRAND_NAME:-Flight Control}" \
+        NODE_ENV="${NODE_ENV:-production}"
 
     local rpm_file
-    rpm_file=$(ls "${PROJECT_DIR}"/cockpit-system-onboarding-*.noarch.rpm 2>/dev/null | head -1)
-    if [[ -z "${rpm_file}" ]]; then
+    shopt -s nullglob
+    local rpms=("${PROJECT_DIR}"/cockpit-system-onboarding-*.noarch.rpm)
+    shopt -u nullglob
+    if [[ ${#rpms[@]} -eq 0 ]]; then
         echo "ERROR: RPM build failed - no .rpm file found" >&2
         exit 1
     fi
+    rpm_file="${rpms[0]}"
 
     echo "Copying RPM to VM..."
     scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
