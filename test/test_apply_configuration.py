@@ -19,6 +19,8 @@
 
 import testlib
 
+from wizard_navigation import advance_past_optional_steps_to_review
+
 
 class TestApplyConfiguration(testlib.MachineCase):
     """Test configuration application and progress monitoring in System Onboarding wizard"""
@@ -30,28 +32,7 @@ class TestApplyConfiguration(testlib.MachineCase):
         self.login_and_go("/system-onboarding")
         b.wait_visible(".pf-v5-c-wizard")
 
-        # Step 1: Set hostname
-        b.wait_visible("#hostname-input")
-        b.set_input_text("#hostname-input", hostname)
-        b.click("button:contains('Next')")
-
-        # Step 2: Select network interface
-        b.wait_visible("#wizard-step-2")
-        b.wait_visible(".pf-v5-c-data-list__item")
-        b.click(".pf-v5-c-data-list__item:first-child")
-        b.click("button:contains('Next')")
-
-        # Step 3: Network address (keep defaults)
-        b.wait_visible("#wizard-step-3")
-        b.click("button:contains('Next')")
-
-        # Step 4: Network services (keep defaults)
-        b.wait_visible("#wizard-step-4")
-        b.click("button:contains('Next')")
-
-        # Step 5: Skip enrollment if present, otherwise we're at review
-        if b.is_present("#wizard-step-5:contains('Enrollment')"):
-            b.click("button:contains('Next')")
+        advance_past_optional_steps_to_review(b, hostname)
 
         # Now on Review page - click Apply/Enroll to proceed
         b.click("button:contains('Apply')")

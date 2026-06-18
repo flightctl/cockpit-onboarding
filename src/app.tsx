@@ -39,26 +39,24 @@ import { readAttemptedMarker, AttemptedMarkerData } from "./attempted-marker";
 import { SystemOnboardingConfig } from "./types";
 
 import { HostnamePage } from "./wizard/HostnamePage.tsx";
-import { NetworkInterfacePage } from "./wizard/NetworkInterfacePage.tsx";
-import { NetworkAddressPage } from "./wizard/NetworkAddressPage.tsx";
-import { NetworkServicesPage } from "./wizard/NetworkServicesPage.tsx";
+import { NetworkPage } from "./wizard/NetworkPage.tsx";
 import { EnrollmentPage } from "./wizard/EnrollmentPage.tsx";
 import { ConnectivityTestPage } from "./wizard/ConnectivityTestPage.tsx";
 import { LabelsPage } from "./wizard/LabelsPage.tsx";
 import { ReviewPage } from "./wizard/ReviewPage.tsx";
 import { EnrollmentProgressPage } from "./wizard/EnrollmentProgressPage.tsx";
 import RestoredConfigurationSection, { WatchdogStatusData } from "./wizard/RestoredConfigurationSection.tsx";
-
-import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from "./paths";
 import {
+    stepIds, WIZARD_STEP_IDS, type WizardStepId,
     validateHostnameStep,
-    validateNetworkInterfaceStep,
-    validateNetworkAddressStep,
-    validateNetworkServicesStep,
+    validateNetworkStep,
     validateEnrollmentStep,
     validateConnectivityTestStep,
     validateLabelsStep,
-} from "./wizard/step-validation";
+} from "./wizard/WizardSteps.ts";
+
+import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from "./paths";
+
 
 const _ = cockpit.gettext;
 
@@ -275,18 +273,6 @@ interface SystemOnboardingWizardProps {
     watchdogStatus?: WatchdogStatusData | null | undefined;
 }
 
-const stepIds = [
-    "hostnameStep",
-    "networkInterfaceStep",
-    "networkAddressStep",
-    "networkServicesStep",
-    "enrollmentStep",
-    "connectivityTestStep",
-    "labelsStep",
-    "reviewStep",
-    "progressStep",
-];
-
 export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({
     interfaces,
     hasPreviousAttempt,
@@ -294,11 +280,11 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
 }) => {
     const { config } = useConfig();
     const { model, cancelEnrollmentRef } = useModelContext();
-    const [maxReachedStep, setMaxReachedStep] = useState(stepIds[0]);
+    const [maxReachedStep, setMaxReachedStep] = useState<WizardStepId>(WIZARD_STEP_IDS.network);
     const [showRestoredConfigurationSection, setShowRestoredConfigurationSection] = useState(hasPreviousAttempt);
     const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
 
-    // Check if enrollment services are configured (controls whether step 5 is shown)
+    // Check if enrollment services are configured (controls whether enrollment step is shown)
     const hasEnrollmentServices = Boolean(config && config.enrollmentServices && config.enrollmentServices.length > 0);
     // Check if the user actually selected any enrollment services
     const hasSelectedEnrollments = hasEnrollmentServices && model.enrollment.selectedServices.length > 0;
@@ -307,38 +293,34 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
 
     // Compute validation state for each step
     const isHostnameStepValid = validateHostnameStep(model);
-    const isNetworkInterfaceStepValid = validateNetworkInterfaceStep(model);
-    const isNetworkAddressStepValid = validateNetworkAddressStep(model);
-    const isNetworkServicesStepValid = validateNetworkServicesStep(model);
+    const isNetworkStepValid = validateNetworkStep(model);
     const isEnrollmentStepValid = validateEnrollmentStep(model, config?.enrollmentServices);
     const isConnectivityTestStepValid = validateConnectivityTestStep(model);
     const isLabelsStepValid = validateLabelsStep(model);
 
     // Map step index to validation state
     const stepValidations = [
-        isHostnameStepValid,
-        isNetworkInterfaceStepValid,
-        isNetworkAddressStepValid,
-        isNetworkServicesStepValid,
+        isNetworkStepValid,
         isEnrollmentStepValid,
         isConnectivityTestStepValid,
+        isHostnameStepValid,
         isLabelsStepValid,
         true,
         true,
     ];
 
-    const visibleStepIds = hasEnrollmentServices
+    const visibleStepIds: readonly WizardStepId[] = hasEnrollmentServices
         ? stepIds
-        : stepIds.filter((id) => id !== "enrollmentStep");
+        : stepIds.filter((id) => id !== WIZARD_STEP_IDS.enrollment);
 
-    const getStepValidation = (stepId: string): boolean => {
+    const getStepValidation = (stepId: WizardStepId): boolean => {
         const index = stepIds.indexOf(stepId);
         return index >= 0 ? stepValidations[index] : false;
     };
 
     // Handle step navigation - using PatternFly Wizard's correct signature
     const handleStepChange = (_event: React.MouseEvent<HTMLButtonElement>, currentStep: WizardBasicStep) => {
-        const stepId = currentStep.id.toString();
+        const stepId = currentStep.id.toString() as WizardStepId;
         const stepIndex = visibleStepIds.indexOf(stepId);
         const maxReachIndex = visibleStepIds.indexOf(maxReachedStep);
 
@@ -349,7 +331,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     };
 
     // Users can only navigate to steps they've reached or the next step if current is valid
-    const isStepDisabled = (stepId: string): boolean => {
+    const isStepDisabled = (stepId: WizardStepId): boolean => {
         const stepIndex = visibleStepIds.indexOf(stepId);
         const maxReachIndex = visibleStepIds.indexOf(maxReachedStep);
 
@@ -470,75 +452,59 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
             >
                 <Wizard onStepChange={handleStepChange}>
                     <WizardStep
-                        name={_("Hostname")}
-                        id={stepIds[0]}
-                        footer={{ isNextDisabled: !isHostnameStepValid, isCancelHidden: true }}
+                        name={_("Network")}
+                        id={WIZARD_STEP_IDS.network}
+                        footer={{ isNextDisabled: !isNetworkStepValid, isCancelHidden: true }}
                     >
-                        <HostnamePage />
-                    </WizardStep>
-                    <WizardStep
-                        name={_("Network interface")}
-                        id={stepIds[1]}
-                        footer={{ isNextDisabled: !isNetworkInterfaceStepValid, isCancelHidden: true }}
-                        isDisabled={isStepDisabled(stepIds[1])}
-                    >
-                        <NetworkInterfacePage interfaces={interfaces} />
-                    </WizardStep>
-                    <WizardStep
-                        name={_("Network address")}
-                        id={stepIds[2]}
-                        footer={{ isNextDisabled: !isNetworkAddressStepValid, isCancelHidden: true }}
-                        isDisabled={isStepDisabled(stepIds[2])}
-                    >
-                        <NetworkAddressPage />
-                    </WizardStep>
-                    <WizardStep
-                        name={_("Network services")}
-                        id={stepIds[3]}
-                        footer={{ isNextDisabled: !isNetworkServicesStepValid, isCancelHidden: true }}
-                        isDisabled={isStepDisabled(stepIds[3])}
-                    >
-                        <NetworkServicesPage />
+                        <NetworkPage interfaces={interfaces} />
                     </WizardStep>
                     {hasEnrollmentServices && (
                         <WizardStep
                             name={_("Enrollment server")}
-                            id={stepIds[4]}
+                            id={WIZARD_STEP_IDS.enrollment}
                             footer={{ isNextDisabled: !isEnrollmentStepValid, isCancelHidden: true }}
-                            isDisabled={isStepDisabled(stepIds[4])}
+                            isDisabled={isStepDisabled(WIZARD_STEP_IDS.enrollment)}
                         >
                             <EnrollmentPage />
                         </WizardStep>
                     )}
                     <WizardStep
                         name={_("Connectivity test")}
-                        id={stepIds[5]}
+                        id={WIZARD_STEP_IDS.connectivityTest}
                         footer={{ isNextDisabled: !isConnectivityTestStepValid, isCancelHidden: true }}
-                        isDisabled={isStepDisabled(stepIds[5])}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.connectivityTest)}
                     >
                         <ConnectivityTestPage />
                     </WizardStep>
                     <WizardStep
+                        name={_("Hostname")}
+                        id={WIZARD_STEP_IDS.hostname}
+                        footer={{ isNextDisabled: !isHostnameStepValid, isCancelHidden: true }}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.hostname)}
+                    >
+                        <HostnamePage />
+                    </WizardStep>
+                    <WizardStep
                         name={_("Device labels")}
-                        id={stepIds[6]}
+                        id={WIZARD_STEP_IDS.labels}
                         footer={{ isNextDisabled: !isLabelsStepValid, isCancelHidden: true }}
-                        isDisabled={isStepDisabled(stepIds[6])}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.labels)}
                     >
                         <LabelsPage />
                     </WizardStep>
                     <WizardStep
                         name={_("Review")}
-                        id={stepIds[7]}
+                        id={WIZARD_STEP_IDS.review}
                         footer={{ nextButtonText: reviewButtonText, isCancelHidden: true }}
-                        isDisabled={isStepDisabled(stepIds[7])}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.review)}
                     >
                         <ReviewPage hasEnrollmentScripts={hasEnrollmentServices} />
                     </WizardStep>
                     <WizardStep
                         name={finalStepName}
-                        id={stepIds[8]}
+                        id={WIZARD_STEP_IDS.progress}
                         footer={getProgressPageFooter()}
-                        isDisabled={isStepDisabled(stepIds[8])}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.progress)}
                     >
                         <EnrollmentProgressPage />
                     </WizardStep>

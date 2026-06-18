@@ -1,10 +1,3 @@
-/**
- * Step validation logic for the wizard
- *
- * These functions determine whether each step's required fields are filled and valid,
- * controlling whether users can proceed to the next step.
- */
-
 import { Model } from "../model-context";
 import {
     validateHostname,
@@ -19,6 +12,30 @@ import {
     validateIPv4GatewaySubnet,
     validateIPv6GatewaySubnet,
 } from "../validation";
+
+export const WIZARD_STEP_IDS = {
+    network: "networkStep",
+    enrollment: "enrollmentStep",
+    connectivityTest: "connectivityTestStep",
+    hostname: "hostnameStep",
+    labels: "labelsStep",
+    review: "reviewStep",
+    progress: "progressStep",
+} as const;
+
+export const stepIds = [
+    WIZARD_STEP_IDS.network,
+    WIZARD_STEP_IDS.enrollment,
+    WIZARD_STEP_IDS.connectivityTest,
+    WIZARD_STEP_IDS.hostname,
+    WIZARD_STEP_IDS.labels,
+    WIZARD_STEP_IDS.review,
+    WIZARD_STEP_IDS.progress,
+] as const;
+
+export type WizardStepId = (typeof stepIds)[number];
+
+
 
 /**
  * Validate the hostname step
@@ -299,6 +316,17 @@ export const validateLabelsStep = (model: Model): boolean => {
     }
 
     return true;
+};
+
+/**
+ * Validate the combined network step (interface, address, and services)
+ */
+export const validateNetworkStep = (model: Model): boolean => {
+    return (
+        validateNetworkInterfaceStep(model) &&
+        validateNetworkAddressStep(model) &&
+        validateNetworkServicesStep(model)
+    );
 };
 
 /**

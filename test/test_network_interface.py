@@ -32,12 +32,8 @@ class TestNetworkInterface(testlib.MachineCase):
         self.login_and_go("/system-onboarding")
         b.wait_visible(".pf-v5-c-wizard")
 
-        # Navigate to hostname page first
-        b.wait_visible("#hostname-input")
-        b.set_input_text("#hostname-input", "test-device")
-
-        # Move to network interface page
-        b.click("button:contains('Next')")
+        # Navigate to network interface page
+        b.wait_visible("#networkStep")
         b.wait_visible("table[aria-label='Network interface selector']")
 
         # Verify table headers
@@ -69,12 +65,8 @@ class TestNetworkInterface(testlib.MachineCase):
         self.login_and_go("/system-onboarding")
         b.wait_visible(".pf-v5-c-wizard")
 
-        # Navigate to hostname page
-        b.wait_visible("#hostname-input")
-        b.set_input_text("#hostname-input", "test-device")
-
-        # Move to network interface page
-        b.click("button:contains('Next')")
+        # Network is the first wizard step
+        b.wait_visible("#networkStep")
         b.wait_visible("table[aria-label='Network interface selector']")
 
         # Find first selectable (managed) interface
@@ -96,12 +88,8 @@ class TestNetworkInterface(testlib.MachineCase):
         self.login_and_go("/system-onboarding")
         b.wait_visible(".pf-v5-c-wizard")
 
-        # Navigate to hostname page
-        b.wait_visible("#hostname-input")
-        b.set_input_text("#hostname-input", "test-device")
-
-        # Move to network interface page
-        b.click("button:contains('Next')")
+        # Network is the first wizard step
+        b.wait_visible("#networkStep")
         b.wait_visible("table[aria-label='Network interface selector']")
 
         # VLAN checkbox should be present
@@ -144,12 +132,8 @@ class TestNetworkInterface(testlib.MachineCase):
         self.login_and_go("/system-onboarding")
         b.wait_visible(".pf-v5-c-wizard")
 
-        # Navigate to hostname page
-        b.wait_visible("#hostname-input")
-        b.set_input_text("#hostname-input", "test-device")
-
-        # Move to network interface page
-        b.click("button:contains('Next')")
+        # Network is the first wizard step
+        b.wait_visible("#networkStep")
         b.wait_visible("table[aria-label='Network interface selector']")
 
         # Enable VLAN

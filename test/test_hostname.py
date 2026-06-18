@@ -19,6 +19,8 @@
 
 import testlib
 
+from wizard_navigation import navigate_to_hostname_step
+
 
 @testlib.nondestructive
 class TestHostname(testlib.MachineCase):
@@ -31,8 +33,7 @@ class TestHostname(testlib.MachineCase):
         self.login_and_go("/system-onboarding")
         b.wait_visible(".pf-v5-c-wizard")
 
-        # Navigate to hostname page
-        b.wait_visible("#hostname-input")
+        navigate_to_hostname_step(b)
 
         # Test empty hostname (should show error)
         b.set_input_text("#hostname-input", "")
@@ -80,10 +81,8 @@ class TestHostname(testlib.MachineCase):
             self.login_and_go("/system-onboarding")
             b.wait_visible(".pf-v5-c-wizard")
 
-            # Navigate to hostname page
-            b.wait_visible("#hostname-input")
+            navigate_to_hostname_step(b)
 
-            # Set a test hostname
             test_hostname = "test-onboarding-host"
             b.set_input_text("#hostname-input", test_hostname)
 
@@ -106,8 +105,7 @@ class TestHostname(testlib.MachineCase):
         self.login_and_go("/system-onboarding")
         b.wait_visible(".pf-v5-c-wizard")
 
-        # Navigate to hostname page
-        b.wait_visible("#hostname-input")
+        navigate_to_hostname_step(b)
 
         # If a DHCP hostname is available, it should be pre-populated
         # This test would require a test environment with DHCP configured
