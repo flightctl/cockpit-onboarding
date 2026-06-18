@@ -5,6 +5,7 @@ import { Divider } from "@patternfly/react-core/dist/esm/components/Divider/inde
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 
+import { Interface } from "../../pkg/networkmanager/interfaces.js";
 import { NetworkInterfaceSection } from "./NetworkInterfaceSection.tsx";
 import { NetworkAddressPage } from "./NetworkAddressPage.tsx";
 import { NetworkServicesPage } from "./NetworkServicesPage.tsx";
@@ -12,10 +13,10 @@ import { NetworkServicesPage } from "./NetworkServicesPage.tsx";
 const _ = cockpit.gettext;
 
 interface NetworkPageProps {
-    interfaces: import("../../pkg/networkmanager/interfaces.js").Interface[];
+    interfaces: Interface[];
 }
 
-export const NetworkPage: React.FunctionComponent<NetworkPageProps> = ({ interfaces }) => {
+export const NetworkPage = ({ interfaces }: NetworkPageProps) => {
     return (
         <Stack hasGutter>
             <StackItem>

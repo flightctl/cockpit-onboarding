@@ -1,26 +1,28 @@
 import React from "react";
 import cockpit from "cockpit";
 
-import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
+import { WifiIcon, ConnectedIcon, DisconnectedIcon } from "@patternfly/react-icons";
+import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
 import { NumberInput } from "@patternfly/react-core/dist/esm/components/NumberInput/index.js";
+import { Content, ContentVariants } from "@patternfly/react-core/dist/esm/components/Content/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
-import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
-import { WifiIcon, ConnectedIcon, DisconnectedIcon } from "@patternfly/react-icons";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
+import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
+
 import { useModelContext } from "../model-context.js";
 import { getSetupInterface } from "../services/network.js";
 import { getCurrentWifiConnection, scanWifiNetworks, WifiConnection } from "../services/wifi.js";
 import { device_state_text, is_managed, type Interface } from "../../pkg/networkmanager/interfaces.js";
 import { WifiSecurity } from "../types.js";
+import { FormTextField } from "../components/FormTextField.tsx";
 
 const _ = cockpit.gettext;
-
 
 export const NetworkInterfaceSection = ({ interfaces }: { interfaces: Interface[] }) => {
     const { model } = useModelContext();
@@ -62,7 +64,16 @@ export const NetworkInterfaceSection = ({ interfaces }: { interfaces: Interface[
     return (
         <Stack hasGutter>
             <StackItem>
-                <p>Choose a network interface to use for onboarding:</p>
+                <Title headingLevel="h2" size="md" className="pf-v6-u-mb-sm">
+                    {_("Choose a network interface to use for onboarding")}
+                </Title>
+                <Content component={ContentVariants.small}>
+                    {_(
+                        "If you don't see your network on this list, you will need to troubleshoot it and refresh the page."
+                    )}
+                </Content>
+            </StackItem>
+            <StackItem>
                 <NetworkInterfaceSelector interfaces={filteredInterfaces} />
             </StackItem>
             {isEthernetNoCable && !isSetupInterface && (
@@ -90,7 +101,7 @@ export const NetworkInterfaceSection = ({ interfaces }: { interfaces: Interface[
             )}
             {!isWifiSelected && (
                 <StackItem>
-                    <p>Optionally, specify the VLAN ID to use on this interface:</p>
+                    <p>{_("Optionally, specify the VLAN ID to use on this interface:")}</p>
                     <NetworkVlanSelector />
                 </StackItem>
             )}
@@ -98,10 +109,7 @@ export const NetworkInterfaceSection = ({ interfaces }: { interfaces: Interface[
     );
 };
 
-
-export const NetworkInterfaceSelector = ({ interfaces }: {
-    interfaces: Interface[];
-}) => {
+export const NetworkInterfaceSelector = ({ interfaces }: { interfaces: Interface[] }) => {
     const { model, updateModel, switchToInterfaceConfig } = useModelContext();
 
     const columnNames = {
@@ -531,7 +539,7 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
     );
 };
 
-export const NetworkVlanSelector: React.FunctionComponent = () => {
+export const NetworkVlanSelector = () => {
     const { model, updateModel } = useModelContext();
     const [vlanError, setVlanError] = React.useState<string | null>(null);
 
@@ -583,12 +591,26 @@ export const NetworkVlanSelector: React.FunctionComponent = () => {
                 isChecked={useVlan}
                 onChange={(_, checked) => setUseVlan(checked)}
             />
+<<<<<<< HEAD
+||||||| parent of cd91eb6 (Create FormTextField)
+           
+=======
+
+>>>>>>> cd91eb6 (Create FormTextField)
             {useVlan && (
-                <div style={{ marginTop: "1rem", marginLeft: "1.5rem" }}>
+                <FormTextField
+                    fieldId="vlan-id"
+                    toggleLabel={_("Enter VLAN ID")}
+                    fieldLabel={_("VLAN ID")}
+                    isRequired
+                    helperText={_("Identifies the VLAN on the network.")}
+                    error={vlanError}
+                >
                     <NumberInput
                         value={model.networkInterface.vlanId || 1}
                         min={1}
                         max={4094}
+                        placeholder={_("Enter a number from 1-4094")}
                         onChange={onVlanIdChange}
                         onMinus={onVlanIdMinus}
                         onPlus={onVlanIdPlus}
@@ -597,18 +619,7 @@ export const NetworkVlanSelector: React.FunctionComponent = () => {
                         widthChars={5}
                         validated={vlanError ? "error" : "default"}
                     />
-                    {vlanError && (
-                        <div
-                            style={{
-                                color: "var(--pf-global--danger-color--100)",
-                                fontSize: "var(--pf-global--FontSize--sm)",
-                                marginTop: "0.25rem",
-                            }}
-                        >
-                            {vlanError}
-                        </div>
-                    )}
-                </div>
+                </FormTextField>
             )}
         </div>
     );
