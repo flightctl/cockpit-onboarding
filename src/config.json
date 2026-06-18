@@ -20,7 +20,7 @@
     {
       "id": "flightctl",
       "name": "Flight Control",
-      "description": "Enroll this device into Flight Control fleet management",
+      "description": "Flight Control allows you to manage your edge environment at scale.",
       "endpoint": {
         "url": "",
         "allowUserOverride": true

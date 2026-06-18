@@ -23,7 +23,7 @@ describe("render-config", () => {
         expect(rendered.brandName).toBe("Flight Control");
         expect(rendered.enrollmentServices[0].name).toBe("Flight Control");
         expect(rendered.enrollmentServices[0].description).toBe(
-            "Enroll this device into Flight Control fleet management"
+            "Flight Control allows you to manage your edge environment at scale."
         );
     });
 
@@ -38,7 +38,7 @@ describe("render-config", () => {
         expect(rendered.brandName).toBe("Red Hat Edge Manager");
         expect(rendered.enrollmentServices[0].name).toBe("Red Hat Edge Manager");
         expect(rendered.enrollmentServices[0].description).toBe(
-            "Enroll this device into Red Hat Edge Manager fleet management"
+            "Red Hat Edge Manager allows you to manage your edge environment at scale."
         );
     });
 

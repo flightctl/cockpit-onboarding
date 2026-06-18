@@ -11,7 +11,7 @@ function applyBrandName(config, brandName) {
     for (const svc of rendered.enrollmentServices ?? []) {
         if (svc.id === "flightctl") {
             svc.name = brandName;
-            svc.description = `Enroll this device into ${brandName} fleet management`;
+            svc.description = `${brandName} allows you to manage your edge environment at scale.`;
         }
     }
     return rendered;

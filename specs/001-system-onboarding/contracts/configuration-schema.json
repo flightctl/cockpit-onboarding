@@ -294,7 +294,7 @@
         {
           "id": "flightctl",
           "name": "Flight Control",
-          "description": "Enroll this device into Flight Control fleet management",
+          "description": "Enroll this device into Flight Control",
           "endpoint": {
             "url": "https://flightctl.example.com",
             "allowUserOverride": true
