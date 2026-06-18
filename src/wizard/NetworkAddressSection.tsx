@@ -1,17 +1,20 @@
 import React from "react";
 import cockpit from "cockpit";
 
-import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
-import { FormGroup, FormHelperText } from "@patternfly/react-core/dist/esm/components/Form/index.js";
+import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
+import { Content } from "@patternfly/react-core/dist/esm/components/Content/index.js";
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
-import { TextInputGroup, TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
+import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
+import { FormGroup, FormHelperText } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
 import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/components/HelperText/index.js";
+import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
-import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
+import { TextInputGroup, TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
+import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
-import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
+
 import { useModelContext } from "../model-context";
 import { getSetupInterface } from "../services/network";
 import { SCRIPT_CHECK_NETWORK } from "../paths";
@@ -24,13 +27,14 @@ import {
     validateIPv4GatewaySubnet,
     validateIPv6GatewaySubnet,
 } from "../validation";
+import FormGroupAccordion from "../components/FormGroupAccordion";
 
 const _ = cockpit.gettext;
 
 type ArpingResult = "conflict" | "available" | "error" | null;
 type GatewayArpingResult = "reachable" | "unreachable" | "error" | null;
 
-export const NetworkAddressPage: React.FunctionComponent = () => {
+const NetworkAddressSection = () => {
     const { model, networkManager } = useModelContext();
 
     const interfaces = networkManager?.list_interfaces?.() || [];
@@ -39,6 +43,14 @@ export const NetworkAddressPage: React.FunctionComponent = () => {
 
     return (
         <Stack hasGutter>
+            <StackItem>
+                <Title headingLevel="h2" size="md">
+                    {_("IP Settings")}
+                </Title>
+            </StackItem>
+            <StackItem>
+                <Content className="pf-v6-u-text-color-subtle">{_("Configure IPv4 and IPv6")}</Content>
+            </StackItem>
             {isSetupInterface && (
                 <StackItem>
                     <Alert variant="warning" isInline title={_("Connected through this interface")}>
@@ -53,20 +65,20 @@ export const NetworkAddressPage: React.FunctionComponent = () => {
                 </StackItem>
             )}
             <StackItem>
-                <p>Configure the IPv4 connection for this interface:</p>
-                <NetworkConfigIPv4 isSetupInterface={isSetupInterface} />
+                <FormGroup label={_("IPv4 Connection:")}>
+                    <NetworkConfigIPv4 isSetupInterface={isSetupInterface} />
+                </FormGroup>
             </StackItem>
             <StackItem>
-                <p>Optionally, configure the IPv6 connection for this interface:</p>
-                <NetworkConfigIPv6 isSetupInterface={isSetupInterface} />
+                <FormGroup label={_("IPv6 Connection:")}>
+                    <NetworkConfigIPv6 isSetupInterface={isSetupInterface} />
+                </FormGroup>
             </StackItem>
         </Stack>
     );
 };
 
-export const NetworkConfigIPv4: React.FunctionComponent<{ isSetupInterface?: boolean }> = ({
-    isSetupInterface = false,
-}) => {
+export const NetworkConfigIPv4 = ({ isSetupInterface = false }: { isSetupInterface?: boolean }) => {
     const { model, updateNestedModel } = useModelContext();
 
     // Validation state
@@ -236,163 +248,167 @@ export const NetworkConfigIPv4: React.FunctionComponent<{ isSetupInterface?: boo
                 </Flex>
             </StackItem>
             {model.networkAddress.ipv4.method === "static" && (
-                <StackItem>
-                    <Stack hasGutter>
-                        <StackItem>
-                            <FormGroup label={_("IPv4 Address")} isRequired>
-                                <Flex alignItems={{ default: "alignItemsFlexStart" }}>
-                                    <FlexItem grow={{ default: "grow" }}>
-                                        <TextInputGroup
-                                            validated={
-                                                validationErrors.address
-                                                    ? ValidatedOptions.error
-                                                    : model.networkAddress.ipv4.address && !validationErrors.address
-                                                      ? ValidatedOptions.success
-                                                      : ValidatedOptions.warning
-                                            }
-                                        >
-                                            <TextInputGroupMain
-                                                id="ipv4-address"
-                                                value={model.networkAddress.ipv4.address || ""}
-                                                onChange={(_, value) => setIpv4Address(value)}
-                                                placeholder="192.168.1.100"
-                                            />
-                                        </TextInputGroup>
-                                    </FlexItem>
-                                    <FlexItem>
-                                        {!isSetupInterface && (
-                                            <Button
-                                                variant="secondary"
-                                                onClick={checkIpAvailability}
-                                                isDisabled={
-                                                    arpingRunning ||
-                                                    !model.networkAddress.ipv4.address ||
-                                                    !!validationErrors.address ||
-                                                    !model.networkInterface.selectedInterface
+                <FormGroupAccordion id="ipv4-static" toggleLabel={_("Static IP Configuration")}>
+                    <StackItem>
+                        <Stack hasGutter>
+                            <StackItem>
+                                <FormGroup label={_("IPv4 Address")} isRequired>
+                                    <Flex alignItems={{ default: "alignItemsFlexStart" }}>
+                                        <FlexItem grow={{ default: "grow" }}>
+                                            <TextInputGroup
+                                                validated={
+                                                    validationErrors.address
+                                                        ? ValidatedOptions.error
+                                                        : model.networkAddress.ipv4.address && !validationErrors.address
+                                                          ? ValidatedOptions.success
+                                                          : ValidatedOptions.warning
                                                 }
-                                                icon={arpingRunning ? <Spinner size="sm" /> : undefined}
                                             >
-                                                {_("Check availability")}
-                                            </Button>
-                                        )}
-                                    </FlexItem>
-                                </Flex>
-                                {arpingResult && (
-                                    <FormHelperText>
-                                        <HelperText>
-                                            {arpingResult === "available" && (
-                                                <HelperTextItem variant="success">
-                                                    {_("IP address appears to be available")}
-                                                </HelperTextItem>
+                                                <TextInputGroupMain
+                                                    id="ipv4-address"
+                                                    value={model.networkAddress.ipv4.address || ""}
+                                                    onChange={(_, value) => setIpv4Address(value)}
+                                                    placeholder="192.168.1.100"
+                                                />
+                                            </TextInputGroup>
+                                        </FlexItem>
+                                        <FlexItem>
+                                            {!isSetupInterface && (
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={checkIpAvailability}
+                                                    isDisabled={
+                                                        arpingRunning ||
+                                                        !model.networkAddress.ipv4.address ||
+                                                        !!validationErrors.address ||
+                                                        !model.networkInterface.selectedInterface
+                                                    }
+                                                    icon={arpingRunning ? <Spinner size="sm" /> : undefined}
+                                                >
+                                                    {_("Check availability")}
+                                                </Button>
                                             )}
-                                            {arpingResult === "conflict" && (
-                                                <HelperTextItem variant="warning">
-                                                    {_("This IP address is already in use on the network")}
-                                                </HelperTextItem>
-                                            )}
-                                            {arpingResult === "error" && (
-                                                <HelperTextItem variant="indeterminate">
-                                                    {_("Could not determine IP availability")}
-                                                </HelperTextItem>
-                                            )}
-                                        </HelperText>
-                                    </FormHelperText>
-                                )}
-                            </FormGroup>
-                        </StackItem>
-                        <StackItem>
-                            <FormGroup label="Subnet Mask" isRequired>
-                                <TextInputGroup
-                                    validated={
-                                        validationErrors.subnetMask
-                                            ? ValidatedOptions.error
-                                            : model.networkAddress.ipv4.subnetMask && !validationErrors.subnetMask
-                                              ? ValidatedOptions.success
-                                              : ValidatedOptions.warning
-                                    }
-                                >
-                                    <TextInputGroupMain
-                                        id="subnet-mask"
-                                        value={model.networkAddress.ipv4.subnetMask || ""}
-                                        onChange={(_, value) => setSubnetMask(value)}
-                                        placeholder="255.255.255.0 or /24"
-                                    />
-                                </TextInputGroup>
-                            </FormGroup>
-                        </StackItem>
-                        <StackItem>
-                            <FormGroup label="Gateway IP" isRequired>
-                                <Flex alignItems={{ default: "alignItemsFlexStart" }}>
-                                    <FlexItem grow={{ default: "grow" }}>
-                                        <TextInputGroup
-                                            validated={
-                                                validationErrors.gateway
-                                                    ? ValidatedOptions.error
-                                                    : model.networkAddress.ipv4.gateway && !validationErrors.gateway
-                                                      ? ValidatedOptions.success
-                                                      : ValidatedOptions.warning
-                                            }
-                                        >
-                                            <TextInputGroupMain
-                                                id="gateway-ip"
-                                                value={model.networkAddress.ipv4.gateway || ""}
-                                                onChange={(_, value) => setGatewayIp(value)}
-                                                placeholder="192.168.1.1"
-                                            />
-                                        </TextInputGroup>
-                                    </FlexItem>
-                                    <FlexItem>
-                                        {!isSetupInterface && (
-                                            <Button
-                                                variant="secondary"
-                                                onClick={checkGatewayReachability}
-                                                isDisabled={
-                                                    gatewayArpingRunning ||
-                                                    !model.networkAddress.ipv4.gateway ||
-                                                    !!validationErrors.gateway ||
-                                                    !model.networkInterface.selectedInterface
+                                        </FlexItem>
+                                    </Flex>
+                                    {arpingResult && (
+                                        <FormHelperText>
+                                            <HelperText>
+                                                {arpingResult === "available" && (
+                                                    <HelperTextItem variant="success">
+                                                        {_("IP address appears to be available")}
+                                                    </HelperTextItem>
+                                                )}
+                                                {arpingResult === "conflict" && (
+                                                    <HelperTextItem variant="warning">
+                                                        {_("This IP address is already in use on the network")}
+                                                    </HelperTextItem>
+                                                )}
+                                                {arpingResult === "error" && (
+                                                    <HelperTextItem variant="indeterminate">
+                                                        {_("Could not determine IP availability")}
+                                                    </HelperTextItem>
+                                                )}
+                                            </HelperText>
+                                        </FormHelperText>
+                                    )}
+                                </FormGroup>
+                            </StackItem>
+                            <StackItem>
+                                <FormGroup label="Subnet Mask" isRequired>
+                                    <TextInputGroup
+                                        validated={
+                                            validationErrors.subnetMask
+                                                ? ValidatedOptions.error
+                                                : model.networkAddress.ipv4.subnetMask && !validationErrors.subnetMask
+                                                  ? ValidatedOptions.success
+                                                  : ValidatedOptions.warning
+                                        }
+                                    >
+                                        <TextInputGroupMain
+                                            id="subnet-mask"
+                                            value={model.networkAddress.ipv4.subnetMask || ""}
+                                            onChange={(_, value) => setSubnetMask(value)}
+                                            placeholder="255.255.255.0 or /24"
+                                        />
+                                    </TextInputGroup>
+                                </FormGroup>
+                            </StackItem>
+                            <StackItem>
+                                <FormGroup label="Gateway IP" isRequired>
+                                    <Flex alignItems={{ default: "alignItemsFlexStart" }}>
+                                        <FlexItem grow={{ default: "grow" }}>
+                                            <TextInputGroup
+                                                validated={
+                                                    validationErrors.gateway
+                                                        ? ValidatedOptions.error
+                                                        : model.networkAddress.ipv4.gateway && !validationErrors.gateway
+                                                          ? ValidatedOptions.success
+                                                          : ValidatedOptions.warning
                                                 }
-                                                icon={gatewayArpingRunning ? <Spinner size="sm" /> : undefined}
                                             >
-                                                {_("Check gateway")}
-                                            </Button>
-                                        )}
-                                    </FlexItem>
-                                </Flex>
-                                {validationErrors.gateway && (
-                                    <FormHelperText>
-                                        <HelperText>
-                                            <HelperTextItem variant="error">{validationErrors.gateway}</HelperTextItem>
-                                        </HelperText>
-                                    </FormHelperText>
-                                )}
-                                {gatewayArpingResult && (
-                                    <FormHelperText>
-                                        <HelperText>
-                                            {gatewayArpingResult === "reachable" && (
-                                                <HelperTextItem variant="success">
-                                                    {_("Gateway is reachable")}
-                                                </HelperTextItem>
+                                                <TextInputGroupMain
+                                                    id="gateway-ip"
+                                                    value={model.networkAddress.ipv4.gateway || ""}
+                                                    onChange={(_, value) => setGatewayIp(value)}
+                                                    placeholder="192.168.1.1"
+                                                />
+                                            </TextInputGroup>
+                                        </FlexItem>
+                                        <FlexItem>
+                                            {!isSetupInterface && (
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={checkGatewayReachability}
+                                                    isDisabled={
+                                                        gatewayArpingRunning ||
+                                                        !model.networkAddress.ipv4.gateway ||
+                                                        !!validationErrors.gateway ||
+                                                        !model.networkInterface.selectedInterface
+                                                    }
+                                                    icon={gatewayArpingRunning ? <Spinner size="sm" /> : undefined}
+                                                >
+                                                    {_("Check gateway")}
+                                                </Button>
                                             )}
-                                            {gatewayArpingResult === "unreachable" && (
-                                                <HelperTextItem variant="warning">
-                                                    {_(
-                                                        "Gateway did not respond — verify the address and cable connection"
-                                                    )}
+                                        </FlexItem>
+                                    </Flex>
+                                    {validationErrors.gateway && (
+                                        <FormHelperText>
+                                            <HelperText>
+                                                <HelperTextItem variant="error">
+                                                    {validationErrors.gateway}
                                                 </HelperTextItem>
-                                            )}
-                                            {gatewayArpingResult === "error" && (
-                                                <HelperTextItem variant="indeterminate">
-                                                    {_("Could not check gateway reachability")}
-                                                </HelperTextItem>
-                                            )}
-                                        </HelperText>
-                                    </FormHelperText>
-                                )}
-                            </FormGroup>
-                        </StackItem>
-                    </Stack>
-                </StackItem>
+                                            </HelperText>
+                                        </FormHelperText>
+                                    )}
+                                    {gatewayArpingResult && (
+                                        <FormHelperText>
+                                            <HelperText>
+                                                {gatewayArpingResult === "reachable" && (
+                                                    <HelperTextItem variant="success">
+                                                        {_("Gateway is reachable")}
+                                                    </HelperTextItem>
+                                                )}
+                                                {gatewayArpingResult === "unreachable" && (
+                                                    <HelperTextItem variant="warning">
+                                                        {_(
+                                                            "Gateway did not respond — verify the address and cable connection"
+                                                        )}
+                                                    </HelperTextItem>
+                                                )}
+                                                {gatewayArpingResult === "error" && (
+                                                    <HelperTextItem variant="indeterminate">
+                                                        {_("Could not check gateway reachability")}
+                                                    </HelperTextItem>
+                                                )}
+                                            </HelperText>
+                                        </FormHelperText>
+                                    )}
+                                </FormGroup>
+                            </StackItem>
+                        </Stack>
+                    </StackItem>
+                </FormGroupAccordion>
             )}
             {model.networkAddress.ipv4.method !== "disabled" && (
                 <StackItem>
@@ -619,140 +635,144 @@ export const NetworkConfigIPv6: React.FunctionComponent<{ isSetupInterface?: boo
             </StackItem>
             {model.networkAddress.ipv6.method === "static" && (
                 <StackItem>
-                    <Stack hasGutter>
-                        <StackItem>
-                            <FormGroup label="IPv6 Address" isRequired>
-                                <Flex alignItems={{ default: "alignItemsFlexStart" }}>
-                                    <FlexItem grow={{ default: "grow" }}>
-                                        <TextInputGroup
-                                            validated={
-                                                validationErrors.address
-                                                    ? ValidatedOptions.error
-                                                    : model.networkAddress.ipv6.address && !validationErrors.address
-                                                      ? ValidatedOptions.success
-                                                      : ValidatedOptions.warning
-                                            }
-                                        >
-                                            <TextInputGroupMain
-                                                id="ipv6-address"
-                                                value={model.networkAddress.ipv6.address || ""}
-                                                onChange={(_, value) => setIpv6Address(value)}
-                                                onBlur={(e) => handleIpv6AddressBlur(e.currentTarget.value)}
-                                                placeholder="2001:db8::1/64"
-                                            />
-                                        </TextInputGroup>
-                                    </FlexItem>
-                                    <FlexItem>
-                                        {!isSetupInterface && (
-                                            <Button
-                                                variant="secondary"
-                                                onClick={checkIpv6Availability}
-                                                isDisabled={
-                                                    ipCheckRunning ||
-                                                    !model.networkAddress.ipv6.address ||
-                                                    !!validationErrors.address ||
-                                                    !model.networkInterface.selectedInterface
+                    <FormGroupAccordion id="ipv6-static" toggleLabel={_("Static IP Configuration")}>
+                        <Stack hasGutter>
+                            <StackItem>
+                                <FormGroup label="IPv6 Address" isRequired>
+                                    <Flex alignItems={{ default: "alignItemsFlexStart" }}>
+                                        <FlexItem grow={{ default: "grow" }}>
+                                            <TextInputGroup
+                                                validated={
+                                                    validationErrors.address
+                                                        ? ValidatedOptions.error
+                                                        : model.networkAddress.ipv6.address && !validationErrors.address
+                                                          ? ValidatedOptions.success
+                                                          : ValidatedOptions.warning
                                                 }
-                                                icon={ipCheckRunning ? <Spinner size="sm" /> : undefined}
                                             >
-                                                {_("Check availability")}
-                                            </Button>
-                                        )}
-                                    </FlexItem>
-                                </Flex>
-                                {ipCheckResult && (
-                                    <FormHelperText>
-                                        <HelperText>
-                                            {ipCheckResult === "available" && (
-                                                <HelperTextItem variant="success">
-                                                    {_("IPv6 address appears to be available")}
-                                                </HelperTextItem>
+                                                <TextInputGroupMain
+                                                    id="ipv6-address"
+                                                    value={model.networkAddress.ipv6.address || ""}
+                                                    onChange={(_, value) => setIpv6Address(value)}
+                                                    onBlur={(e) => handleIpv6AddressBlur(e.currentTarget.value)}
+                                                    placeholder="2001:db8::1/64"
+                                                />
+                                            </TextInputGroup>
+                                        </FlexItem>
+                                        <FlexItem>
+                                            {!isSetupInterface && (
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={checkIpv6Availability}
+                                                    isDisabled={
+                                                        ipCheckRunning ||
+                                                        !model.networkAddress.ipv6.address ||
+                                                        !!validationErrors.address ||
+                                                        !model.networkInterface.selectedInterface
+                                                    }
+                                                    icon={ipCheckRunning ? <Spinner size="sm" /> : undefined}
+                                                >
+                                                    {_("Check availability")}
+                                                </Button>
                                             )}
-                                            {ipCheckResult === "conflict" && (
-                                                <HelperTextItem variant="warning">
-                                                    {_("This IPv6 address is already in use on the network")}
-                                                </HelperTextItem>
-                                            )}
-                                            {ipCheckResult === "error" && (
-                                                <HelperTextItem variant="indeterminate">
-                                                    {_("Could not determine IPv6 address availability")}
-                                                </HelperTextItem>
-                                            )}
-                                        </HelperText>
-                                    </FormHelperText>
-                                )}
-                            </FormGroup>
-                        </StackItem>
-                        <StackItem>
-                            <FormGroup label="Gateway IP">
-                                <Flex alignItems={{ default: "alignItemsFlexStart" }}>
-                                    <FlexItem grow={{ default: "grow" }}>
-                                        <TextInputGroup
-                                            {...(validationErrors.gateway
-                                                ? { validated: ValidatedOptions.error }
-                                                : model.networkAddress.ipv6.gateway?.trim()
-                                                  ? { validated: ValidatedOptions.success }
-                                                  : {})}
-                                        >
-                                            <TextInputGroupMain
-                                                id="gateway-ipv6"
-                                                value={model.networkAddress.ipv6.gateway || ""}
-                                                onChange={(_, value) => setGatewayIpv6(value)}
-                                                placeholder="2001:db8::1"
-                                            />
-                                        </TextInputGroup>
-                                    </FlexItem>
-                                    <FlexItem>
-                                        {!isSetupInterface && (
-                                            <Button
-                                                variant="secondary"
-                                                onClick={checkIpv6Gateway}
-                                                isDisabled={
-                                                    gwCheckRunning ||
-                                                    !model.networkAddress.ipv6.gateway ||
-                                                    !!validationErrors.gateway ||
-                                                    !model.networkInterface.selectedInterface
-                                                }
-                                                icon={gwCheckRunning ? <Spinner size="sm" /> : undefined}
+                                        </FlexItem>
+                                    </Flex>
+                                    {ipCheckResult && (
+                                        <FormHelperText>
+                                            <HelperText>
+                                                {ipCheckResult === "available" && (
+                                                    <HelperTextItem variant="success">
+                                                        {_("IPv6 address appears to be available")}
+                                                    </HelperTextItem>
+                                                )}
+                                                {ipCheckResult === "conflict" && (
+                                                    <HelperTextItem variant="warning">
+                                                        {_("This IPv6 address is already in use on the network")}
+                                                    </HelperTextItem>
+                                                )}
+                                                {ipCheckResult === "error" && (
+                                                    <HelperTextItem variant="indeterminate">
+                                                        {_("Could not determine IPv6 address availability")}
+                                                    </HelperTextItem>
+                                                )}
+                                            </HelperText>
+                                        </FormHelperText>
+                                    )}
+                                </FormGroup>
+                            </StackItem>
+                            <StackItem>
+                                <FormGroup label="Gateway IP">
+                                    <Flex alignItems={{ default: "alignItemsFlexStart" }}>
+                                        <FlexItem grow={{ default: "grow" }}>
+                                            <TextInputGroup
+                                                {...(validationErrors.gateway
+                                                    ? { validated: ValidatedOptions.error }
+                                                    : model.networkAddress.ipv6.gateway?.trim()
+                                                      ? { validated: ValidatedOptions.success }
+                                                      : {})}
                                             >
-                                                {_("Check gateway")}
-                                            </Button>
-                                        )}
-                                    </FlexItem>
-                                </Flex>
-                                {validationErrors.gateway && (
-                                    <FormHelperText>
-                                        <HelperText>
-                                            <HelperTextItem variant="error">{validationErrors.gateway}</HelperTextItem>
-                                        </HelperText>
-                                    </FormHelperText>
-                                )}
-                                {gwCheckResult && (
-                                    <FormHelperText>
-                                        <HelperText>
-                                            {gwCheckResult === "reachable" && (
-                                                <HelperTextItem variant="success">
-                                                    {_("Gateway is reachable")}
-                                                </HelperTextItem>
+                                                <TextInputGroupMain
+                                                    id="gateway-ipv6"
+                                                    value={model.networkAddress.ipv6.gateway || ""}
+                                                    onChange={(_, value) => setGatewayIpv6(value)}
+                                                    placeholder="2001:db8::1"
+                                                />
+                                            </TextInputGroup>
+                                        </FlexItem>
+                                        <FlexItem>
+                                            {!isSetupInterface && (
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={checkIpv6Gateway}
+                                                    isDisabled={
+                                                        gwCheckRunning ||
+                                                        !model.networkAddress.ipv6.gateway ||
+                                                        !!validationErrors.gateway ||
+                                                        !model.networkInterface.selectedInterface
+                                                    }
+                                                    icon={gwCheckRunning ? <Spinner size="sm" /> : undefined}
+                                                >
+                                                    {_("Check gateway")}
+                                                </Button>
                                             )}
-                                            {gwCheckResult === "unreachable" && (
-                                                <HelperTextItem variant="warning">
-                                                    {_(
-                                                        "Gateway did not respond — verify the address and cable connection"
-                                                    )}
+                                        </FlexItem>
+                                    </Flex>
+                                    {validationErrors.gateway && (
+                                        <FormHelperText>
+                                            <HelperText>
+                                                <HelperTextItem variant="error">
+                                                    {validationErrors.gateway}
                                                 </HelperTextItem>
-                                            )}
-                                            {gwCheckResult === "error" && (
-                                                <HelperTextItem variant="indeterminate">
-                                                    {_("Could not check gateway reachability")}
-                                                </HelperTextItem>
-                                            )}
-                                        </HelperText>
-                                    </FormHelperText>
-                                )}
-                            </FormGroup>
-                        </StackItem>
-                    </Stack>
+                                            </HelperText>
+                                        </FormHelperText>
+                                    )}
+                                    {gwCheckResult && (
+                                        <FormHelperText>
+                                            <HelperText>
+                                                {gwCheckResult === "reachable" && (
+                                                    <HelperTextItem variant="success">
+                                                        {_("Gateway is reachable")}
+                                                    </HelperTextItem>
+                                                )}
+                                                {gwCheckResult === "unreachable" && (
+                                                    <HelperTextItem variant="warning">
+                                                        {_(
+                                                            "Gateway did not respond — verify the address and cable connection"
+                                                        )}
+                                                    </HelperTextItem>
+                                                )}
+                                                {gwCheckResult === "error" && (
+                                                    <HelperTextItem variant="indeterminate">
+                                                        {_("Could not check gateway reachability")}
+                                                    </HelperTextItem>
+                                                )}
+                                            </HelperText>
+                                        </FormHelperText>
+                                    )}
+                                </FormGroup>
+                            </StackItem>
+                        </Stack>
+                    </FormGroupAccordion>
                 </StackItem>
             )}
             {model.networkAddress.ipv6.method !== "disabled" && (
@@ -810,3 +830,5 @@ export const NetworkConfigIPv6: React.FunctionComponent<{ isSetupInterface?: boo
         </Stack>
     );
 };
+
+export default NetworkAddressSection;

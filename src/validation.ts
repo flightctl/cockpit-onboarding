@@ -335,12 +335,6 @@ export const validateIPv6GatewaySubnet = (address: string, gateway: string): str
 };
 
 /**
- * @deprecated Use validateIP instead - DNS servers are just IP addresses
- * Alias for backward compatibility
- */
-export const validateDNSServer = validateIP;
-
-/**
  * Validate hostname or IP address (IPv4 or IPv6)
  *
  * Useful for fields that accept any of these formats (e.g., proxy hostname, NTP server)

@@ -3,6 +3,7 @@ import { Interface, Ipv4Config, Ipv6Config, NetworkManagerModel } from "../../pk
 import { Model } from "../model-context";
 import { ONBOARDING_PROFILE_PREFIX } from "../paths";
 import { waitForProxy, waitForProxyWithTimeout } from "./dbus-helpers";
+import { WifiSecurity } from "../types.js";
 
 export interface NetworkApplyResult {
     results: string[];
@@ -57,6 +58,18 @@ function dbusPathListResult(result: unknown[]): string[] {
 
 function isLocalhost(hostname: string): boolean {
     return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+export function mapWifiSecurity(security: string): WifiSecurity {
+    switch (security) {
+        case "None":
+            return "none";
+        case "WEP":
+            return "wep";
+        default:
+            // WPA, WPA2, WPA3, or any combination -> 'wpa'
+            return "wpa";
+    }
 }
 
 export function getSetupInterface(interfaces: Interface[]): string | null {
@@ -634,12 +647,7 @@ async function deleteOnboardingProfiles(ifaceName?: string): Promise<void> {
 
                 if (typeof connId === "string" && connId.startsWith(prefix)) {
                     console.log(`Deleting onboarding profile: ${connId} at ${connPath}`);
-                    await nmClient.call(
-                        connPath,
-                        "org.freedesktop.NetworkManager.Settings.Connection",
-                        "Delete",
-                        []
-                    );
+                    await nmClient.call(connPath, "org.freedesktop.NetworkManager.Settings.Connection", "Delete", []);
                 }
             } catch (connError) {
                 console.warn(`Failed to inspect/delete connection ${connPath}:`, connError);

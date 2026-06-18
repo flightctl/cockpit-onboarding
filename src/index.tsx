@@ -25,6 +25,9 @@ import "cockpit-dark-theme";
 import { Application } from "./app.tsx";
 
 import "patternfly/patternfly-6-cockpit.scss";
+import "@patternfly/react-styles/css/utilities/Spacing/spacing.css";
+import "@patternfly/react-styles/css/utilities/Text/text.css";
+
 import "./app.scss";
 
 document.addEventListener("DOMContentLoaded", () => {

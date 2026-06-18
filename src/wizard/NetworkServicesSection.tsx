@@ -1,36 +1,57 @@
 import React, { useState } from "react";
+import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
+import cockpit from "cockpit";
 
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
+import { Content } from "@patternfly/react-core/dist/esm/components/Content/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { TextInputGroup, TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
+import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/components/HelperText/index.js";
 import { FormSelect, FormSelectOption } from "@patternfly/react-core/dist/esm/components/FormSelect/index.js";
+import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
-import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
+
 import { useModelContext } from "../model-context";
 import { validateHostnameOrIP, validatePort } from "../validation";
 import type { ProxyProtocol } from "../types";
 
-export const NetworkServicesPage: React.FunctionComponent = () => {
+const _ = cockpit.gettext;
+
+const getValidationStateProps = (
+    value: string | null | undefined,
+    error: string | undefined
+): { validated: "success" | "error" } | Record<string, never> => {
+    if (error) {
+        return { validated: ValidatedOptions.error };
+    }
+    if (value) {
+        return { validated: ValidatedOptions.success };
+    }
+    return {};
+};
+
+const NetworkServicesSection = () => {
     const { model, updateNestedModel } = useModelContext();
     const [ntpServerInput, setNtpServerInput] = useState<string>("");
-    const [ntpValidationError, setNtpValidationError] = useState<string | null>(null);
-    const [proxyHostnameError, setProxyHostnameError] = useState<string | null>(null);
-    const [proxyPortError, setProxyPortError] = useState<string | null>(null);
+    const [ntpValidationError, setNtpValidationError] = useState<string>();
+    const [proxyHostnameError, setProxyHostnameError] = useState<string>();
+    const [proxyPortError, setProxyPortError] = useState<string>();
 
     const setAutoNtp = (autoConfig: boolean) => {
         updateNestedModel("networkServices", "ntp", { autoConfig });
     };
 
     const handleNtpServerInputChange = (value: string) => {
-        setNtpServerInput(value);
+        const trimmedValue = value.trim();
+        setNtpServerInput(trimmedValue);
         // Only validate if the input is not empty, since this field is optional
         // (user only needs to fill it if they want to add a server)
-        const error = value.trim() ? validateHostnameOrIP(value, false) : null;
-        setNtpValidationError(error);
+        const error = validateHostnameOrIP(trimmedValue, false);
+        setNtpValidationError(error ?? undefined);
     };
 
     const addNtpServer = () => {
@@ -52,7 +73,7 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
             const newServers = [...model.networkServices.ntp.servers, trimmedInput];
             updateNestedModel("networkServices", "ntp", { servers: newServers.sort() });
             setNtpServerInput("");
-            setNtpValidationError(null);
+            setNtpValidationError(undefined);
         }
     };
 
@@ -66,22 +87,22 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
         updateNestedModel("networkServices", "proxy", { enabled });
         if (!enabled) {
             // Clear validation errors when disabling proxy
-            setProxyHostnameError(null);
-            setProxyPortError(null);
+            setProxyHostnameError(undefined);
+            setProxyPortError(undefined);
         }
     };
 
     const handleProxyHostnameChange = (value: string) => {
         updateNestedModel("networkServices", "proxy", { hostname: value || null });
         const error = validateHostnameOrIP(value, false);
-        setProxyHostnameError(error);
+        setProxyHostnameError(error || undefined);
     };
 
     const handleProxyPortChange = (value: string) => {
         const port = value ? parseInt(value, 10) : null;
-        updateNestedModel("networkServices", "proxy", { port });
         const error = validatePort(port, false);
-        setProxyPortError(error);
+        updateNestedModel("networkServices", "proxy", { port });
+        setProxyPortError(error || undefined);
     };
 
     const handleProxyUsernameChange = (value: string) => {
@@ -102,34 +123,39 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
 
     return (
         <Stack hasGutter>
+            <Title headingLevel="h2" size="md">
+                {_("Network Services")}
+            </Title>
             <StackItem>
-                <p>Configure the Network Time Protocol (NTP):</p>
-                <Checkbox
-                    id="auto-ntp"
-                    label="Automatically configure time servers"
-                    isChecked={model.networkServices.ntp.autoConfig}
-                    onChange={(_, checked) => setAutoNtp(checked)}
-                />
+                <Content className="pf-v6-u-text-color-subtle">
+                    {_("Configure additional network services such as NTP servers and HTTP proxies")}
+                </Content>
+            </StackItem>
+            <StackItem>
+                <FormGroup label={_("Configure NTP Servers:")}>
+                    <Checkbox
+                        id="auto-ntp"
+                        label={_("Automatically configure time servers")}
+                        isChecked={model.networkServices.ntp.autoConfig}
+                        onChange={(_, checked) => setAutoNtp(checked)}
+                    />
+                </FormGroup>
             </StackItem>
             {!model.networkServices.ntp.autoConfig && (
-                <StackItem style={{ marginLeft: "1.5rem" }}>
+                <StackItem>
                     <Stack hasGutter>
                         <StackItem>
-                            <FormGroup label="NTP Server Hostname">
+                            <FormGroup label={_("NTP Server Hostname")} isRequired>
                                 <Flex>
                                     <FlexItem flex={{ default: "flex_1" }}>
                                         <TextInputGroup
-                                            {...(ntpValidationError
-                                                ? { validated: ValidatedOptions.error }
-                                                : ntpServerInput.trim()
-                                                  ? { validated: ValidatedOptions.success }
-                                                  : {})}
+                                            {...getValidationStateProps(ntpServerInput, ntpValidationError)}
                                         >
                                             <TextInputGroupMain
                                                 id="ntp-server-input"
                                                 value={ntpServerInput}
                                                 onChange={(_, value) => handleNtpServerInputChange(value)}
-                                                placeholder="pool.ntp.org"
+                                                placeholder={_("e.g. pool.ntp.org")}
                                                 onKeyDown={(e) => {
                                                     if (e.key === "Enter") {
                                                         addNtpServer();
@@ -138,15 +164,9 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                             />
                                         </TextInputGroup>
                                         {ntpValidationError && (
-                                            <div
-                                                style={{
-                                                    color: "var(--pf-global--danger-color--100)",
-                                                    fontSize: "var(--pf-global--FontSize--sm)",
-                                                    marginTop: "0.25rem",
-                                                }}
-                                            >
-                                                {ntpValidationError}
-                                            </div>
+                                            <HelperText>
+                                                <HelperTextItem variant="error">{ntpValidationError}</HelperTextItem>
+                                            </HelperText>
                                         )}
                                     </FlexItem>
                                     <FlexItem>
@@ -155,19 +175,19 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                             onClick={addNtpServer}
                                             isDisabled={!ntpServerInput.trim() || !!ntpValidationError}
                                         >
-                                            Add
+                                            {_("Add")}
                                         </Button>
                                     </FlexItem>
                                 </Flex>
                             </FormGroup>
                         </StackItem>
                         <StackItem>
-                            <p>Configured NTP Servers:</p>
-                            <Table aria-label="NTP servers table" variant="compact">
+                            <p>{_("Configured NTP Servers:")}</p>
+                            <Table aria-label={_("NTP servers table")} variant="compact">
                                 <Thead>
                                     <Tr>
-                                        <Th>Server</Th>
-                                        <Th>Actions</Th>
+                                        <Th>{_("Server")}</Th>
+                                        <Th>{_("Actions")}</Th>
                                     </Tr>
                                 </Thead>
                                 <Tbody>
@@ -181,14 +201,14 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                                                         size="sm"
                                                         onClick={() => removeNtpServer(server)}
                                                     >
-                                                        Remove
+                                                        {_("Remove")}
                                                     </Button>
                                                 </Td>
                                             </Tr>
                                         ))
                                     ) : (
                                         <Tr>
-                                            <Td colSpan={2}>No NTP servers configured</Td>
+                                            <Td colSpan={2}>{_("No NTP servers configured")}</Td>
                                         </Tr>
                                     )}
                                 </Tbody>
@@ -198,132 +218,113 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
                 </StackItem>
             )}
 
-            <StackItem style={{ marginTop: "2rem" }}>
-                <p>Configure HTTP proxy (optional):</p>
-                <Checkbox
-                    id="proxy-enabled"
-                    label="Use HTTP proxy"
-                    isChecked={model.networkServices.proxy.enabled}
-                    onChange={(_, checked) => setProxyEnabled(checked)}
-                />
+            <StackItem>
+                <FormGroup label={_("Configure HTTP proxy (optional):")}>
+                    <Checkbox
+                        id="proxy-enabled"
+                        label={_("Use HTTP proxy")}
+                        isChecked={model.networkServices.proxy.enabled}
+                        onChange={(_, checked) => setProxyEnabled(checked)}
+                    />
+                </FormGroup>
             </StackItem>
 
             {model.networkServices.proxy.enabled && (
-                <StackItem style={{ marginLeft: "1.5rem" }}>
+                <StackItem>
                     <Stack hasGutter>
                         <StackItem>
-                            <FormGroup label="Protocol">
+                            <FormGroup label={_("Protocol")}>
                                 <FormSelect
                                     id="proxy-protocol-select"
                                     value={model.networkServices.proxy.protocol}
                                     onChange={(_event, value) => handleProxyProtocolChange(value)}
                                 >
-                                    <FormSelectOption value="http" label="HTTP" />
-                                    <FormSelectOption value="https" label="HTTPS" />
-                                    <FormSelectOption value="socks5" label="SOCKS5" />
+                                    <FormSelectOption value="http" label={_("HTTP")} />
+                                    <FormSelectOption value="https" label={_("HTTPS")} />
+                                    <FormSelectOption value="socks5" label={_("SOCKS5")} />
                                 </FormSelect>
                             </FormGroup>
                         </StackItem>
 
                         <StackItem>
-                            <FormGroup label="Proxy Hostname" isRequired>
+                            <FormGroup label={_("Proxy Hostname")} isRequired>
                                 <TextInput
                                     id="proxy-hostname-input"
                                     value={model.networkServices.proxy.hostname || ""}
                                     onChange={(_, value) => handleProxyHostnameChange(value)}
-                                    placeholder="proxy.example.com"
-                                    validated={
+                                    placeholder={_("e.g. proxy.example.com")}
+                                    {...getValidationStateProps(
+                                        model.networkServices.proxy.hostname,
                                         proxyHostnameError
-                                            ? ValidatedOptions.error
-                                            : model.networkServices.proxy.hostname
-                                              ? ValidatedOptions.success
-                                              : ValidatedOptions.default
-                                    }
+                                    )}
                                 />
                                 {proxyHostnameError && (
-                                    <div
-                                        style={{
-                                            color: "var(--pf-global--danger-color--100)",
-                                            fontSize: "var(--pf-global--FontSize--sm)",
-                                            marginTop: "0.25rem",
-                                        }}
-                                    >
-                                        {proxyHostnameError}
-                                    </div>
+                                    <HelperText>
+                                        <HelperTextItem variant="error">{proxyHostnameError}</HelperTextItem>
+                                    </HelperText>
                                 )}
                             </FormGroup>
                         </StackItem>
 
                         <StackItem>
-                            <FormGroup label="Proxy Port" isRequired>
+                            <FormGroup label={_("Proxy Port")} isRequired>
                                 <TextInput
                                     id="proxy-port-input"
                                     type="number"
                                     value={model.networkServices.proxy.port?.toString() || ""}
                                     onChange={(_, value) => handleProxyPortChange(value)}
-                                    placeholder="8080"
-                                    validated={
+                                    placeholder={_("e.g. 8080")}
+                                    {...getValidationStateProps(
+                                        model.networkServices.proxy.port?.toString(),
                                         proxyPortError
-                                            ? ValidatedOptions.error
-                                            : model.networkServices.proxy.port
-                                              ? ValidatedOptions.success
-                                              : ValidatedOptions.default
-                                    }
+                                    )}
                                 />
                                 {proxyPortError && (
-                                    <div
-                                        style={{
-                                            color: "var(--pf-global--danger-color--100)",
-                                            fontSize: "var(--pf-global--FontSize--sm)",
-                                            marginTop: "0.25rem",
-                                        }}
-                                    >
-                                        {proxyPortError}
-                                    </div>
+                                    <HelperText>
+                                        <HelperTextItem variant="error">{proxyPortError}</HelperTextItem>
+                                    </HelperText>
                                 )}
                             </FormGroup>
                         </StackItem>
 
                         <StackItem>
-                            <FormGroup label="Proxy Username (optional)">
+                            <FormGroup label={_("Proxy Username (optional)")}>
                                 <TextInput
                                     id="proxy-username-input"
                                     value={model.networkServices.proxy.username || ""}
                                     onChange={(_, value) => handleProxyUsernameChange(value)}
-                                    placeholder="username"
+                                    placeholder={_("Enter the proxy username")}
                                 />
                             </FormGroup>
                         </StackItem>
 
                         <StackItem>
-                            <FormGroup label="Proxy Password (optional)">
+                            <FormGroup label={_("Proxy Password (optional)")}>
                                 <TextInput
                                     id="proxy-password-input"
                                     type="password"
                                     value={model.networkServices.proxy.password || ""}
                                     onChange={(_, value) => handleProxyPasswordChange(value)}
-                                    placeholder="password"
+                                    placeholder={_("Enter the proxy password")}
                                 />
                             </FormGroup>
                         </StackItem>
 
                         <StackItem>
-                            <FormGroup label="No Proxy" fieldId="proxy-no-proxy-input">
+                            <FormGroup label={_("No Proxy")} fieldId="proxy-no-proxy-input">
                                 <TextInput
                                     id="proxy-no-proxy-input"
                                     value={model.networkServices.proxy.noProxy}
                                     onChange={(_, value) => handleProxyNoProxyChange(value)}
-                                    placeholder="localhost,127.0.0.1,::1,*.internal.corp,10.0.0.0/8"
+                                    placeholder={_("e.g. localhost,127.0.0.1,::1,*.internal.corp,10.0.0.0/8")}
                                 />
-                                <div
-                                    style={{
-                                        fontSize: "var(--pf-global--FontSize--sm)",
-                                        color: "var(--pf-global--Color--200)",
-                                        marginTop: "0.25rem",
-                                    }}
-                                >
-                                    Comma-separated list of hosts, domains, or CIDRs that should bypass the proxy
-                                </div>
+                                <HelperText>
+                                    <HelperTextItem variant="default">
+                                        {_(
+                                            "Comma-separated list of hosts, domains, or CIDRs that should bypass the proxy"
+                                        )}
+                                    </HelperTextItem>
+                                </HelperText>
                             </FormGroup>
                         </StackItem>
                     </Stack>
@@ -332,3 +333,5 @@ export const NetworkServicesPage: React.FunctionComponent = () => {
         </Stack>
     );
 };
+
+export default NetworkServicesSection;

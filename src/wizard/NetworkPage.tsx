@@ -6,9 +6,9 @@ import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 
 import { Interface } from "../../pkg/networkmanager/interfaces.js";
-import { NetworkInterfaceSection } from "./NetworkInterfaceSection.tsx";
-import { NetworkAddressPage } from "./NetworkAddressPage.tsx";
-import { NetworkServicesPage } from "./NetworkServicesPage.tsx";
+import NetworkInterfaceSection from "./NetworkInterfaceSection";
+import NetworkAddressSection from "./NetworkAddressSection";
+import NetworkServicesSection from "./NetworkServicesSection";
 
 const _ = cockpit.gettext;
 
@@ -20,10 +20,11 @@ export const NetworkPage = ({ interfaces }: NetworkPageProps) => {
     return (
         <Stack hasGutter>
             <StackItem>
-                <Title headingLevel="h3" size="lg">
+                <Title headingLevel="h1" size="2xl">
                     {_("Network")}
                 </Title>
             </StackItem>
+
             <StackItem>
                 <NetworkInterfaceSection interfaces={interfaces} />
             </StackItem>
@@ -33,12 +34,7 @@ export const NetworkPage = ({ interfaces }: NetworkPageProps) => {
             </StackItem>
 
             <StackItem>
-                <Title headingLevel="h4" size="lg">
-                    {_("IP settings")}
-                </Title>
-            </StackItem>
-            <StackItem>
-                <NetworkAddressPage />
+                <NetworkAddressSection />
             </StackItem>
 
             <StackItem>
@@ -46,12 +42,7 @@ export const NetworkPage = ({ interfaces }: NetworkPageProps) => {
             </StackItem>
 
             <StackItem>
-                <Title headingLevel="h4" size="lg">
-                    {_("Network services")}
-                </Title>
-            </StackItem>
-            <StackItem>
-                <NetworkServicesPage />
+                <NetworkServicesSection />
             </StackItem>
         </Stack>
     );
