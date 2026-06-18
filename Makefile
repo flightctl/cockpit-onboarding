@@ -10,6 +10,8 @@ TARFILE=$(RPM_NAME)-$(VERSION).tar.xz
 NODE_CACHE=$(RPM_NAME)-node-$(VERSION).tar.xz
 SPEC=$(RPM_NAME).spec
 PREFIX ?= /usr/local
+BRAND_NAME ?= Flight Control
+export BRAND_NAME
 APPSTREAMFILE=org.cockpit_project.$(subst -,_,$(PACKAGE_NAME)).metainfo.xml
 VM_IMAGE=$(CURDIR)/test/images/$(TEST_OS)
 # stamp file to check for node_modules/
@@ -89,8 +91,11 @@ $(SPEC): packaging/$(SPEC).in $(NODE_MODULES_TEST)
 packaging/arch/PKGBUILD: packaging/arch/PKGBUILD.in
 	sed 's/VERSION/$(VERSION)/; s/SOURCE/$(TARFILE)/' $< > $@
 
-$(DIST_TEST): $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP) $(shell find src/ -type f) package.json build.js
+$(DIST_TEST): $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP) $(shell find src/ -type f) package.json build.js scripts/render-config.cjs
+	@mkdir -p dist
+	@if [ ! -f dist/.brand-name ] || [ "$$(cat dist/.brand-name)" != "$(BRAND_NAME)" ]; then rm -f dist/manifest.json; fi
 	NODE_ENV=$(NODE_ENV) ./build.js
+	@echo "$(BRAND_NAME)" > dist/.brand-name
 
 watch: $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP)
 	NODE_ENV=$(NODE_ENV) ./build.js --watch
@@ -162,6 +167,7 @@ rpm: $(SPEC)
 	  --define "_srcrpmdir `pwd`" \
 	  --define "_rpmdir `pwd`/output" \
 	  --define "_buildrootdir `pwd`/build" \
+	  --define "brand_name $(BRAND_NAME)" \
 	  $(SPEC)
 	find `pwd`/output -name '*.rpm' -printf '%f\n' -exec mv {} . \;
 	rm -rf "`pwd`/rpmbuild"

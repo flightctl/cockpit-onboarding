@@ -146,6 +146,16 @@ export function validateConfig(config: SystemOnboardingConfig): void {
         throw new Error(`Configuration validation failed: version must be '1.0', got '${config.version}'`);
     }
 
+    if (config.brandName !== undefined) {
+        if (typeof config.brandName !== "string") {
+            throw new Error("Configuration validation failed: brandName must be a string");
+        }
+
+        if (config.brandName.length < 1 || config.brandName.length > 100) {
+            throw new Error("Configuration validation failed: brandName length must be between 1 and 100 characters");
+        }
+    }
+
     // Validate enrollment services if present
     if (config.enrollmentServices && Array.isArray(config.enrollmentServices)) {
         config.enrollmentServices.forEach((service, index) => {

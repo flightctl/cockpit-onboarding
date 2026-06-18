@@ -9,6 +9,7 @@
 
 export interface SystemOnboardingConfig {
     version: string;
+    brandName?: string;
     runOnce?: boolean;
     keepCockpit?: boolean;
     hideModules?: boolean;

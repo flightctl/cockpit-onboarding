@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { createRequire } from "node:module";
 
 import { sassPlugin } from "esbuild-sass-plugin";
 
@@ -10,6 +11,9 @@ import { cleanPlugin } from "./pkg/lib/esbuild-cleanup-plugin.js";
 import { cockpitCompressPlugin } from "./pkg/lib/esbuild-compress-plugin.js";
 import { cockpitPoEsbuildPlugin } from "./pkg/lib/cockpit-po-plugin.js";
 import { cockpitRsyncEsbuildPlugin } from "./pkg/lib/cockpit-rsync-plugin.js";
+
+const require = createRequire(import.meta.url);
+const { renderConfig } = require("./scripts/render-config.cjs");
 
 const production = process.env.NODE_ENV === "production";
 // Prefer native esbuild; fall back to esbuild-wasm only if the native package fails to load
@@ -106,9 +110,9 @@ const context = await esbuild.context({
             name: "copy-assets",
             setup(build) {
                 build.onEnd(() => {
+                    renderConfig();
                     fs.copyFileSync("./src/manifest.json", "./dist/manifest.json");
                     fs.copyFileSync("./src/index.html", "./dist/index.html");
-                    fs.copyFileSync("./src/config.json", "./dist/config.json");
                 });
             },
         },

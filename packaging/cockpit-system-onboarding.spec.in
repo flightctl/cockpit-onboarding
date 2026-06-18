@@ -36,6 +36,8 @@ Recommends: dnsmasq
 
 %{NPM_PROVIDES}
 
+%global brand_name Flight Control
+
 %description
 Cockpit System Onboarding Module
 
@@ -48,7 +50,7 @@ rm -rf dist
 %endif
 
 %build
-NODE_ENV=production make
+NODE_ENV=production BRAND_NAME="%{brand_name}" make
 
 %install
 %make_install PREFIX=/usr
@@ -101,11 +103,6 @@ install -m 644 packaging/polkit/49-cockpit-system-onboarding.rules %{buildroot}%
 # Install example enrollment scripts
 mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d
 install -m 755 packaging/system-onboarding.d/*.sh %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d/
-
-# Install branding override (distro-agnostic, takes priority over all distro dirs)
-mkdir -p %{buildroot}%{_sysconfdir}/cockpit/branding
-install -m 644 packaging/branding/branding.css %{buildroot}%{_sysconfdir}/cockpit/branding/
-install -m 644 packaging/branding/favicon.ico %{buildroot}%{_sysconfdir}/cockpit/branding/
 
 # Create state directory
 mkdir -p %{buildroot}%{_localstatedir}/lib/cockpit-system-onboarding
@@ -207,9 +204,6 @@ fi
 %dir %{_unitdir}/flightctl-agent.service.d
 %{_unitdir}/flightctl-agent.service.d/onboarding-gate.conf
 %{_libexecdir}/cockpit-system-onboarding/
-%dir %{_sysconfdir}/cockpit/branding
-%{_sysconfdir}/cockpit/branding/branding.css
-%{_sysconfdir}/cockpit/branding/favicon.ico
 %dir %{_localstatedir}/lib/cockpit-system-onboarding
 
 %changelog
