@@ -200,10 +200,8 @@ bots: $(COCKPIT_REPO_STAMP)
 	test/common/make-bots
 
 $(NODE_MODULES_TEST): package.json
-	# if it exists already, npm install won't update it; force that so that we always get up-to-date packages
-	rm -f package-lock.json
 	# unset NODE_ENV, skips devDependencies otherwise
-	env -u NODE_ENV npm install --ignore-scripts
+	env -u NODE_ENV npm ci --ignore-scripts
 	env -u NODE_ENV npm prune
 
 # Fedora test VM with WiFi simulation (mac80211_hwsim)
