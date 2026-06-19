@@ -18,7 +18,7 @@ const _ = cockpit.gettext;
 type ArpingResult = "conflict" | "available" | "error" | null;
 type GatewayArpingResult = "reachable" | "unreachable" | "error" | null;
 
-export const NetworkAddressIpv4 = ({ isSetupInterface = false }: { isSetupInterface?: boolean }) => {
+export const StaticIpv4Configuration = ({ isSetupInterface = false }: { isSetupInterface?: boolean }) => {
     const { model, updateNestedModel } = useModelContext();
 
     const [validationErrors, setValidationErrors] = React.useState({
@@ -34,8 +34,6 @@ export const NetworkAddressIpv4 = ({ isSetupInterface = false }: { isSetupInterf
 
     const { gateway: ipv4Gateway, address: ipv4Address, subnetMask: ipv4SubnetMask } = model.networkAddress.ipv4;
     const selectedIfaceName = model.networkInterface.selectedInterface;
-
-    console.log("%c model.networkAddress.ipv4", "color: red; font-size:18px", model.networkAddress.ipv4);
 
     const setIpv4Address = (address: string) => {
         const error = validateIPv4(address);

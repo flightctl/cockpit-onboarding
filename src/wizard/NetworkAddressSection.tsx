@@ -14,8 +14,8 @@ import FeatureSwitch from "../components/FeatureSwitch";
 import { LabelHeading, SubtleHeading } from "../components/Headings.tsx";
 import ValidatedRadioLabel from "../components/ValidatedRadioLabel.tsx";
 import { NetworkAddressDns } from "./NetworkAddressDns";
-import { NetworkAddressIpv4 } from "./NetworkAddressIpv4";
-import { NetworkAddressIpv6 } from "./NetworkAddressIpv6";
+import { StaticIpv4Configuration } from "./StaticIpv4Configuration.tsx";
+import { StaticIpv6Configuration } from "./StaticIpv6Configuration.tsx";
 
 const _ = cockpit.gettext;
 
@@ -103,7 +103,7 @@ const NetworkConfigIPv4 = ({ isSetupInterface = false }: { isSetupInterface?: bo
                                         onChange={() => setIpv4Method("static")}
                                         body={
                                             selectedIpv4Method === "static" && (
-                                                <NetworkAddressIpv4 isSetupInterface={isSetupInterface} />
+                                                <StaticIpv4Configuration isSetupInterface={isSetupInterface} />
                                             )
                                         }
                                     />
@@ -177,7 +177,7 @@ const NetworkConfigIPv6 = ({ isSetupInterface = false }: { isSetupInterface?: bo
                                         onChange={() => setIpv6Method("static")}
                                         body={
                                             selectedIpv6Method === "static" && (
-                                                <NetworkAddressIpv6 isSetupInterface={isSetupInterface} />
+                                                <StaticIpv6Configuration isSetupInterface={isSetupInterface} />
                                             )
                                         }
                                     />

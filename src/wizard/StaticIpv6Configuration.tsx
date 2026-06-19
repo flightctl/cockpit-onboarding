@@ -17,7 +17,7 @@ const _ = cockpit.gettext;
 type Ping6Result = "available" | "conflict" | "error" | null;
 type Ping6GwResult = "reachable" | "unreachable" | "error" | null;
 
-export const NetworkAddressIpv6 = ({ isSetupInterface = false }: { isSetupInterface?: boolean }) => {
+export const StaticIpv6Configuration = ({ isSetupInterface = false }: { isSetupInterface?: boolean }) => {
     const { model, updateNestedModel } = useModelContext();
 
     const [validationErrors, setValidationErrors] = React.useState({
@@ -173,7 +173,7 @@ export const NetworkAddressIpv6 = ({ isSetupInterface = false }: { isSetupInterf
                 </FormGroup>
             </StackItem>
             <StackItem>
-                <FormGroup label={_("Gateway IP")}>
+                <FormGroup label={_("Gateway IP")} isRequired>
                     <Grid hasGutter>
                         <GridItem md={fieldColSpan}>
                             <ValidatedTextInput
