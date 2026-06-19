@@ -447,6 +447,24 @@ export const validateHostnameOrIP = (value: string, required = true): string | n
 };
 
 /**
+ * Validate manual NTP server list.
+ * Every row must be filled with a valid hostname or IP; blank rows are not allowed.
+ */
+export const validateManualNtpServers = (servers: string[]): boolean => {
+    if (servers.length === 0) {
+        return false;
+    }
+
+    for (const server of servers) {
+        if (!server.trim() || validateHostnameOrIP(server, false) !== null) {
+            return false;
+        }
+    }
+
+    return true;
+};
+
+/**
  * Validate port number
  *
  * @param port - The port number to validate

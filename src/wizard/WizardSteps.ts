@@ -7,6 +7,7 @@ import {
     validateIpv6StaticConfig,
     validateIpv6DnsConfig,
     validateHostnameOrIP,
+    validateManualNtpServers,
     validatePort,
     validateLabelKey,
     validateLabelValue,
@@ -119,18 +120,8 @@ export const validateNetworkServicesStep = (model: Model): boolean => {
     const { ntp, proxy } = model.networkServices;
 
     // NTP validation
-    if (!ntp.autoConfig) {
-        // Manual NTP configuration requires at least one server
-        if (ntp.servers.length === 0) {
-            return false;
-        }
-
-        // All servers must be valid (servers in the list should never be empty)
-        for (const server of ntp.servers) {
-            if (validateHostnameOrIP(server, false) !== null) {
-                return false;
-            }
-        }
+    if (!ntp.autoConfig && !validateManualNtpServers(ntp.servers)) {
+        return false;
     }
 
     // Proxy validation
