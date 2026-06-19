@@ -6,6 +6,8 @@
 
 import * as ipaddr from "ipaddr.js";
 
+import { IPv4Config, IPv6Config } from "./types";
+
 /**
  * Validate hostname according to RFC 1123
  *
@@ -286,6 +288,80 @@ export const validateIPv4GatewaySubnet = (address: string, gateway: string, mask
     }
 
     return null;
+};
+
+/**
+ * Validate a complete static IPv4 configuration (address, subnet, gatewayNS).
+ *
+ * @param ipv4 - The IPv4 configuration
+ * @returns Error message or null if valid
+ */
+export const validateIpv4StaticConfig = (ipv4: IPv4Config): boolean => {
+    if (!ipv4.address || validateIPv4(ipv4.address) !== null) {
+        return false;
+    }
+    if (!ipv4.subnetMask || validateSubnetMask(ipv4.subnetMask) !== null) {
+        return false;
+    }
+    if (!ipv4.gateway || validateIPv4(ipv4.gateway) !== null) {
+        return false;
+    }
+
+    if (validateIPv4GatewaySubnet(ipv4.address, ipv4.gateway, ipv4.subnetMask) !== null) {
+        return false;
+    }
+    return true;
+};
+
+/**
+ * Validate the DNS configuration for an IPv4 static configuration.
+ *
+ * @param ipv4 - The IPv4 configuration
+ * @returns Error message or null if valid
+ */
+export const validateIpv4DnsConfig = (ipv4: IPv4Config): boolean => {
+    if (!ipv4.autoDns) {
+        if (!ipv4.primaryDns || validateIP(ipv4.primaryDns) !== null) {
+            return false;
+        }
+        if (ipv4.secondaryDns && validateIP(ipv4.secondaryDns, false) !== null) {
+            return false;
+        }
+    }
+    return true;
+};
+
+/**
+ * Validate a complete static IPv6 configuration (address with prefix and gateway).
+ */
+export const validateIpv6StaticConfig = (ipv6: IPv6Config): boolean => {
+    if (!ipv6.address || validateIPv6(ipv6.address, true) !== null) {
+        return false;
+    }
+    if (!ipv6.gateway || validateIPv6(ipv6.gateway) !== null) {
+        return false;
+    }
+
+    if (validateIPv6GatewaySubnet(ipv6.address, ipv6.gateway) !== null) {
+        return false;
+    }
+
+    return true;
+};
+
+/**
+ * Validate the DNS configuration for an IPv6 configuration.
+ */
+export const validateIpv6DnsConfig = (ipv6: IPv6Config): boolean => {
+    if (!ipv6.autoDns) {
+        if (!ipv6.primaryDns || validateIP(ipv6.primaryDns) !== null) {
+            return false;
+        }
+        if (ipv6.secondaryDns && validateIP(ipv6.secondaryDns, false) !== null) {
+            return false;
+        }
+    }
+    return true;
 };
 
 /**

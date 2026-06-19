@@ -4,7 +4,6 @@ import cockpit from "cockpit";
 
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
-import { TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { FormSelect, FormSelectOption } from "@patternfly/react-core/dist/esm/components/FormSelect/index.js";
@@ -12,8 +11,8 @@ import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 
-import ValidatedTextInputGroup, { getValidatedProps } from "../components/ValidatedTextInputGroup";
-import DefaultHelperText, { ErrorHelperText } from "../components/HelperTexts";
+import ValidatedTextInput from "../components/ValidatedTextInput";
+import DefaultHelperText from "../components/HelperTexts";
 import { SubtleHeading } from "../components/Headings";
 import { useModelContext } from "../model-context";
 import { validateHostnameOrIP, validatePort } from "../validation";
@@ -133,20 +132,18 @@ const NetworkServicesSection = () => {
                             <FormGroup label={_("NTP Server Hostname")} isRequired>
                                 <Flex>
                                     <FlexItem flex={{ default: "flex_1" }}>
-                                        <ValidatedTextInputGroup value={ntpServerInput} error={ntpValidationError}>
-                                            <TextInputGroupMain
-                                                id="ntp-server-input"
-                                                value={ntpServerInput}
-                                                onChange={(_, value) => handleNtpServerInputChange(value)}
-                                                placeholder={_("e.g. pool.ntp.org")}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === "Enter") {
-                                                        addNtpServer();
-                                                    }
-                                                }}
-                                            />
-                                        </ValidatedTextInputGroup>
-                                        <ErrorHelperText error={ntpValidationError} />
+                                        <ValidatedTextInput
+                                            id="ntp-server-input"
+                                            value={ntpServerInput}
+                                            error={ntpValidationError}
+                                            onChange={(_, value) => handleNtpServerInputChange(value)}
+                                            placeholder={_("e.g. pool.ntp.org")}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    addNtpServer();
+                                                }
+                                            }}
+                                        />
                                     </FlexItem>
                                     <FlexItem>
                                         <Button
@@ -227,28 +224,26 @@ const NetworkServicesSection = () => {
 
                         <StackItem>
                             <FormGroup label={_("Proxy Hostname")} isRequired>
-                                <TextInput
+                                <ValidatedTextInput
                                     id="proxy-hostname-input"
                                     value={model.networkServices.proxy.hostname || ""}
+                                    error={proxyHostnameError}
                                     onChange={(_, value) => handleProxyHostnameChange(value)}
                                     placeholder={_("e.g. proxy.example.com")}
-                                    {...getValidatedProps(model.networkServices.proxy.hostname, proxyHostnameError)}
                                 />
-                                <ErrorHelperText error={proxyHostnameError} />
                             </FormGroup>
                         </StackItem>
 
                         <StackItem>
                             <FormGroup label={_("Proxy Port")} isRequired>
-                                <TextInput
+                                <ValidatedTextInput
                                     id="proxy-port-input"
                                     type="number"
                                     value={model.networkServices.proxy.port?.toString() || ""}
+                                    error={proxyPortError}
                                     onChange={(_, value) => handleProxyPortChange(value)}
                                     placeholder={_("e.g. 8080")}
-                                    {...getValidatedProps(model.networkServices.proxy.port?.toString(), proxyPortError)}
                                 />
-                                <ErrorHelperText error={proxyPortError} />
                             </FormGroup>
                         </StackItem>
 

@@ -3,13 +3,12 @@ import cockpit from "cockpit";
 
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { FormGroup, FormHelperText } from "@patternfly/react-core/dist/esm/components/Form/index.js";
+import { Grid, GridItem, gridSpans } from "@patternfly/react-core/dist/esm/layouts/Grid/index.js";
 import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/components/HelperText/index.js";
 import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
-import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
-import { TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
 
-import ValidatedTextInputGroup from "../components/ValidatedTextInputGroup";
+import ValidatedTextInput from "../components/ValidatedTextInput";
 import { useModelContext } from "../model-context";
 import { SCRIPT_CHECK_NETWORK } from "../paths";
 import { validateIPv4, validateIPv4GatewaySubnet, validateSubnetMask } from "../validation";
@@ -35,6 +34,8 @@ export const NetworkAddressIpv4 = ({ isSetupInterface = false }: { isSetupInterf
 
     const { gateway: ipv4Gateway, address: ipv4Address, subnetMask: ipv4SubnetMask } = model.networkAddress.ipv4;
     const selectedIfaceName = model.networkInterface.selectedInterface;
+
+    console.log("%c model.networkAddress.ipv4", "color: red; font-size:18px", model.networkAddress.ipv4);
 
     const setIpv4Address = (address: string) => {
         const error = validateIPv4(address);
@@ -116,27 +117,26 @@ export const NetworkAddressIpv4 = ({ isSetupInterface = false }: { isSetupInterf
         updateNestedModel("networkAddress", "ipv4", { gateway });
     };
 
+    const fieldColSpan = isSetupInterface ? 12 : (10 as gridSpans);
+    const buttonColSpan = 2 as gridSpans;
+
     return (
         <Stack hasGutter>
             <StackItem>
                 <FormGroup label={_("IPv4 Address")} isRequired>
-                    <Flex alignItems={{ default: "alignItemsFlexStart" }}>
-                        <FlexItem grow={{ default: "grow" }}>
-                            <ValidatedTextInputGroup
-                                value={ipv4Address}
+                    <Grid hasGutter>
+                        <GridItem md={fieldColSpan}>
+                            <ValidatedTextInput
+                                id="ipv4-address"
+                                value={ipv4Address || ""}
                                 error={validationErrors.address}
-                                warnWhenEmpty
-                            >
-                                <TextInputGroupMain
-                                    id="ipv4-address"
-                                    value={ipv4Address || ""}
-                                    onChange={(_, value) => setIpv4Address(value)}
-                                    placeholder={_("e.g. 192.168.1.100")}
-                                />
-                            </ValidatedTextInputGroup>
-                        </FlexItem>
-                        <FlexItem>
-                            {!isSetupInterface && (
+                                onChange={(_, value) => setIpv4Address(value)}
+                                placeholder={_("e.g. 192.168.1.100")}
+                            />
+                        </GridItem>
+
+                        {!isSetupInterface && (
+                            <GridItem md={buttonColSpan}>
                                 <Button
                                     variant="secondary"
                                     onClick={checkIpAvailability}
@@ -150,9 +150,10 @@ export const NetworkAddressIpv4 = ({ isSetupInterface = false }: { isSetupInterf
                                 >
                                     {_("Check availability")}
                                 </Button>
-                            )}
-                        </FlexItem>
-                    </Flex>
+                            </GridItem>
+                        )}
+                    </Grid>
+
                     {arpingResult && (
                         <FormHelperText>
                             <HelperText>
@@ -178,39 +179,33 @@ export const NetworkAddressIpv4 = ({ isSetupInterface = false }: { isSetupInterf
             </StackItem>
             <StackItem>
                 <FormGroup label="Subnet Mask" isRequired>
-                    <ValidatedTextInputGroup
-                        value={ipv4SubnetMask}
-                        error={validationErrors.subnetMask}
-                        warnWhenEmpty
-                    >
-                        <TextInputGroupMain
-                            id="subnet-mask"
-                            value={ipv4SubnetMask || ""}
-                            onChange={(_, value) => setSubnetMask(value)}
-                            placeholder={_("e.g. 255.255.255.0 or /24")}
-                        />
-                    </ValidatedTextInputGroup>
+                    <Grid hasGutter>
+                        <GridItem md={fieldColSpan}>
+                            <ValidatedTextInput
+                                id="subnet-mask"
+                                value={ipv4SubnetMask || ""}
+                                error={validationErrors.subnetMask}
+                                onChange={(_, value) => setSubnetMask(value)}
+                                placeholder={_("e.g. 255.255.255.0 or /24")}
+                            />
+                        </GridItem>
+                    </Grid>
                 </FormGroup>
             </StackItem>
             <StackItem>
                 <FormGroup label={_("Gateway IP")} isRequired>
-                    <Flex alignItems={{ default: "alignItemsFlexStart" }}>
-                        <FlexItem grow={{ default: "grow" }}>
-                            <ValidatedTextInputGroup
-                                value={ipv4Gateway}
+                    <Grid hasGutter>
+                        <GridItem span={fieldColSpan}>
+                            <ValidatedTextInput
+                                id="gateway-ip"
+                                value={ipv4Gateway || ""}
                                 error={validationErrors.gateway}
-                                warnWhenEmpty
-                            >
-                                <TextInputGroupMain
-                                    id="gateway-ip"
-                                    value={ipv4Gateway || ""}
-                                    onChange={(_, value) => setGatewayIp(value)}
-                                    placeholder={_("e.g. 192.168.1.1")}
-                                />
-                            </ValidatedTextInputGroup>
-                        </FlexItem>
-                        <FlexItem>
-                            {!isSetupInterface && (
+                                onChange={(_, value) => setGatewayIp(value)}
+                                placeholder={_("e.g. 192.168.1.1")}
+                            />
+                        </GridItem>
+                        {!isSetupInterface && (
+                            <GridItem md={buttonColSpan}>
                                 <Button
                                     variant="secondary"
                                     onClick={checkGatewayReachability}
@@ -224,16 +219,10 @@ export const NetworkAddressIpv4 = ({ isSetupInterface = false }: { isSetupInterf
                                 >
                                     {_("Check gateway")}
                                 </Button>
-                            )}
-                        </FlexItem>
-                    </Flex>
-                    {validationErrors.gateway && (
-                        <FormHelperText>
-                            <HelperText>
-                                <HelperTextItem variant="error">{validationErrors.gateway}</HelperTextItem>
-                            </HelperText>
-                        </FormHelperText>
-                    )}
+                            </GridItem>
+                        )}
+                    </Grid>
+
                     {gatewayArpingResult && (
                         <FormHelperText>
                             <HelperText>

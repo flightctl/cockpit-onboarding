@@ -15,7 +15,7 @@ import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js
 
 import { SubtleHeading } from "../components/Headings.tsx";
 import FeatureSwitch from "../components/FeatureSwitch.tsx";
-import DefaultHelperText, { ErrorHelperText } from "../components/HelperTexts.tsx";
+import ValidatedTextInput from "../components/ValidatedTextInput.tsx";
 
 import { useModelContext } from "../model-context.js";
 import { mapWifiSecurity } from "../services/network.js";
@@ -530,15 +530,15 @@ export const NetworkVlanSelector = () => {
     return (
         <FeatureSwitch fieldId="vlan-id" label={_("VLAN ID")} isChecked={useVlan} onToggle={onToggleUseVlan}>
             <FormGroup label={_("VLAN ID")} isRequired fieldId="vlan-id">
-                <TextInput
+                <ValidatedTextInput
                     id="vlan-id"
                     value={model.networkInterface.vlanId || ""}
+                    error={vlanError}
                     isRequired
                     placeholder={_("Enter a number from 1-4094")}
                     onChange={onVlanIdChange}
+                    helperText={_("Enter the 802.1Q VLAN ID assigned to this port")}
                 />
-                <DefaultHelperText text={_("Enter the 802.1Q VLAN ID assigned to this port")} />
-                <ErrorHelperText error={vlanError} />
             </FormGroup>
         </FeatureSwitch>
     );

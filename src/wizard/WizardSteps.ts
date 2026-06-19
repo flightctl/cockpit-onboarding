@@ -2,16 +2,14 @@ import { Model } from "../model-context";
 import { EnrollmentService } from "../types";
 import {
     validateHostname,
-    validateIPv4,
-    validateSubnetMask,
-    validateIPv6,
-    validateIP,
+    validateIpv4StaticConfig,
+    validateIpv4DnsConfig,
+    validateIpv6StaticConfig,
+    validateIpv6DnsConfig,
     validateHostnameOrIP,
     validatePort,
     validateLabelKey,
     validateLabelValue,
-    validateIPv4GatewaySubnet,
-    validateIPv6GatewaySubnet,
 } from "../validation";
 
 export const WIZARD_STEP_IDS = {
@@ -35,8 +33,6 @@ export const stepIds = [
 ] as const;
 
 export type WizardStepId = (typeof stepIds)[number];
-
-
 
 /**
  * Validate the hostname step
@@ -95,65 +91,20 @@ export const validateNetworkAddressStep = (model: Model): boolean => {
     }
 
     // IPv4 validation
-    if (ipv4.method === "static") {
-        // Static IPv4 requires address, subnet mask, and gateway
-        if (!ipv4.address || validateIPv4(ipv4.address) !== null) {
-            return false;
-        }
-        if (!ipv4.subnetMask || validateSubnetMask(ipv4.subnetMask) !== null) {
-            return false;
-        }
-        if (!ipv4.gateway || validateIPv4(ipv4.gateway) !== null) {
-            return false;
-        }
-
-        // Gateway must be in the same subnet as the IP
-        if (ipv4.address && ipv4.gateway && ipv4.subnetMask) {
-            if (validateIPv4GatewaySubnet(ipv4.address, ipv4.gateway, ipv4.subnetMask) !== null) {
-                return false;
-            }
-        }
-
-        // If manual DNS is selected, primary DNS is required
-        if (!ipv4.autoDns) {
-            if (!ipv4.primaryDns || validateIP(ipv4.primaryDns) !== null) {
-                return false;
-            }
-            // Secondary DNS is optional, but if provided must be valid
-            if (ipv4.secondaryDns && validateIP(ipv4.secondaryDns, false) !== null) {
-                return false;
-            }
-        }
+    if (ipv4.method === "static" && !validateIpv4StaticConfig(ipv4)) {
+        return false;
+    }
+    if (ipv4.method !== "disabled" && !validateIpv4DnsConfig(ipv4)) {
+        return false;
     }
     // DHCP/auto and disabled don't require additional validation
 
     // IPv6 validation (optional, but if static must be complete)
-    if (ipv6.method === "static") {
-        // Static IPv6 requires address with prefix and gateway
-        if (!ipv6.address || validateIPv6(ipv6.address, true) !== null) {
-            return false;
-        }
-        if (!ipv6.gateway || validateIPv6(ipv6.gateway) !== null) {
-            return false;
-        }
-
-        // Gateway must be in the same subnet as the IP
-        if (ipv6.address && ipv6.gateway) {
-            if (validateIPv6GatewaySubnet(ipv6.address, ipv6.gateway) !== null) {
-                return false;
-            }
-        }
-
-        // If manual DNS is selected, primary DNS is required
-        if (!ipv6.autoDns) {
-            if (!ipv6.primaryDns || validateIP(ipv6.primaryDns) !== null) {
-                return false;
-            }
-            // Secondary DNS is optional, but if provided must be valid
-            if (ipv6.secondaryDns && validateIP(ipv6.secondaryDns, false) !== null) {
-                return false;
-            }
-        }
+    if (ipv6.method === "static" && !validateIpv6StaticConfig(ipv6)) {
+        return false;
+    }
+    if (ipv6.method !== "disabled" && !validateIpv6DnsConfig(ipv6)) {
+        return false;
     }
 
     return true;
@@ -322,9 +273,7 @@ export const validateLabelsStep = (model: Model): boolean => {
  */
 export const validateNetworkStep = (model: Model): boolean => {
     return (
-        validateNetworkInterfaceStep(model) &&
-        validateNetworkAddressStep(model) &&
-        validateNetworkServicesStep(model)
+        validateNetworkInterfaceStep(model) && validateNetworkAddressStep(model) && validateNetworkServicesStep(model)
     );
 };
 

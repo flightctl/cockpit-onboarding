@@ -7,9 +7,12 @@ import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 
 import { useModelContext } from "../model-context";
+import { getSetupInterface } from "../services/network";
+import { validateIpv4StaticConfig, validateIpv6StaticConfig } from "../validation";
+
 import FeatureSwitch from "../components/FeatureSwitch";
 import { LabelHeading, SubtleHeading } from "../components/Headings.tsx";
-import { getSetupInterface } from "../services/network";
+import ValidatedRadioLabel from "../components/ValidatedRadioLabel.tsx";
 import { NetworkAddressDns } from "./NetworkAddressDns";
 import { NetworkAddressIpv4 } from "./NetworkAddressIpv4";
 import { NetworkAddressIpv6 } from "./NetworkAddressIpv6";
@@ -60,6 +63,7 @@ const NetworkConfigIPv4 = ({ isSetupInterface = false }: { isSetupInterface?: bo
     };
 
     const selectedIpv4Method = model.networkAddress.ipv4.method;
+    const isValidStaticIp = selectedIpv4Method !== "static" || validateIpv4StaticConfig(model.networkAddress.ipv4);
 
     return (
         <Stack hasGutter>
@@ -89,7 +93,12 @@ const NetworkConfigIPv4 = ({ isSetupInterface = false }: { isSetupInterface?: bo
                                     <Radio
                                         id="static-ip-radio"
                                         name="ipv4-method"
-                                        label={_("Manual (Static IP)")}
+                                        label={
+                                            <ValidatedRadioLabel
+                                                label={_("Manual (Static IP)")}
+                                                isValid={isValidStaticIp}
+                                            />
+                                        }
                                         isChecked={selectedIpv4Method === "static"}
                                         onChange={() => setIpv4Method("static")}
                                         body={
@@ -119,6 +128,7 @@ const NetworkConfigIPv6 = ({ isSetupInterface = false }: { isSetupInterface?: bo
     };
 
     const selectedIpv6Method = model.networkAddress.ipv6.method;
+    const isValidStaticIp = selectedIpv6Method !== "static" || validateIpv6StaticConfig(model.networkAddress.ipv6);
 
     return (
         <Stack hasGutter>
@@ -157,7 +167,12 @@ const NetworkConfigIPv6 = ({ isSetupInterface = false }: { isSetupInterface?: bo
                                     <Radio
                                         id="static-ipv6-radio"
                                         name="ipv6-method"
-                                        label={_("Manual (Static IP)")}
+                                        label={
+                                            <ValidatedRadioLabel
+                                                label={_("Manual (Static IP)")}
+                                                isValid={isValidStaticIp}
+                                            />
+                                        }
                                         isChecked={selectedIpv6Method === "static"}
                                         onChange={() => setIpv6Method("static")}
                                         body={
