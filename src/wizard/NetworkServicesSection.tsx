@@ -1,23 +1,20 @@
 import React, { useState } from "react";
 import cockpit from "cockpit";
 
-import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
-import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
+import { Divider } from "@patternfly/react-core/dist/esm/components/Divider/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
-import { FormSelect, FormSelectOption } from "@patternfly/react-core/dist/esm/components/FormSelect/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import { MinusCircleIcon, PlusCircleIcon } from "@patternfly/react-icons";
 
 import ValidatedTextInput from "../components/ValidatedTextInput";
-import DefaultHelperText from "../components/HelperTexts";
 import { LabelHeading } from "../components/Headings";
 import { useModelContext } from "../model-context";
-import { validateHostnameOrIP, validateManualNtpServers, validatePort } from "../validation";
-import type { ProxyProtocol } from "../types";
+import { validateHostnameOrIP, validateManualNtpServers } from "../validation";
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio";
 import ValidatedRadioLabel from "../components/ValidatedRadioLabel";
+import NetworkProxySection from "./NetworkProxySection";
 
 const _ = cockpit.gettext;
 
@@ -36,8 +33,6 @@ const emptyNtpServers = [""];
 const NetworkServicesSection = () => {
     const { model, updateNestedModel } = useModelContext();
     const [ntpValidationErrors, setNtpValidationErrors] = useState<Record<number, string | undefined>>({});
-    const [proxyHostnameError, setProxyHostnameError] = useState<string>();
-    const [proxyPortError, setProxyPortError] = useState<string>();
 
     const storedNtpServers = model.networkServices.ntp.servers || [];
     const ntpServers = storedNtpServers.length > 0 ? storedNtpServers : emptyNtpServers;
@@ -89,45 +84,6 @@ const NetworkServicesSection = () => {
             });
             return next;
         });
-    };
-
-    // Proxy configuration handlers
-    const setProxyEnabled = (enabled: boolean) => {
-        updateNestedModel("networkServices", "proxy", { enabled });
-        if (!enabled) {
-            // Clear validation errors when disabling proxy
-            setProxyHostnameError(undefined);
-            setProxyPortError(undefined);
-        }
-    };
-
-    const handleProxyHostnameChange = (value: string) => {
-        updateNestedModel("networkServices", "proxy", { hostname: value || null });
-        const error = validateHostnameOrIP(value, false);
-        setProxyHostnameError(error || undefined);
-    };
-
-    const handleProxyPortChange = (value: string) => {
-        const port = value ? parseInt(value, 10) : null;
-        const error = validatePort(port, false);
-        updateNestedModel("networkServices", "proxy", { port });
-        setProxyPortError(error || undefined);
-    };
-
-    const handleProxyUsernameChange = (value: string) => {
-        updateNestedModel("networkServices", "proxy", { username: value || null });
-    };
-
-    const handleProxyPasswordChange = (value: string) => {
-        updateNestedModel("networkServices", "proxy", { password: value || null });
-    };
-
-    const handleProxyProtocolChange = (value: string) => {
-        updateNestedModel("networkServices", "proxy", { protocol: value as ProxyProtocol });
-    };
-
-    const handleProxyNoProxyChange = (value: string) => {
-        updateNestedModel("networkServices", "proxy", { noProxy: value });
     };
 
     return (
@@ -203,99 +159,12 @@ const NetworkServicesSection = () => {
             )}
 
             <StackItem>
-                <FormGroup label={_("Configure HTTP proxy (optional):")}>
-                    <Checkbox
-                        id="proxy-enabled"
-                        label={_("Use HTTP proxy")}
-                        isChecked={model.networkServices.proxy.enabled}
-                        onChange={(_, checked) => setProxyEnabled(checked)}
-                    />
-                </FormGroup>
+                <Divider />
             </StackItem>
 
-            {model.networkServices.proxy.enabled && (
-                <StackItem>
-                    <Stack hasGutter>
-                        <StackItem>
-                            <FormGroup label={_("Protocol")}>
-                                <FormSelect
-                                    id="proxy-protocol-select"
-                                    value={model.networkServices.proxy.protocol}
-                                    onChange={(_event, value) => handleProxyProtocolChange(value)}
-                                >
-                                    <FormSelectOption value="http" label={_("HTTP")} />
-                                    <FormSelectOption value="https" label={_("HTTPS")} />
-                                    <FormSelectOption value="socks5" label={_("SOCKS5")} />
-                                </FormSelect>
-                            </FormGroup>
-                        </StackItem>
-
-                        <StackItem>
-                            <FormGroup label={_("Proxy Hostname")} isRequired>
-                                <ValidatedTextInput
-                                    id="proxy-hostname-input"
-                                    value={model.networkServices.proxy.hostname || ""}
-                                    error={proxyHostnameError}
-                                    onChange={(_, value) => handleProxyHostnameChange(value)}
-                                    placeholder={_("e.g. proxy.example.com")}
-                                />
-                            </FormGroup>
-                        </StackItem>
-
-                        <StackItem>
-                            <FormGroup label={_("Proxy Port")} isRequired>
-                                <ValidatedTextInput
-                                    id="proxy-port-input"
-                                    type="number"
-                                    value={model.networkServices.proxy.port?.toString() || ""}
-                                    error={proxyPortError}
-                                    onChange={(_, value) => handleProxyPortChange(value)}
-                                    placeholder={_("e.g. 8080")}
-                                />
-                            </FormGroup>
-                        </StackItem>
-
-                        <StackItem>
-                            <FormGroup label={_("Proxy Username (optional)")}>
-                                <TextInput
-                                    id="proxy-username-input"
-                                    value={model.networkServices.proxy.username || ""}
-                                    onChange={(_, value) => handleProxyUsernameChange(value)}
-                                    placeholder={_("Enter the proxy username")}
-                                />
-                            </FormGroup>
-                        </StackItem>
-
-                        <StackItem>
-                            <FormGroup label={_("Proxy Password (optional)")}>
-                                <TextInput
-                                    id="proxy-password-input"
-                                    type="password"
-                                    value={model.networkServices.proxy.password || ""}
-                                    onChange={(_, value) => handleProxyPasswordChange(value)}
-                                    placeholder={_("Enter the proxy password")}
-                                />
-                            </FormGroup>
-                        </StackItem>
-
-                        <StackItem>
-                            <FormGroup label={_("No Proxy")} fieldId="proxy-no-proxy-input">
-                                <TextInput
-                                    id="proxy-no-proxy-input"
-                                    value={model.networkServices.proxy.noProxy}
-                                    onChange={(_, value) => handleProxyNoProxyChange(value)}
-                                    placeholder={_("e.g. localhost,127.0.0.1,::1,*.internal.corp,10.0.0.0/8")}
-                                />
-                                <DefaultHelperText
-                                    text={_(
-                                        "Comma-separated list of hosts, domains, or CIDRs that should bypass the proxy"
-                                    )}
-                                />
-                            </FormGroup>
-                        </StackItem>
-                    </Stack>
-                </StackItem>
-            )}
+            <StackItem>
+                <NetworkProxySection />
+            </StackItem>
         </Stack>
     );
 };
