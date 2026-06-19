@@ -25,9 +25,9 @@ import {
     ActionListGroup,
     ActionListItem,
 } from "@patternfly/react-core/dist/esm/components/ActionList/index.js";
+import { Form } from "@patternfly/react-core/dist/esm/components/Form/index";
 import { Modal, ModalBody, ModalFooter, ModalHeader } from "@patternfly/react-core/dist/esm/components/Modal/index.js";
 import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist/esm/components/Page/index.js";
-import { Form } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import {
     Wizard,
     WizardBasicStep,
@@ -51,10 +51,10 @@ import { SystemOnboardingConfig } from "./types";
 import { HostnamePage } from "./wizard/HostnamePage.tsx";
 import { NetworkPage } from "./wizard/NetworkPage.tsx";
 import { EnrollmentPage } from "./wizard/EnrollmentPage.tsx";
+import { EnrollmentProgressPage } from "./wizard/EnrollmentProgressPage.tsx";
 import { ConnectivityTestPage } from "./wizard/ConnectivityTestPage.tsx";
 import { LabelsPage } from "./wizard/LabelsPage.tsx";
 import { ReviewPage } from "./wizard/ReviewPage.tsx";
-import { EnrollmentProgressPage } from "./wizard/EnrollmentProgressPage.tsx";
 import RestoredConfigurationSection, { WatchdogStatusData } from "./wizard/RestoredConfigurationSection.tsx";
 import {
     stepIds,
@@ -257,6 +257,12 @@ export const Application = () => {
     );
 };
 
+// Wraps each page in a Form so that all PatternFly styles apply correctly.
+// We can't wrap the entire wizard in a Form as it makes the steps adjust to the content height.
+const FormWrapper = ({ children }: React.PropsWithChildren) => {
+    return <Form onSubmit={(event) => event.preventDefault()}>{children}</Form>;
+};
+
 // Wrapper to wait for model initialization before showing wizard
 const SystemOnboardingWizardWrapper: React.FunctionComponent<{
     interfaces: Interface[];
@@ -448,7 +454,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     };
 
     return (
-        <Page className="no-masthead-sidebar" isContentFilled id="system-onboarding-wizard">
+        <Page className="no-masthead-sidebar" id="system-onboarding-wizard">
             {showRestoredConfigurationSection && (
                 <RestoredConfigurationSection
                     onDismiss={() => setShowRestoredConfigurationSection(false)}
@@ -461,67 +467,79 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                 padding={{ default: "noPadding" }}
                 aria-label="Wizard container"
             >
-                <Form>
-                    <Wizard onStepChange={handleStepChange}>
-                        <WizardStep
-                            name={_("Network")}
-                            id={WIZARD_STEP_IDS.network}
-                            footer={{ isNextDisabled: !isNetworkStepValid, isCancelHidden: true }}
-                        >
+                <Wizard onStepChange={handleStepChange}>
+                    <WizardStep
+                        name={_("Network")}
+                        id={WIZARD_STEP_IDS.network}
+                        footer={{ isNextDisabled: !isNetworkStepValid, isCancelHidden: true }}
+                    >
+                        <FormWrapper>
                             <NetworkPage interfaces={interfaces} />
-                        </WizardStep>
-                        {hasEnrollmentServices && (
-                            <WizardStep
-                                name={_("Enrollment server")}
-                                id={WIZARD_STEP_IDS.enrollment}
-                                footer={{ isNextDisabled: !isEnrollmentStepValid, isCancelHidden: true }}
-                                isDisabled={isStepDisabled(WIZARD_STEP_IDS.enrollment)}
-                            >
+                        </FormWrapper>
+                    </WizardStep>
+                    {hasEnrollmentServices && (
+                        <WizardStep
+                            name={_("Enrollment server")}
+                            id={WIZARD_STEP_IDS.enrollment}
+                            footer={{ isNextDisabled: !isEnrollmentStepValid, isCancelHidden: true }}
+                            isDisabled={isStepDisabled(WIZARD_STEP_IDS.enrollment)}
+                        >
+                            <FormWrapper>
                                 <EnrollmentPage />
-                            </WizardStep>
-                        )}
-                        <WizardStep
-                            name={_("Connectivity test")}
-                            id={WIZARD_STEP_IDS.connectivityTest}
-                            footer={{ isNextDisabled: !isConnectivityTestStepValid, isCancelHidden: true }}
-                            isDisabled={isStepDisabled(WIZARD_STEP_IDS.connectivityTest)}
-                        >
+                            </FormWrapper>
+                        </WizardStep>
+                    )}
+                    <WizardStep
+                        name={_("Connectivity test")}
+                        id={WIZARD_STEP_IDS.connectivityTest}
+                        footer={{ isNextDisabled: !isConnectivityTestStepValid, isCancelHidden: true }}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.connectivityTest)}
+                    >
+                        <FormWrapper>
                             <ConnectivityTestPage />
-                        </WizardStep>
-                        <WizardStep
-                            name={_("Hostname")}
-                            id={WIZARD_STEP_IDS.hostname}
-                            footer={{ isNextDisabled: !isHostnameStepValid, isCancelHidden: true }}
-                            isDisabled={isStepDisabled(WIZARD_STEP_IDS.hostname)}
-                        >
+                        </FormWrapper>
+                    </WizardStep>
+                    <WizardStep
+                        name={_("Hostname")}
+                        id={WIZARD_STEP_IDS.hostname}
+                        footer={{ isNextDisabled: !isHostnameStepValid, isCancelHidden: true }}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.hostname)}
+                    >
+                        <FormWrapper>
                             <HostnamePage />
-                        </WizardStep>
-                        <WizardStep
-                            name={_("Device labels")}
-                            id={WIZARD_STEP_IDS.labels}
-                            footer={{ isNextDisabled: !isLabelsStepValid, isCancelHidden: true }}
-                            isDisabled={isStepDisabled(WIZARD_STEP_IDS.labels)}
-                        >
+                        </FormWrapper>
+                    </WizardStep>
+                    <WizardStep
+                        name={_("Device labels")}
+                        id={WIZARD_STEP_IDS.labels}
+                        footer={{ isNextDisabled: !isLabelsStepValid, isCancelHidden: true }}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.labels)}
+                    >
+                        <FormWrapper>
                             <LabelsPage />
-                        </WizardStep>
-                        <WizardStep
-                            name={_("Review")}
-                            id={WIZARD_STEP_IDS.review}
-                            footer={{ nextButtonText: reviewButtonText, isCancelHidden: true }}
-                            isDisabled={isStepDisabled(WIZARD_STEP_IDS.review)}
-                        >
+                        </FormWrapper>
+                    </WizardStep>
+                    <WizardStep
+                        name={_("Review")}
+                        id={WIZARD_STEP_IDS.review}
+                        footer={{ nextButtonText: reviewButtonText, isCancelHidden: true }}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.review)}
+                    >
+                        <FormWrapper>
                             <ReviewPage hasEnrollmentScripts={hasEnrollmentServices} />
-                        </WizardStep>
-                        <WizardStep
-                            name={finalStepName}
-                            id={WIZARD_STEP_IDS.progress}
-                            footer={getProgressPageFooter()}
-                            isDisabled={isStepDisabled(WIZARD_STEP_IDS.progress)}
-                        >
+                        </FormWrapper>
+                    </WizardStep>
+                    <WizardStep
+                        name={finalStepName}
+                        id={WIZARD_STEP_IDS.progress}
+                        footer={getProgressPageFooter()}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.progress)}
+                    >
+                        <FormWrapper>
                             <EnrollmentProgressPage />
-                        </WizardStep>
-                    </Wizard>
-                </Form>
+                        </FormWrapper>
+                    </WizardStep>
+                </Wizard>
             </PageSection>
             <Modal
                 isOpen={isCancelConfirmOpen}

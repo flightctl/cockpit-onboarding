@@ -29,6 +29,10 @@ const getNtpServerValidationError = (value: string): string | undefined => {
     return validateHostnameOrIP(value, false) ?? undefined;
 };
 
+// The empty string is to be able to fill in the first server.
+// It will be invalid unless it's set to a valid hostname or IP address.
+const emptyNtpServers = [""];
+
 const NetworkServicesSection = () => {
     const { model, updateNestedModel } = useModelContext();
     const [ntpValidationErrors, setNtpValidationErrors] = useState<Record<number, string | undefined>>({});
@@ -36,17 +40,13 @@ const NetworkServicesSection = () => {
     const [proxyPortError, setProxyPortError] = useState<string>();
 
     const storedNtpServers = model.networkServices.ntp.servers || [];
-    const ntpServers = storedNtpServers.length > 0 ? storedNtpServers : [""];
+    const ntpServers = storedNtpServers.length > 0 ? storedNtpServers : emptyNtpServers;
     const isValidManualNtp =
         model.networkServices.ntp.autoConfig ||
-        validateManualNtpServers(storedNtpServers.length > 0 ? storedNtpServers : [""]);
+        validateManualNtpServers(storedNtpServers.length > 0 ? storedNtpServers : emptyNtpServers);
 
     const setAutoNtp = (autoConfig: boolean) => {
-        if (!autoConfig && storedNtpServers.length === 0) {
-            updateNestedModel("networkServices", "ntp", { autoConfig: false, servers: [""] });
-        } else {
-            updateNestedModel("networkServices", "ntp", { autoConfig });
-        }
+        updateNestedModel("networkServices", "ntp", { autoConfig, servers: emptyNtpServers });
         if (autoConfig) {
             setNtpValidationErrors({});
         }
@@ -74,7 +74,7 @@ const NetworkServicesSection = () => {
     const removeNtpServer = (index: number) => {
         if (ntpServers.length === 1) {
             // When clicking on "remove" for the last server, we keep the row, and clear the field content
-            updateNestedModel("networkServices", "ntp", { servers: [""] });
+            updateNestedModel("networkServices", "ntp", { servers: emptyNtpServers });
             setNtpValidationErrors({ 0: getNtpServerValidationError("") });
             return;
         }
@@ -164,7 +164,7 @@ const NetworkServicesSection = () => {
                     <Stack hasGutter>
                         {ntpServers.map((server, index) => (
                             <StackItem key={index}>
-                                <Flex alignItems={{ default: "alignItemsFlexStart" }}>
+                                <Flex>
                                     <FlexItem flex={{ default: "flex_1" }}>
                                         <FormGroup
                                             label={index === 0 ? _("NTP Server Hostname") : undefined}
@@ -179,12 +179,13 @@ const NetworkServicesSection = () => {
                                             />
                                         </FormGroup>
                                     </FlexItem>
-                                    <FlexItem>
+                                    <FlexItem
+                                        alignSelf={{ default: index === 0 ? "alignSelfFlexEnd" : "alignSelfFlexStart" }}
+                                    >
                                         <Button
                                             variant="plain"
                                             aria-label={_("Remove NTP server")}
                                             onClick={() => removeNtpServer(index)}
-                                            style={{ marginTop: index === 0 ? "1.5rem" : undefined }}
                                         >
                                             <MinusCircleIcon />
                                         </Button>
