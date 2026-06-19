@@ -30,6 +30,7 @@ export interface ConfigDefaults {
     proxy?: {
         enabled?: boolean;
         protocol?: ProxyProtocol;
+        applyForHttps?: boolean;
         hostname?: string;
         port?: number;
         username?: string;
@@ -156,6 +157,8 @@ export type ProxyProtocol = "http" | "https" | "socks5";
 export interface ProxyConfig {
     enabled: boolean;
     protocol: ProxyProtocol;
+    /** UI-only until backend wiring is reviewed. See NetworkProxySection TODO. */
+    applyForHttps: boolean;
     hostname: string | null;
     port: number | null;
     username: string | null;

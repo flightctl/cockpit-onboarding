@@ -96,7 +96,7 @@ const NetworkServicesSection = () => {
                     <Stack hasGutter>
                         <StackItem>
                             <Radio
-                                id={`auto-ntp-radio`}
+                                id="auto-ntp-radio"
                                 name="ntp-method"
                                 label={_("Automatic")}
                                 isChecked={model.networkServices.ntp.autoConfig}
@@ -105,7 +105,7 @@ const NetworkServicesSection = () => {
                         </StackItem>
                         <StackItem>
                             <Radio
-                                id={`manual-ntp-radio`}
+                                id="manual-ntp-radio"
                                 name="ntp-method"
                                 label={<ValidatedRadioLabel label={_("Manual")} isValid={isValidManualNtp} />}
                                 isChecked={!model.networkServices.ntp.autoConfig}

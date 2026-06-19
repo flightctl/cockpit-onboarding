@@ -273,6 +273,10 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                             {_("No proxy: ")} {model.networkServices.proxy.noProxy}
                                         </div>
                                     )}
+                                    {model.networkServices.proxy.protocol === "http" &&
+                                        model.networkServices.proxy.applyForHttps && (
+                                            <div>{_("Also applies to HTTPS traffic")}</div>
+                                        )}
                                 </>
                             ) : (
                                 _("Not configured")

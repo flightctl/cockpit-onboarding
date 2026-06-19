@@ -122,6 +122,7 @@ const initialModel: Model = {
         proxy: {
             enabled: false,
             protocol: "http",
+            applyForHttps: true,
             hostname: null,
             port: null,
             username: null,
@@ -533,6 +534,8 @@ export const ModelProvider: React.FunctionComponent<{
                         ...(defaults?.proxy && {
                             enabled: defaults.proxy.enabled ?? prev.networkServices.proxy.enabled,
                             protocol: defaults.proxy.protocol ?? prev.networkServices.proxy.protocol,
+                            applyForHttps:
+                                defaults.proxy.applyForHttps ?? prev.networkServices.proxy.applyForHttps,
                             hostname: defaults.proxy.hostname ?? prev.networkServices.proxy.hostname,
                             port: defaults.proxy.port ?? prev.networkServices.proxy.port,
                             username: defaults.proxy.username ?? prev.networkServices.proxy.username,

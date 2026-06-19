@@ -2,10 +2,12 @@ import React, { useState } from "react";
 import cockpit from "cockpit";
 
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
+import { Switch } from "@patternfly/react-core/dist/esm/components/Switch/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { MenuToggle, MenuToggleElement } from "@patternfly/react-core/dist/esm/components/MenuToggle/index.js";
 import { Select, SelectList, SelectOption } from "@patternfly/react-core/dist/esm/components/Select/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 
 import FeatureSwitch from "../components/FeatureSwitch";
 import ValidatedTextInput from "../components/ValidatedTextInput";
@@ -58,10 +60,18 @@ const NetworkProxySection = () => {
     };
 
     const handleProxyProtocolChange = (value: ProxyProtocol) => {
-        updateNestedModel("networkServices", "proxy", { protocol: value });
+        updateNestedModel("networkServices", "proxy", {
+            protocol: value,
+            applyForHttps: value === "http",
+        });
+    };
+
+    const setApplyForHttps = (applyForHttps: boolean) => {
+        updateNestedModel("networkServices", "proxy", { applyForHttps });
     };
 
     const selectedProtocol = model.networkServices.proxy.protocol;
+    const isHttpProtocol = selectedProtocol === "http";
     const selectedProtocolLabel =
         PROXY_PROTOCOLS.find((protocol) => protocol.value === selectedProtocol)?.label ?? _("HTTP");
 
@@ -100,23 +110,37 @@ const NetworkProxySection = () => {
             <Stack hasGutter>
                 <StackItem>
                     <FormGroup label={_("Protocol")}>
-                        <Select
-                            id="proxy-protocol-select-menu"
-                            isOpen={isProtocolOpen}
-                            selected={selectedProtocol}
-                            onSelect={onProtocolSelect}
-                            onOpenChange={setIsProtocolOpen}
-                            toggle={protocolToggle}
-                            shouldFocusToggleOnSelect
-                        >
-                            <SelectList>
-                                {PROXY_PROTOCOLS.map(({ value, label }) => (
-                                    <SelectOption key={value} value={value}>
-                                        {label}
-                                    </SelectOption>
-                                ))}
-                            </SelectList>
-                        </Select>
+                        <Flex alignItems={{ default: "alignItemsFlexStart" }} spaceItems={{ default: "spaceItemsMd" }}>
+                            <FlexItem>
+                                <Select
+                                    id="proxy-protocol-select-menu"
+                                    isOpen={isProtocolOpen}
+                                    selected={selectedProtocol}
+                                    onSelect={onProtocolSelect}
+                                    onOpenChange={setIsProtocolOpen}
+                                    toggle={protocolToggle}
+                                    shouldFocusToggleOnSelect
+                                >
+                                    <SelectList>
+                                        {PROXY_PROTOCOLS.map(({ value, label }) => (
+                                            <SelectOption key={value} value={value}>
+                                                {label}
+                                            </SelectOption>
+                                        ))}
+                                    </SelectList>
+                                </Select>
+                            </FlexItem>
+                            <FlexItem>
+                                {/* TODO: Review backend wiring for applyForHttps (apply-proxy.sh, enrollment). */}
+                                <Switch
+                                    id="proxy-apply-for-https"
+                                    label={_("Apply for HTTPS")}
+                                    isChecked={model.networkServices.proxy.applyForHttps}
+                                    isDisabled={!isHttpProtocol}
+                                    onChange={(_event, checked) => setApplyForHttps(checked)}
+                                />
+                            </FlexItem>
+                        </Flex>
                     </FormGroup>
                 </StackItem>
 
