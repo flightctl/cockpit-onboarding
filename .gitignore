@@ -22,7 +22,6 @@
 /cockpit-system-onboarding.spec
 /coverage/
 /dist/
-/package-lock.json
 /pkg/*
 # Exception: TypeScript definitions created by this project
 !/pkg/networkmanager/interfaces.d.ts
