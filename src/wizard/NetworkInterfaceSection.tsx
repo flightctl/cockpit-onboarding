@@ -1,10 +1,9 @@
 import React from "react";
 import cockpit from "cockpit";
 
-import { WifiIcon, ConnectedIcon, DisconnectedIcon } from "@patternfly/react-icons";
+import { WifiIcon } from "@patternfly/react-icons";
 import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
-import { Content, ContentVariants } from "@patternfly/react-core/dist/esm/components/Content/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
@@ -14,13 +13,14 @@ import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 
+import { SubtleHeading } from "../components/Headings.tsx";
+import FeatureSwitch from "../components/FeatureSwitch.tsx";
+import DefaultHelperText, { ErrorHelperText } from "../components/HelperTexts.tsx";
+
 import { useModelContext } from "../model-context.js";
-import { getSetupInterface, mapWifiSecurity } from "../services/network.js";
+import { mapWifiSecurity } from "../services/network.js";
 import { getCurrentWifiConnection, scanWifiNetworks, WifiConnection } from "../services/wifi.js";
 import { Device, device_state_text, is_managed, type Interface } from "../../pkg/networkmanager/interfaces.js";
-import FormGroupAccordion from "../components/FormGroupAccordion.tsx";
-import FeatureSwitch from "../components/FeatureSwitch.tsx";
-import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/components/HelperText/index";
 
 const _ = cockpit.gettext;
 
@@ -57,51 +57,29 @@ const NetworkInterfaceSection = ({ interfaces }: { interfaces: Interface[] }) =>
     const selectedIface = filteredInterfaces.find((iface) => iface.Name === model.networkInterface.selectedInterface);
     const isWifiSelected = selectedIface?.Device?.DeviceType === "802-11-wireless";
 
-    const setupInterface = getSetupInterface(interfaces);
-    const isSetupInterface = setupInterface !== null && model.networkInterface.selectedInterface === setupInterface;
-
-    const isEthernetNoCable =
-        selectedIface?.Device?.DeviceType === "ethernet" && selectedIface?.Device?.Carrier === false;
-
     return (
         <Stack hasGutter>
             <StackItem>
                 <Title headingLevel="h2" size="md" className="pf-v6-u-mb-sm">
                     {_("Choose a network interface to use for onboarding")}
                 </Title>
-                <Content component={ContentVariants.small}>
-                    {_(
+                <SubtleHeading
+                    text={_(
                         "If you don't see your network on this list, you will need to troubleshoot it and refresh the page."
                     )}
-                </Content>
+                />
             </StackItem>
+
             <StackItem>
                 <NetworkInterfaceSelector interfaces={filteredInterfaces} />
             </StackItem>
+
             {!isWifiSelected && (
                 <StackItem>
                     <NetworkVlanSelector />
                 </StackItem>
             )}
 
-            {isEthernetNoCable && !isSetupInterface && (
-                <StackItem>
-                    <Alert variant="warning" isInline title={_("No cable detected on selected interface")}>
-                        {_(
-                            "The selected ethernet interface does not have a cable connected. Plug in a network cable before proceeding, or select a different interface."
-                        )}
-                    </Alert>
-                </StackItem>
-            )}
-            {isSetupInterface && (
-                <StackItem>
-                    <Alert variant="warning" isInline title={_("You are currently connected through this interface")}>
-                        {_(
-                            "Applying network changes to this interface will sever your browser connection. The configuration and enrollment process will continue in the background — if enrollment fails, changes will be rolled back automatically and you can reconnect to retry."
-                        )}
-                    </Alert>
-                </StackItem>
-            )}
             {isWifiSelected && selectedIface && (
                 <StackItem>
                     <NetworkWifiSelector interfaceName={selectedIface.Name} />
@@ -117,13 +95,13 @@ const WiredDeviceStatus = ({ device }: { device: Device | null }) => {
     }
     if (device.Carrier) {
         return (
-            <Label isCompact status="success" icon={<ConnectedIcon />} className="pf-v6-u-ml-sm">
-                {_("Cable connected")}
+            <Label color="green" className="pf-v6-u-ml-sm">
+                {_("Connected")}
             </Label>
         );
     }
     return (
-        <Label isCompact status="warning" icon={<DisconnectedIcon />} className="pf-v6-u-ml-sm">
+        <Label color="orange" className="pf-v6-u-ml-sm">
             {_("No cable detected")}
         </Label>
     );
@@ -559,14 +537,8 @@ export const NetworkVlanSelector = () => {
                     placeholder={_("Enter a number from 1-4094")}
                     onChange={onVlanIdChange}
                 />
-                <HelperText>
-                    <HelperTextItem>{_("Enter the 802.1Q VLAN ID assigned to this port")}</HelperTextItem>
-                </HelperText>
-                {vlanError && (
-                    <HelperText>
-                        <HelperTextItem variant="error">{vlanError}</HelperTextItem>
-                    </HelperText>
-                )}
+                <DefaultHelperText text={_("Enter the 802.1Q VLAN ID assigned to this port")} />
+                <ErrorHelperText error={vlanError} />
             </FormGroup>
         </FeatureSwitch>
     );

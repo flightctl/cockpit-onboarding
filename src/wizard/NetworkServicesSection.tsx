@@ -3,36 +3,23 @@ import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
 import cockpit from "cockpit";
 
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
-import { Content } from "@patternfly/react-core/dist/esm/components/Content/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
-import { TextInputGroup, TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
+import { TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
-import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/components/HelperText/index.js";
 import { FormSelect, FormSelectOption } from "@patternfly/react-core/dist/esm/components/FormSelect/index.js";
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
-import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
 
+import ValidatedTextInputGroup, { getValidatedProps } from "../components/ValidatedTextInputGroup";
+import DefaultHelperText, { ErrorHelperText } from "../components/HelperTexts";
+import { SubtleHeading } from "../components/Headings";
 import { useModelContext } from "../model-context";
 import { validateHostnameOrIP, validatePort } from "../validation";
 import type { ProxyProtocol } from "../types";
 
 const _ = cockpit.gettext;
-
-const getValidationStateProps = (
-    value: string | null | undefined,
-    error: string | undefined
-): { validated: "success" | "error" } | Record<string, never> => {
-    if (error) {
-        return { validated: ValidatedOptions.error };
-    }
-    if (value) {
-        return { validated: ValidatedOptions.success };
-    }
-    return {};
-};
 
 const NetworkServicesSection = () => {
     const { model, updateNestedModel } = useModelContext();
@@ -127,9 +114,7 @@ const NetworkServicesSection = () => {
                 {_("Network Services")}
             </Title>
             <StackItem>
-                <Content className="pf-v6-u-text-color-subtle">
-                    {_("Configure additional network services such as NTP servers and HTTP proxies")}
-                </Content>
+                <SubtleHeading text={_("Configure additional network services such as NTP servers and HTTP proxies")} />
             </StackItem>
             <StackItem>
                 <FormGroup label={_("Configure NTP Servers:")}>
@@ -148,9 +133,7 @@ const NetworkServicesSection = () => {
                             <FormGroup label={_("NTP Server Hostname")} isRequired>
                                 <Flex>
                                     <FlexItem flex={{ default: "flex_1" }}>
-                                        <TextInputGroup
-                                            {...getValidationStateProps(ntpServerInput, ntpValidationError)}
-                                        >
+                                        <ValidatedTextInputGroup value={ntpServerInput} error={ntpValidationError}>
                                             <TextInputGroupMain
                                                 id="ntp-server-input"
                                                 value={ntpServerInput}
@@ -162,12 +145,8 @@ const NetworkServicesSection = () => {
                                                     }
                                                 }}
                                             />
-                                        </TextInputGroup>
-                                        {ntpValidationError && (
-                                            <HelperText>
-                                                <HelperTextItem variant="error">{ntpValidationError}</HelperTextItem>
-                                            </HelperText>
-                                        )}
+                                        </ValidatedTextInputGroup>
+                                        <ErrorHelperText error={ntpValidationError} />
                                     </FlexItem>
                                     <FlexItem>
                                         <Button
@@ -253,16 +232,9 @@ const NetworkServicesSection = () => {
                                     value={model.networkServices.proxy.hostname || ""}
                                     onChange={(_, value) => handleProxyHostnameChange(value)}
                                     placeholder={_("e.g. proxy.example.com")}
-                                    {...getValidationStateProps(
-                                        model.networkServices.proxy.hostname,
-                                        proxyHostnameError
-                                    )}
+                                    {...getValidatedProps(model.networkServices.proxy.hostname, proxyHostnameError)}
                                 />
-                                {proxyHostnameError && (
-                                    <HelperText>
-                                        <HelperTextItem variant="error">{proxyHostnameError}</HelperTextItem>
-                                    </HelperText>
-                                )}
+                                <ErrorHelperText error={proxyHostnameError} />
                             </FormGroup>
                         </StackItem>
 
@@ -274,16 +246,9 @@ const NetworkServicesSection = () => {
                                     value={model.networkServices.proxy.port?.toString() || ""}
                                     onChange={(_, value) => handleProxyPortChange(value)}
                                     placeholder={_("e.g. 8080")}
-                                    {...getValidationStateProps(
-                                        model.networkServices.proxy.port?.toString(),
-                                        proxyPortError
-                                    )}
+                                    {...getValidatedProps(model.networkServices.proxy.port?.toString(), proxyPortError)}
                                 />
-                                {proxyPortError && (
-                                    <HelperText>
-                                        <HelperTextItem variant="error">{proxyPortError}</HelperTextItem>
-                                    </HelperText>
-                                )}
+                                <ErrorHelperText error={proxyPortError} />
                             </FormGroup>
                         </StackItem>
 
@@ -318,13 +283,11 @@ const NetworkServicesSection = () => {
                                     onChange={(_, value) => handleProxyNoProxyChange(value)}
                                     placeholder={_("e.g. localhost,127.0.0.1,::1,*.internal.corp,10.0.0.0/8")}
                                 />
-                                <HelperText>
-                                    <HelperTextItem variant="default">
-                                        {_(
-                                            "Comma-separated list of hosts, domains, or CIDRs that should bypass the proxy"
-                                        )}
-                                    </HelperTextItem>
-                                </HelperText>
+                                <DefaultHelperText
+                                    text={_(
+                                        "Comma-separated list of hosts, domains, or CIDRs that should bypass the proxy"
+                                    )}
+                                />
                             </FormGroup>
                         </StackItem>
                     </Stack>

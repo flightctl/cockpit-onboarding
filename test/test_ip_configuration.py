@@ -80,7 +80,7 @@ class TestIPConfiguration(testlib.MachineCase):
 
         # Navigate to network address page
         # Uncheck auto-DNS to enable manual DNS configuration
-        b.click("#auto-dns-ipv4")
+        b.click("#manual-dns-ipv4-radio")
         b.wait_visible("#primary-dns-ipv4")
 
         # Test empty primary DNS (should show error when required)
@@ -178,7 +178,7 @@ class TestIPConfiguration(testlib.MachineCase):
         b.click("#dhcpv6-radio")  # Or static-ipv6-radio
 
         # Uncheck auto-DNS to enable manual DNS configuration
-        b.click("#auto-dns-ipv6")
+        b.click("#manual-dns-ipv6-radio")
         b.wait_visible("#primary-dns-ipv6")
 
         # Test empty primary DNS (should show error when required)
@@ -215,7 +215,7 @@ class TestIPConfiguration(testlib.MachineCase):
         b.set_input_text("#gateway-ip", "192.168.1.1")
 
         # Configure manual DNS
-        b.click("#auto-dns-ipv4")
+        b.click("#manual-dns-ipv4-radio")
         b.wait_visible("#primary-dns-ipv4")
         b.set_input_text("#primary-dns-ipv4", "8.8.8.8")
         b.set_input_text("#secondary-dns-ipv4", "8.8.4.4")
@@ -228,7 +228,7 @@ class TestIPConfiguration(testlib.MachineCase):
         b.set_input_text("#gateway-ipv6", "2001:db8::ffff")
 
         # Configure IPv6 DNS
-        b.click("#auto-dns-ipv6")
+        b.click("#manual-dns-ipv6-radio")
         b.wait_visible("#primary-dns-ipv6")
         b.set_input_text("#primary-dns-ipv6", "2001:4860:4860::8888")
         b.set_input_text("#secondary-dns-ipv6", "2001:4860:4860::8844")

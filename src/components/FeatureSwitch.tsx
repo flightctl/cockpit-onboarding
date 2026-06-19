@@ -1,9 +1,12 @@
 import * as React from "react";
-import { Card, CardBody, Divider, Flex, FlexItem, Switch, Title } from "@patternfly/react-core";
+import { Card, CardBody, Divider, Switch } from "@patternfly/react-core/dist/esm/components/index.js";
+import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
+
+import { LabelHeading } from "./Headings";
 
 type FeatureSwitchProps = {
     fieldId: string;
-    label: React.ReactNode;
+    label: string;
     isChecked: boolean;
     isDisabled?: boolean;
     onToggle: (checked: boolean) => void;
@@ -22,12 +25,12 @@ const FeatureSwitch = ({
         <CardBody>
             <Flex justifyContent={{ default: "justifyContentSpaceBetween" }}>
                 <FlexItem>
-                    <Title headingLevel="h4">{label}</Title>
+                    <LabelHeading text={label} />
                 </FlexItem>
                 <FlexItem>
                     <Switch
                         id={fieldId}
-                        label={label}
+                        aria-label={label}
                         isChecked={isChecked}
                         isDisabled={isDisabled}
                         onChange={(_event, checked) => onToggle(checked)}

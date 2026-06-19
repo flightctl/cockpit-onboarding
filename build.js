@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
 
@@ -10,6 +11,8 @@ import { cleanPlugin } from "./pkg/lib/esbuild-cleanup-plugin.js";
 import { cockpitCompressPlugin } from "./pkg/lib/esbuild-compress-plugin.js";
 import { cockpitPoEsbuildPlugin } from "./pkg/lib/cockpit-po-plugin.js";
 import { cockpitRsyncEsbuildPlugin } from "./pkg/lib/cockpit-rsync-plugin.js";
+
+const require = createRequire(import.meta.url);
 
 const production = process.env.NODE_ENV === "production";
 // Prefer native esbuild; fall back to esbuild-wasm only if the native package fails to load
@@ -37,6 +40,19 @@ if (args.rsync) {
 // List of directories to use when using import statements
 const nodePaths = ["pkg/lib"];
 const outdir = "dist";
+
+// Force react-table to resolve all its PatternFly dependencies to the pinned versions in package.json.
+// Otherwise we end up with mixed PatternFly versions and mixed CSS tokens.
+function patternflyPkgDir(name) {
+    return path.dirname(require.resolve(`${name}/package.json`));
+}
+
+const patternflyAliases = {
+    "@patternfly/react-core": patternflyPkgDir("@patternfly/react-core"),
+    "@patternfly/react-styles": patternflyPkgDir("@patternfly/react-styles"),
+    "@patternfly/react-tokens": patternflyPkgDir("@patternfly/react-tokens"),
+    "@patternfly/react-icons": patternflyPkgDir("@patternfly/react-icons"),
+};
 
 // Obtain package name from package.json
 const packageJson = JSON.parse(fs.readFileSync("package.json"));
@@ -96,6 +112,7 @@ const context = await esbuild.context({
     minify: production,
     nodePaths,
     outdir,
+    alias: patternflyAliases,
     target: ["es2020"],
     plugins: [
         cleanPlugin(),

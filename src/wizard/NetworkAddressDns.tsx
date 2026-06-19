@@ -1,0 +1,119 @@
+import React from "react";
+import cockpit from "cockpit";
+
+import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
+import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
+import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { TextInputGroupMain } from "@patternfly/react-core/dist/esm/components/TextInputGroup/index.js";
+
+import { LabelHeading } from "../components/Headings";
+import ValidatedTextInputGroup from "../components/ValidatedTextInputGroup";
+import { useModelContext } from "../model-context";
+import { validateIP } from "../validation";
+
+const _ = cockpit.gettext;
+
+type IpVersion = "ipv4" | "ipv6";
+
+const placeholders = {
+    ipv4: {
+        primary: _("e.g. 8.8.8.8"),
+        secondary: _("e.g. 8.8.4.4"),
+    },
+    ipv6: {
+        primary: _("e.g. 2001:4860:4860::8888"),
+        secondary: _("e.g. 2001:4860:4860::8844"),
+    },
+};
+
+export const NetworkAddressDns = ({ version }: { version: IpVersion }) => {
+    const { model, updateNestedModel } = useModelContext();
+    const dnsConfig = model.networkAddress[version];
+
+    const [validationErrors, setValidationErrors] = React.useState({
+        primaryDns: null as string | null,
+        secondaryDns: null as string | null,
+    });
+
+    const setAutoDns = (autoDns: boolean) => {
+        updateNestedModel("networkAddress", version, { autoDns });
+        if (autoDns) {
+            setValidationErrors((prev) => ({ ...prev, primaryDns: null, secondaryDns: null }));
+        }
+    };
+
+    const setPrimaryDns = (primaryDns: string) => {
+        const error = validateIP(primaryDns, !dnsConfig.autoDns);
+        setValidationErrors((prev) => ({ ...prev, primaryDns: error }));
+        updateNestedModel("networkAddress", version, { primaryDns });
+    };
+
+    const setSecondaryDns = (secondaryDns: string) => {
+        const error = validateIP(secondaryDns, false);
+        setValidationErrors((prev) => ({ ...prev, secondaryDns: error }));
+        updateNestedModel("networkAddress", version, { secondaryDns });
+    };
+
+    return (
+        <Stack hasGutter>
+            <StackItem>
+                <LabelHeading text={version === "ipv4" ? _("IPv4 DNS Configuration") : _("IPv6 DNS Configuration")} />
+            </StackItem>
+            <StackItem>
+                <Radio
+                    id={`auto-dns-${version}-radio`}
+                    name={`${version}-dns-method`}
+                    label={_("Automatic")}
+                    isChecked={dnsConfig.autoDns}
+                    onChange={() => setAutoDns(true)}
+                />
+            </StackItem>
+            <StackItem>
+                <Radio
+                    id={`manual-dns-${version}-radio`}
+                    name={`${version}-dns-method`}
+                    label={_("Manual")}
+                    isChecked={!dnsConfig.autoDns}
+                    onChange={() => setAutoDns(false)}
+                    body={
+                        !dnsConfig.autoDns && (
+                            <Stack hasGutter>
+                                <StackItem>
+                                    <FormGroup label={_("Primary Server")} isRequired>
+                                        <ValidatedTextInputGroup
+                                            value={dnsConfig.primaryDns}
+                                            error={validationErrors.primaryDns}
+                                            warnWhenEmpty
+                                        >
+                                            <TextInputGroupMain
+                                                id={`primary-dns-${version}`}
+                                                value={dnsConfig.primaryDns || ""}
+                                                onChange={(_, value) => setPrimaryDns(value)}
+                                                placeholder={placeholders[version].primary}
+                                            />
+                                        </ValidatedTextInputGroup>
+                                    </FormGroup>
+                                </StackItem>
+                                <StackItem>
+                                    <FormGroup label={_("Secondary Server")}>
+                                        <ValidatedTextInputGroup
+                                            value={dnsConfig.secondaryDns}
+                                            error={validationErrors.secondaryDns}
+                                        >
+                                            <TextInputGroupMain
+                                                id={`secondary-dns-${version}`}
+                                                value={dnsConfig.secondaryDns || ""}
+                                                onChange={(_, value) => setSecondaryDns(value)}
+                                                placeholder={placeholders[version].secondary}
+                                            />
+                                        </ValidatedTextInputGroup>
+                                    </FormGroup>
+                                </StackItem>
+                            </Stack>
+                        )
+                    }
+                />
+            </StackItem>
+        </Stack>
+    );
+};
