@@ -37,6 +37,15 @@ export const NetworkAddressPage: React.FunctionComponent = () => {
     const setupInterface = getSetupInterface(interfaces);
     const isSetupInterface = setupInterface !== null && model.networkInterface.selectedInterface === setupInterface;
 
+    // Hide arping/ping availability check buttons when they can't produce reliable results:
+    // - setup interface: changing its IP would break the browser session
+    // - WiFi: arping over WiFi is unreliable
+    // - VLAN: the VLAN sub-interface doesn't exist yet, so arping on the base interface can't reach the VLAN's gateway
+    const hideAvailabilityChecks =
+        isSetupInterface ||
+        model.networkInterface.interfaceType === "wifi" ||
+        model.networkInterface.vlanId !== null;
+
     return (
         <Stack hasGutter>
             {isSetupInterface && (
@@ -54,18 +63,18 @@ export const NetworkAddressPage: React.FunctionComponent = () => {
             )}
             <StackItem>
                 <p>Configure the IPv4 connection for this interface:</p>
-                <NetworkConfigIPv4 isSetupInterface={isSetupInterface} />
+                <NetworkConfigIPv4 hideAvailabilityChecks={hideAvailabilityChecks} />
             </StackItem>
             <StackItem>
                 <p>Optionally, configure the IPv6 connection for this interface:</p>
-                <NetworkConfigIPv6 isSetupInterface={isSetupInterface} />
+                <NetworkConfigIPv6 hideAvailabilityChecks={hideAvailabilityChecks} />
             </StackItem>
         </Stack>
     );
 };
 
-export const NetworkConfigIPv4: React.FunctionComponent<{ isSetupInterface?: boolean }> = ({
-    isSetupInterface = false,
+export const NetworkConfigIPv4: React.FunctionComponent<{ hideAvailabilityChecks?: boolean }> = ({
+    hideAvailabilityChecks = false,
 }) => {
     const { model, updateNestedModel } = useModelContext();
 
@@ -256,7 +265,7 @@ export const NetworkConfigIPv4: React.FunctionComponent<{ isSetupInterface?: boo
                                         </TextInputGroup>
                                     </FlexItem>
                                     <FlexItem>
-                                        {!isSetupInterface && (
+                                        {!hideAvailabilityChecks && (
                                             <Button
                                                 variant="secondary"
                                                 onClick={checkIpAvailability}
@@ -338,7 +347,7 @@ export const NetworkConfigIPv4: React.FunctionComponent<{ isSetupInterface?: boo
                                         </TextInputGroup>
                                     </FlexItem>
                                     <FlexItem>
-                                        {!isSetupInterface && (
+                                        {!hideAvailabilityChecks && (
                                             <Button
                                                 variant="secondary"
                                                 onClick={checkGatewayReachability}
@@ -446,8 +455,8 @@ export const NetworkConfigIPv4: React.FunctionComponent<{ isSetupInterface?: boo
     );
 };
 
-export const NetworkConfigIPv6: React.FunctionComponent<{ isSetupInterface?: boolean }> = ({
-    isSetupInterface = false,
+export const NetworkConfigIPv6: React.FunctionComponent<{ hideAvailabilityChecks?: boolean }> = ({
+    hideAvailabilityChecks = false,
 }) => {
     const { model, updateNestedModel } = useModelContext();
 
@@ -635,7 +644,7 @@ export const NetworkConfigIPv6: React.FunctionComponent<{ isSetupInterface?: boo
                                         </TextInputGroup>
                                     </FlexItem>
                                     <FlexItem>
-                                        {!isSetupInterface && (
+                                        {!hideAvailabilityChecks && (
                                             <Button
                                                 variant="secondary"
                                                 onClick={checkIpv6Availability}
@@ -695,7 +704,7 @@ export const NetworkConfigIPv6: React.FunctionComponent<{ isSetupInterface?: boo
                                         </TextInputGroup>
                                     </FlexItem>
                                     <FlexItem>
-                                        {!isSetupInterface && (
+                                        {!hideAvailabilityChecks && (
                                             <Button
                                                 variant="secondary"
                                                 onClick={checkIpv6Gateway}
