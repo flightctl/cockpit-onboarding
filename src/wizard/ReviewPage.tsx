@@ -15,6 +15,7 @@ import { PencilAltIcon } from "@patternfly/react-icons";
 import { useModelContext } from "../model-context";
 import { useConfig } from "../app";
 import { getSetupInterface } from "../services/network";
+import { WIZARD_STEP_IDS } from "./WizardSteps";
 
 const _ = cockpit.gettext;
 
@@ -65,7 +66,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById("wizard-step-1")}
+                                onClick={() => goToStepById(WIZARD_STEP_IDS.hostname)}
                                 aria-label={_("Edit hostname")}
                             />
                         </DescriptionListDescription>
@@ -79,7 +80,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById("wizard-step-2")}
+                                onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
                                 aria-label={_("Edit network interface")}
                             />
                         </DescriptionListDescription>
@@ -93,7 +94,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                     <Button
                                         variant="link"
                                         icon={<PencilAltIcon />}
-                                        onClick={() => goToStepById("wizard-step-2")}
+                                        onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
                                         aria-label={_("Edit network interface")}
                                     />
                                 </DescriptionListDescription>
@@ -117,7 +118,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                 <Button
                                     variant="link"
                                     icon={<PencilAltIcon />}
-                                    onClick={() => goToStepById("wizard-step-2")}
+                                    onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
                                     aria-label={_("Edit network interface")}
                                 />
                             </DescriptionListDescription>
@@ -134,7 +135,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById("wizard-step-3")}
+                                onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
                                 aria-label={_("Edit network address")}
                             />
                         </DescriptionListDescription>
@@ -190,7 +191,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById("wizard-step-3")}
+                                onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
                                 aria-label={_("Edit network address")}
                             />
                         </DescriptionListDescription>
@@ -249,7 +250,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById("wizard-step-4")}
+                                onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
                                 aria-label={_("Edit network services")}
                             />
                         </DescriptionListDescription>
@@ -272,6 +273,10 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                             {_("No proxy: ")} {model.networkServices.proxy.noProxy}
                                         </div>
                                     )}
+                                    {model.networkServices.proxy.protocol === "http" &&
+                                        model.networkServices.proxy.applyForHttps && (
+                                            <div>{_("Also applies to HTTPS traffic")}</div>
+                                        )}
                                 </>
                             ) : (
                                 _("Not configured")
@@ -279,7 +284,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById("wizard-step-4")}
+                                onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
                                 aria-label={_("Edit network services")}
                             />
                         </DescriptionListDescription>
@@ -293,7 +298,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                             <Button
                                 variant="link"
                                 icon={<PencilAltIcon />}
-                                onClick={() => goToStepById(hasEnrollmentScripts ? "wizard-step-6" : "wizard-step-5")}
+                                onClick={() => goToStepById(WIZARD_STEP_IDS.connectivityTest)}
                                 aria-label={_("Edit connectivity test host")}
                             />
                         </DescriptionListDescription>
@@ -315,7 +320,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                                 <Button
                                                     variant="link"
                                                     icon={<PencilAltIcon />}
-                                                    onClick={() => goToStepById("wizard-step-5")}
+                                                    onClick={() => goToStepById(WIZARD_STEP_IDS.enrollment)}
                                                     aria-label={_("Edit enrollment services")}
                                                 />
                                             </DescriptionListDescription>
@@ -334,7 +339,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                                 <Button
                                                     variant="link"
                                                     icon={<PencilAltIcon />}
-                                                    onClick={() => goToStepById("wizard-step-5")}
+                                                    onClick={() => goToStepById(WIZARD_STEP_IDS.enrollment)}
                                                     aria-label={_("Edit enrollment services")}
                                                 />
                                             </DescriptionListDescription>
@@ -379,7 +384,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                             <Button
                                                 variant="link"
                                                 icon={<PencilAltIcon />}
-                                                onClick={() => goToStepById("wizard-step-5")}
+                                                onClick={() => goToStepById(WIZARD_STEP_IDS.enrollment)}
                                                 aria-label={_("Edit enrollment services")}
                                             />
                                         </DescriptionListDescription>
@@ -407,9 +412,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
                                 <Button
                                     variant="link"
                                     icon={<PencilAltIcon />}
-                                    onClick={() =>
-                                        goToStepById(hasEnrollmentScripts ? "wizard-step-7" : "wizard-step-6")
-                                    }
+                                    onClick={() => goToStepById(WIZARD_STEP_IDS.labels)}
                                     aria-label={_("Edit device labels")}
                                 />
                             </DescriptionListDescription>

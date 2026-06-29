@@ -6,6 +6,8 @@
 
 import * as ipaddr from "ipaddr.js";
 
+import { IPv4Config, IPv6Config } from "./types";
+
 /**
  * Validate hostname according to RFC 1123
  *
@@ -28,22 +30,34 @@ export const validateHostname = (hostname: string, required = true): string | nu
     }
 
     // RFC 1123 hostname validation
-    if (trimmedHostname.length > 253) {return "Hostname must be 253 characters or less"}
+    if (trimmedHostname.length > 253) {
+        return "Hostname must be 253 characters or less";
+    }
 
     // Split into labels (parts separated by dots)
     const labels = trimmedHostname.split(".");
 
     for (const label of labels) {
         // Each label must be 1-63 characters
-        if (label.length === 0) {return "Hostname cannot have empty labels"}
-        if (label.length > 63) {return "Each hostname label must be 63 characters or less"}
+        if (label.length === 0) {
+            return "Hostname cannot have empty labels";
+        }
+        if (label.length > 63) {
+            return "Each hostname label must be 63 characters or less";
+        }
 
         // Can only contain alphanumeric characters and hyphens (check this first)
-        if (!/^[a-zA-Z0-9-]+$/.test(label)) {return "Hostname can only contain letters, numbers, and hyphens"}
+        if (!/^[a-zA-Z0-9-]+$/.test(label)) {
+            return "Hostname can only contain letters, numbers, and hyphens";
+        }
 
         // Must start and end with alphanumeric character
-        if (!/^[a-zA-Z0-9]/.test(label)) {return "Each hostname label must start with an alphanumeric character"}
-        if (!/[a-zA-Z0-9]$/.test(label)) {return "Each hostname label must end with an alphanumeric character"}
+        if (!/^[a-zA-Z0-9]/.test(label)) {
+            return "Each hostname label must start with an alphanumeric character";
+        }
+        if (!/[a-zA-Z0-9]$/.test(label)) {
+            return "Each hostname label must end with an alphanumeric character";
+        }
     }
 
     // Reject if ALL labels are numeric (looks like an IPv4 address)
@@ -66,7 +80,9 @@ export const validateHostname = (hostname: string, required = true): string | nu
  */
 export const validateIPv4 = (ip: string): string | null => {
     const trimmedIp = ip.trim();
-    if (!trimmedIp) {return "IPv4 address is required"}
+    if (!trimmedIp) {
+        return "IPv4 address is required";
+    }
 
     // Use ipaddr.js validation (same as NetworkManager utils)
     // IPv4.isValidFourPartDecimal explicitly requires all 4 octets
@@ -75,7 +91,9 @@ export const validateIPv4 = (ip: string): string | null => {
         const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
         const match = trimmedIp.match(ipRegex);
 
-        if (!match) {return "Invalid IPv4 address format"}
+        if (!match) {
+            return "Invalid IPv4 address format";
+        }
 
         const octets = match.slice(1).map(Number);
         for (const octet of octets) {
@@ -98,7 +116,9 @@ export const validateIPv4 = (ip: string): string | null => {
  */
 export const validateSubnetMask = (mask: string): string | null => {
     const trimmedMask = mask.trim();
-    if (!trimmedMask) {return "Subnet mask is required"}
+    if (!trimmedMask) {
+        return "Subnet mask is required";
+    }
 
     // Support CIDR notation (/24)
     if (trimmedMask.startsWith("/")) {
@@ -111,7 +131,9 @@ export const validateSubnetMask = (mask: string): string | null => {
 
     // Support dotted decimal notation (255.255.255.0)
     const ipv4Error = validateIPv4(trimmedMask);
-    if (ipv4Error) {return "Invalid subnet mask format"}
+    if (ipv4Error) {
+        return "Invalid subnet mask format";
+    }
 
     // Validate that it's a valid subnet mask
     const octets = trimmedMask.split(".").map(Number);
@@ -139,7 +161,9 @@ export const validateSubnetMask = (mask: string): string | null => {
  */
 export const validateIPv6 = (ip: string, requirePrefix = false): string | null => {
     const trimmedIp = ip.trim();
-    if (!trimmedIp) {return requirePrefix ? "IPv6 address is required" : null}
+    if (!trimmedIp) {
+        return requirePrefix ? "IPv6 address is required" : null;
+    }
 
     let address = trimmedIp;
     let prefix: number | null = null;
@@ -147,7 +171,9 @@ export const validateIPv6 = (ip: string, requirePrefix = false): string | null =
     // Extract prefix if present
     if (trimmedIp.includes("/")) {
         const parts = trimmedIp.split("/");
-        if (parts.length !== 2) {return "Invalid IPv6 address format"}
+        if (parts.length !== 2) {
+            return "Invalid IPv6 address format";
+        }
         address = parts[0];
         prefix = parseInt(parts[1], 10);
 
@@ -174,10 +200,14 @@ export const validateIPv6 = (ip: string, requirePrefix = false): string | null =
  */
 export const validateIPv6Gateway = (gateway: string): string | null => {
     const trimmedGateway = gateway.trim();
-    if (!trimmedGateway) {return null} // Optional field
+    if (!trimmedGateway) {
+        return null;
+    } // Optional field
 
     const error = validateIPv6(trimmedGateway);
-    if (error) {return error}
+    if (error) {
+        return error;
+    }
 
     // Check if it's a link-local address (not allowed for gateway)
     if (trimmedGateway.toLowerCase().startsWith("fe80:")) {
@@ -204,10 +234,14 @@ export const validateIP = (ip: string, required = true): string | null => {
     }
 
     // Try IPv4 first (using ipaddr.js)
-    if (ipaddr.IPv4.isValidFourPartDecimal(trimmedIp)) {return null}
+    if (ipaddr.IPv4.isValidFourPartDecimal(trimmedIp)) {
+        return null;
+    }
 
     // Try IPv6 (using ipaddr.js)
-    if (ipaddr.IPv6.isValid(trimmedIp)) {return null}
+    if (ipaddr.IPv6.isValid(trimmedIp)) {
+        return null;
+    }
 
     return "Invalid IP address";
 };
@@ -224,8 +258,12 @@ export const validateIPv4GatewaySubnet = (address: string, gateway: string, mask
     const addr = address.trim();
     const gw = gateway.trim();
     const m = mask.trim();
-    if (!addr || !gw || !m) {return null}
-    if (validateIPv4(addr) || validateIPv4(gw) || validateSubnetMask(m)) {return null}
+    if (!addr || !gw || !m) {
+        return null;
+    }
+    if (validateIPv4(addr) || validateIPv4(gw) || validateSubnetMask(m)) {
+        return null;
+    }
 
     let prefixLen: number;
     if (m.startsWith("/")) {
@@ -233,7 +271,9 @@ export const validateIPv4GatewaySubnet = (address: string, gateway: string, mask
     } else {
         const octets = m.split(".").map(Number);
         let bits = "";
-        for (const o of octets) {bits += o.toString(2).padStart(8, "0")}
+        for (const o of octets) {
+            bits += o.toString(2).padStart(8, "0");
+        }
         prefixLen = bits.indexOf("0") === -1 ? 32 : bits.indexOf("0");
     }
 
@@ -251,6 +291,80 @@ export const validateIPv4GatewaySubnet = (address: string, gateway: string, mask
 };
 
 /**
+ * Validate a complete static IPv4 configuration (address, subnet, gatewayNS).
+ *
+ * @param ipv4 - The IPv4 configuration
+ * @returns Error message or null if valid
+ */
+export const validateIpv4StaticConfig = (ipv4: IPv4Config): boolean => {
+    if (!ipv4.address || validateIPv4(ipv4.address) !== null) {
+        return false;
+    }
+    if (!ipv4.subnetMask || validateSubnetMask(ipv4.subnetMask) !== null) {
+        return false;
+    }
+    if (!ipv4.gateway || validateIPv4(ipv4.gateway) !== null) {
+        return false;
+    }
+
+    if (validateIPv4GatewaySubnet(ipv4.address, ipv4.gateway, ipv4.subnetMask) !== null) {
+        return false;
+    }
+    return true;
+};
+
+/**
+ * Validate the DNS configuration for an IPv4 static configuration.
+ *
+ * @param ipv4 - The IPv4 configuration
+ * @returns Error message or null if valid
+ */
+export const validateIpv4DnsConfig = (ipv4: IPv4Config): boolean => {
+    if (!ipv4.autoDns) {
+        if (!ipv4.primaryDns || validateIP(ipv4.primaryDns) !== null) {
+            return false;
+        }
+        if (ipv4.secondaryDns && validateIP(ipv4.secondaryDns, false) !== null) {
+            return false;
+        }
+    }
+    return true;
+};
+
+/**
+ * Validate a complete static IPv6 configuration (address with prefix and gateway).
+ */
+export const validateIpv6StaticConfig = (ipv6: IPv6Config): boolean => {
+    if (!ipv6.address || validateIPv6(ipv6.address, true) !== null) {
+        return false;
+    }
+    if (!ipv6.gateway || validateIPv6(ipv6.gateway) !== null) {
+        return false;
+    }
+
+    if (validateIPv6GatewaySubnet(ipv6.address, ipv6.gateway) !== null) {
+        return false;
+    }
+
+    return true;
+};
+
+/**
+ * Validate the DNS configuration for an IPv6 configuration.
+ */
+export const validateIpv6DnsConfig = (ipv6: IPv6Config): boolean => {
+    if (!ipv6.autoDns) {
+        if (!ipv6.primaryDns || validateIP(ipv6.primaryDns) !== null) {
+            return false;
+        }
+        if (ipv6.secondaryDns && validateIP(ipv6.secondaryDns, false) !== null) {
+            return false;
+        }
+    }
+    return true;
+};
+
+/**
  * Validate that an IPv6 gateway is within the same subnet as the static IP.
  *
  * @param address - The IPv6 address with prefix (e.g. "2001:db8::1/64")
@@ -260,8 +374,12 @@ export const validateIPv4GatewaySubnet = (address: string, gateway: string, mask
 export const validateIPv6GatewaySubnet = (address: string, gateway: string): string | null => {
     const addr = address.trim();
     const gw = gateway.trim();
-    if (!addr || !gw || !addr.includes("/")) {return null}
-    if (validateIPv6(addr, true) || validateIPv6(gw)) {return null}
+    if (!addr || !gw || !addr.includes("/")) {
+        return null;
+    }
+    if (validateIPv6(addr, true) || validateIPv6(gw)) {
+        return null;
+    }
 
     try {
         const [addrPart, prefixStr] = addr.split("/");
@@ -293,12 +411,6 @@ export const validateIPv6GatewaySubnet = (address: string, gateway: string): str
 };
 
 /**
- * @deprecated Use validateIP instead - DNS servers are just IP addresses
- * Alias for backward compatibility
- */
-export const validateDNSServer = validateIP;
-
-/**
  * Validate hostname or IP address (IPv4 or IPv6)
  *
  * Useful for fields that accept any of these formats (e.g., proxy hostname, NTP server)
@@ -315,17 +427,41 @@ export const validateHostnameOrIP = (value: string, required = true): string | n
     }
 
     // Try IPv4 first (quick check)
-    if (ipaddr.IPv4.isValidFourPartDecimal(trimmedValue)) {return null}
+    if (ipaddr.IPv4.isValidFourPartDecimal(trimmedValue)) {
+        return null;
+    }
 
     // Try IPv6 (quick check)
-    if (ipaddr.IPv6.isValid(trimmedValue)) {return null}
+    if (ipaddr.IPv6.isValid(trimmedValue)) {
+        return null;
+    }
 
     // Finally try hostname validation
     const hostnameError = validateHostname(trimmedValue, true);
-    if (!hostnameError) {return null}
+    if (!hostnameError) {
+        return null;
+    }
 
     // Return a user-friendly combined error
     return "Invalid hostname or IP address";
+};
+
+/**
+ * Validate manual NTP server list.
+ * Every row must be filled with a valid hostname or IP; blank rows are not allowed.
+ */
+export const validateManualNtpServers = (servers: string[]): boolean => {
+    if (servers.length === 0) {
+        return false;
+    }
+
+    for (const server of servers) {
+        if (!server.trim() || validateHostnameOrIP(server, false) !== null) {
+            return false;
+        }
+    }
+
+    return true;
 };
 
 /**
@@ -371,19 +507,29 @@ export const validateLabelKey = (key: string, required = true): string | null =>
     let name = trimmed;
     if (trimmed.includes("/")) {
         const parts = trimmed.split("/");
-        if (parts.length !== 2) {return 'Label key can contain at most one "/"'}
+        if (parts.length !== 2) {
+            return 'Label key can contain at most one "/"';
+        }
         const prefix = parts[0];
         name = parts[1];
 
-        if (!prefix) {return "Label key prefix cannot be empty"}
-        if (prefix.length > 253) {return "Label key prefix must be 253 characters or less"}
+        if (!prefix) {
+            return "Label key prefix cannot be empty";
+        }
+        if (prefix.length > 253) {
+            return "Label key prefix must be 253 characters or less";
+        }
         if (!/^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$/.test(prefix)) {
             return "Label key prefix must be a valid DNS subdomain";
         }
     }
 
-    if (!name) {return "Label key name cannot be empty"}
-    if (name.length > 63) {return "Label key name must be 63 characters or less"}
+    if (!name) {
+        return "Label key name cannot be empty";
+    }
+    if (name.length > 63) {
+        return "Label key name must be 63 characters or less";
+    }
     if (!/^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/.test(name)) {
         return "Label key name must start and end with alphanumeric characters, and contain only alphanumerics, hyphens, underscores, or dots";
     }
@@ -400,8 +546,12 @@ export const validateLabelKey = (key: string, required = true): string | null =>
 export const validateLabelValue = (value: string): string | null => {
     const trimmed = value.trim();
 
-    if (!trimmed) {return null}
-    if (trimmed.length > 63) {return "Label value must be 63 characters or less"}
+    if (!trimmed) {
+        return null;
+    }
+    if (trimmed.length > 63) {
+        return "Label value must be 63 characters or less";
+    }
     if (!/^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/.test(trimmed)) {
         return "Label value must start and end with alphanumeric characters, and contain only alphanumerics, hyphens, underscores, or dots";
     }

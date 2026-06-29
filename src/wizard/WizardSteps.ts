@@ -1,24 +1,39 @@
-/**
- * Step validation logic for the wizard
- *
- * These functions determine whether each step's required fields are filled and valid,
- * controlling whether users can proceed to the next step.
- */
-
 import { Model } from "../model-context";
+import { EnrollmentService } from "../types";
 import {
     validateHostname,
-    validateIPv4,
-    validateSubnetMask,
-    validateIPv6,
-    validateIP,
+    validateIpv4StaticConfig,
+    validateIpv4DnsConfig,
+    validateIpv6StaticConfig,
+    validateIpv6DnsConfig,
     validateHostnameOrIP,
+    validateManualNtpServers,
     validatePort,
     validateLabelKey,
     validateLabelValue,
-    validateIPv4GatewaySubnet,
-    validateIPv6GatewaySubnet,
 } from "../validation";
+
+export const WIZARD_STEP_IDS = {
+    network: "networkStep",
+    enrollment: "enrollmentStep",
+    connectivityTest: "connectivityTestStep",
+    hostname: "hostnameStep",
+    labels: "labelsStep",
+    review: "reviewStep",
+    progress: "progressStep",
+} as const;
+
+export const stepIds = [
+    WIZARD_STEP_IDS.network,
+    WIZARD_STEP_IDS.enrollment,
+    WIZARD_STEP_IDS.connectivityTest,
+    WIZARD_STEP_IDS.hostname,
+    WIZARD_STEP_IDS.labels,
+    WIZARD_STEP_IDS.review,
+    WIZARD_STEP_IDS.progress,
+] as const;
+
+export type WizardStepId = (typeof stepIds)[number];
 
 /**
  * Validate the hostname step
@@ -77,65 +92,20 @@ export const validateNetworkAddressStep = (model: Model): boolean => {
     }
 
     // IPv4 validation
-    if (ipv4.method === "static") {
-        // Static IPv4 requires address, subnet mask, and gateway
-        if (!ipv4.address || validateIPv4(ipv4.address) !== null) {
-            return false;
-        }
-        if (!ipv4.subnetMask || validateSubnetMask(ipv4.subnetMask) !== null) {
-            return false;
-        }
-        if (!ipv4.gateway || validateIPv4(ipv4.gateway) !== null) {
-            return false;
-        }
-
-        // Gateway must be in the same subnet as the IP
-        if (ipv4.address && ipv4.gateway && ipv4.subnetMask) {
-            if (validateIPv4GatewaySubnet(ipv4.address, ipv4.gateway, ipv4.subnetMask) !== null) {
-                return false;
-            }
-        }
-
-        // If manual DNS is selected, primary DNS is required
-        if (!ipv4.autoDns) {
-            if (!ipv4.primaryDns || validateIP(ipv4.primaryDns) !== null) {
-                return false;
-            }
-            // Secondary DNS is optional, but if provided must be valid
-            if (ipv4.secondaryDns && validateIP(ipv4.secondaryDns, false) !== null) {
-                return false;
-            }
-        }
+    if (ipv4.method === "static" && !validateIpv4StaticConfig(ipv4)) {
+        return false;
+    }
+    if (ipv4.method !== "disabled" && !validateIpv4DnsConfig(ipv4)) {
+        return false;
     }
     // DHCP/auto and disabled don't require additional validation
 
     // IPv6 validation (optional, but if static must be complete)
-    if (ipv6.method === "static") {
-        // Static IPv6 requires address with prefix and gateway
-        if (!ipv6.address || validateIPv6(ipv6.address, true) !== null) {
-            return false;
-        }
-        if (!ipv6.gateway || validateIPv6(ipv6.gateway) !== null) {
-            return false;
-        }
-
-        // Gateway must be in the same subnet as the IP
-        if (ipv6.address && ipv6.gateway) {
-            if (validateIPv6GatewaySubnet(ipv6.address, ipv6.gateway) !== null) {
-                return false;
-            }
-        }
-
-        // If manual DNS is selected, primary DNS is required
-        if (!ipv6.autoDns) {
-            if (!ipv6.primaryDns || validateIP(ipv6.primaryDns) !== null) {
-                return false;
-            }
-            // Secondary DNS is optional, but if provided must be valid
-            if (ipv6.secondaryDns && validateIP(ipv6.secondaryDns, false) !== null) {
-                return false;
-            }
-        }
+    if (ipv6.method === "static" && !validateIpv6StaticConfig(ipv6)) {
+        return false;
+    }
+    if (ipv6.method !== "disabled" && !validateIpv6DnsConfig(ipv6)) {
+        return false;
     }
 
     return true;
@@ -150,18 +120,8 @@ export const validateNetworkServicesStep = (model: Model): boolean => {
     const { ntp, proxy } = model.networkServices;
 
     // NTP validation
-    if (!ntp.autoConfig) {
-        // Manual NTP configuration requires at least one server
-        if (ntp.servers.length === 0) {
-            return false;
-        }
-
-        // All servers must be valid (servers in the list should never be empty)
-        for (const server of ntp.servers) {
-            if (validateHostnameOrIP(server, false) !== null) {
-                return false;
-            }
-        }
+    if (!ntp.autoConfig && !validateManualNtpServers(ntp.servers)) {
+        return false;
     }
 
     // Proxy validation
@@ -189,8 +149,7 @@ export const validateNetworkServicesStep = (model: Model): boolean => {
  * Note: This function needs access to the config to validate properly.
  * For now, we do basic validation. Full validation is done in the UI component.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[]): boolean => {
+export const validateEnrollmentStep = (model: Model, enrollmentServices?: EnrollmentService[]): boolean => {
     const { selectedServices, credentials, endpoints } = model.enrollment;
 
     // If no services are selected, step is valid (enrollment is optional)
@@ -211,9 +170,10 @@ export const validateEnrollmentStep = (model: Model, enrollmentServices?: any[])
 
     // Full validation with config
     for (const serviceId of selectedServices) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const service = enrollmentServices.find((s: any) => s.id === serviceId);
-        if (!service) {continue}
+        const service = enrollmentServices.find((s) => s.id === serviceId);
+        if (!service) {
+            continue;
+        }
 
         // When using existing credentials, skip endpoint and credential validation
         if (model.enrollment.useExisting?.[serviceId]) {
@@ -264,9 +224,15 @@ export const validateLabelsStep = (model: Model): boolean => {
         const hasValue = value.trim().length > 0;
 
         if (hasKey || hasValue) {
-            if (!hasKey) {return false}
-            if (validateLabelKey(key) !== null) {return false}
-            if (validateLabelValue(value) !== null) {return false}
+            if (!hasKey) {
+                return false;
+            }
+            if (validateLabelKey(key) !== null) {
+                return false;
+            }
+            if (validateLabelValue(value) !== null) {
+                return false;
+            }
         }
     }
 
@@ -278,13 +244,28 @@ export const validateLabelsStep = (model: Model): boolean => {
             : systemInfoField.trim().length > 0;
 
         if (hasKey || hasField) {
-            if (!hasKey) {return false}
-            if (!hasField) {return false}
-            if (validateLabelKey(labelKey) !== null) {return false}
+            if (!hasKey) {
+                return false;
+            }
+            if (!hasField) {
+                return false;
+            }
+            if (validateLabelKey(labelKey) !== null) {
+                return false;
+            }
         }
     }
 
     return true;
+};
+
+/**
+ * Validate the combined network step (interface, address, and services)
+ */
+export const validateNetworkStep = (model: Model): boolean => {
+    return (
+        validateNetworkInterfaceStep(model) && validateNetworkAddressStep(model) && validateNetworkServicesStep(model)
+    );
 };
 
 /**

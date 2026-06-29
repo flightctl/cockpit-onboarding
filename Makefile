@@ -13,7 +13,7 @@ PREFIX ?= /usr/local
 APPSTREAMFILE=org.cockpit_project.$(subst -,_,$(PACKAGE_NAME)).metainfo.xml
 VM_IMAGE=$(CURDIR)/test/images/$(TEST_OS)
 # stamp file to check for node_modules/
-NODE_MODULES_TEST=package-lock.json
+NODE_MODULES_STAMP=node_modules/.install-stamp
 # one example file in dist/ from bundler to check if that already ran
 DIST_TEST=dist/manifest.json
 # one example file in pkg/lib to check if it was already checked out
@@ -63,7 +63,7 @@ po/$(PACKAGE_NAME).js.pot:
 		--from-code=UTF-8 $$(find src/ -name '*.[jt]s' -o -name '*.[jt]sx') | \
 		sed '/^#/ s/, c-format//' > $@
 
-po/$(PACKAGE_NAME).html.pot: $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP)
+po/$(PACKAGE_NAME).html.pot: $(NODE_MODULES_STAMP) $(COCKPIT_REPO_STAMP)
 	pkg/lib/html2po -o $@ $$(find src -name '*.html')
 
 po/$(PACKAGE_NAME).manifest.pot: $(COCKPIT_REPO_STAMP)
@@ -82,17 +82,17 @@ po/LINGUAS:
 # Build/Install/dist
 #
 
-$(SPEC): packaging/$(SPEC).in $(NODE_MODULES_TEST)
+$(SPEC): packaging/$(SPEC).in package-lock.json
 	provides=$$(npm ls --omit dev --package-lock-only --depth=Infinity | grep -Eo '[^[:space:]]+@[^[:space:]]+' | sort -u | sed 's/^/Provides: bundled(npm(/; s/\(.*\)@/\1)) = /'); \
 	awk -v p="$$provides" '{gsub(/%{VERSION}/, "$(VERSION)"); gsub(/%{NPM_PROVIDES}/, p)}1' $< > $@
 
 packaging/arch/PKGBUILD: packaging/arch/PKGBUILD.in
 	sed 's/VERSION/$(VERSION)/; s/SOURCE/$(TARFILE)/' $< > $@
 
-$(DIST_TEST): $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP) $(shell find src/ -type f) package.json build.js
+$(DIST_TEST): $(NODE_MODULES_STAMP) $(COCKPIT_REPO_STAMP) $(shell find src/ -type f) package.json build.js
 	NODE_ENV=$(NODE_ENV) ./build.js
 
-watch: $(NODE_MODULES_TEST) $(COCKPIT_REPO_STAMP)
+watch: $(NODE_MODULES_STAMP) $(COCKPIT_REPO_STAMP)
 	NODE_ENV=$(NODE_ENV) ./build.js --watch
 
 clean:
@@ -134,10 +134,10 @@ $(TARFILE): $(DIST_TEST) $(SPEC) packaging/arch/PKGBUILD
 	if type appstream-util >/dev/null 2>&1; then appstream-util validate-relax --nonet *.metainfo.xml; fi
 	tar --xz $(TAR_ARGS) -cf $(TARFILE) --transform 's,^,$(RPM_NAME)/,' \
 		--exclude packaging/$(SPEC).in --exclude node_modules \
-		$$(git ls-files) $(COCKPIT_REPO_FILES) $(NODE_MODULES_TEST) \
+		$$(git ls-files) $(COCKPIT_REPO_FILES) \
 		$(SPEC) packaging/arch/PKGBUILD dist/
 
-$(NODE_CACHE): $(NODE_MODULES_TEST)
+$(NODE_CACHE): $(NODE_MODULES_STAMP)
 	tar --xz $(TAR_ARGS) -cf $@ node_modules
 
 node-cache: $(NODE_CACHE)
@@ -185,26 +185,25 @@ print-vm:
 
 # convenience target to setup all the bits needed for the integration tests
 # without actually running them
-prepare-check: $(NODE_MODULES_TEST) $(VM_IMAGE) test/common
+prepare-check: $(NODE_MODULES_STAMP) $(VM_IMAGE) test/common
 
 # run the browser integration tests
 # this will run all tests/check-* and format them as TAP
 check: prepare-check
 	test/common/run-tests ${RUN_TESTS_OPTIONS}
 
-codecheck: test/common $(NODE_MODULES_TEST)
+codecheck: test/common $(NODE_MODULES_STAMP)
 	test/common/static-code
 
 # checkout Cockpit's bots for standard test VM images and API to launch them
 bots: $(COCKPIT_REPO_STAMP)
 	test/common/make-bots
 
-$(NODE_MODULES_TEST): package.json
-	# if it exists already, npm install won't update it; force that so that we always get up-to-date packages
-	rm -f package-lock.json
+$(NODE_MODULES_STAMP): package.json package-lock.json
 	# unset NODE_ENV, skips devDependencies otherwise
-	env -u NODE_ENV npm install --ignore-scripts
+	env -u NODE_ENV npm ci --ignore-scripts
 	env -u NODE_ENV npm prune
+	@touch $@
 
 # Fedora test VM with WiFi simulation (mac80211_hwsim)
 deploy-test-vm:

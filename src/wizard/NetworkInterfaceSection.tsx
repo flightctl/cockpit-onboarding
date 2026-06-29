@@ -1,33 +1,35 @@
 import React from "react";
 import cockpit from "cockpit";
 
-import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
+import { WifiIcon } from "@patternfly/react-icons";
+import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
-import { NumberInput } from "@patternfly/react-core/dist/esm/components/NumberInput/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
-import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
-import { WifiIcon, ConnectedIcon, DisconnectedIcon } from "@patternfly/react-icons";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
-import { useModelContext } from "../model-context";
-import { getSetupInterface } from "../services/network";
-import { getCurrentWifiConnection, scanWifiNetworks } from "../services/wifi";
-import { device_state_text, is_managed } from "../../pkg/networkmanager/interfaces.js";
+import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
+
+import { SubtleHeading } from "../components/Headings.tsx";
+import FeatureSwitch from "../components/FeatureSwitch.tsx";
+import ValidatedTextInput from "../components/ValidatedTextInput.tsx";
+
+import { useModelContext } from "../model-context.js";
+import { mapWifiSecurity } from "../services/network.js";
+import { getCurrentWifiConnection, scanWifiNetworks, WifiConnection } from "../services/wifi.js";
+import { Device, device_state_text, is_managed, type Interface } from "../../pkg/networkmanager/interfaces.js";
 
 const _ = cockpit.gettext;
 
-interface NetworkInterfacePageProps {
-    interfaces: import("../../pkg/networkmanager/interfaces.js").Interface[];
-}
+const N_A = _("N/A");
 
-export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageProps> = ({ interfaces }) => {
+const NetworkInterfaceSection = ({ interfaces }: { interfaces: Interface[] }) => {
     const { model } = useModelContext();
 
-    function hasGroup(iface: import("../../pkg/networkmanager/interfaces.js").Interface) {
+    function hasGroup(iface: Interface) {
         return (
             (iface.Device &&
                 iface.Device.ActiveConnection &&
@@ -55,68 +57,69 @@ export const NetworkInterfacePage: React.FunctionComponent<NetworkInterfacePageP
     const selectedIface = filteredInterfaces.find((iface) => iface.Name === model.networkInterface.selectedInterface);
     const isWifiSelected = selectedIface?.Device?.DeviceType === "802-11-wireless";
 
-    const setupInterface = getSetupInterface(interfaces);
-    const isSetupInterface = setupInterface !== null && model.networkInterface.selectedInterface === setupInterface;
-
-    const isEthernetNoCable =
-        selectedIface?.Device?.DeviceType === "ethernet" && selectedIface?.Device?.Carrier === false;
-
     return (
         <Stack hasGutter>
             <StackItem>
-                <p>Choose a network interface to use for onboarding:</p>
+                <Title headingLevel="h2" size="md" className="pf-v6-u-mb-sm">
+                    {_("Choose a network interface to use for onboarding")}
+                </Title>
+                <SubtleHeading
+                    text={_(
+                        "If you don't see your network on this list, you will need to troubleshoot it and refresh the page."
+                    )}
+                />
+            </StackItem>
+
+            <StackItem>
                 <NetworkInterfaceSelector interfaces={filteredInterfaces} />
             </StackItem>
-            {isEthernetNoCable && !isSetupInterface && (
+
+            {!isWifiSelected && (
                 <StackItem>
-                    <Alert variant="warning" isInline title={_("No cable detected on selected interface")}>
-                        {_(
-                            "The selected ethernet interface does not have a cable connected. Plug in a network cable before proceeding, or select a different interface."
-                        )}
-                    </Alert>
+                    <NetworkVlanSelector />
                 </StackItem>
             )}
-            {isSetupInterface && (
-                <StackItem>
-                    <Alert variant="warning" isInline title={_("You are currently connected through this interface")}>
-                        {_(
-                            "Applying network changes to this interface will sever your browser connection. The configuration and enrollment process will continue in the background — if enrollment fails, changes will be rolled back automatically and you can reconnect to retry."
-                        )}
-                    </Alert>
-                </StackItem>
-            )}
+
             {isWifiSelected && selectedIface && (
                 <StackItem>
                     <NetworkWifiSelector interfaceName={selectedIface.Name} />
-                </StackItem>
-            )}
-            {!isWifiSelected && (
-                <StackItem>
-                    <p>Optionally, specify the VLAN ID to use on this interface:</p>
-                    <NetworkVlanSelector />
                 </StackItem>
             )}
         </Stack>
     );
 };
 
-interface NetworkInterfaceSelectorProps {
-    interfaces: import("../../pkg/networkmanager/interfaces.js").Interface[];
-}
+const WiredDeviceStatus = ({ device }: { device: Device | null }) => {
+    if (device === null || device.DeviceType !== "ethernet") {
+        return null;
+    }
+    if (device.Carrier) {
+        return (
+            <Label color="green" className="pf-v6-u-ml-sm">
+                {_("Connected")}
+            </Label>
+        );
+    }
+    return (
+        <Label color="orange" className="pf-v6-u-ml-sm">
+            {_("No cable detected")}
+        </Label>
+    );
+};
 
-export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceSelectorProps> = ({ interfaces }) => {
+export const NetworkInterfaceSelector = ({ interfaces }: { interfaces: Interface[] }) => {
     const { model, updateModel, switchToInterfaceConfig } = useModelContext();
 
     const columnNames = {
-        name: "Name",
-        type: "Type",
-        mac: "MAC address",
-        model: "Vendor and model",
-        speed: "Speed",
-        state: "State",
+        name: _("Name"),
+        type: _("Type"),
+        mac: _("MAC address"),
+        model: _("Vendor and model"),
+        speed: _("Speed"),
+        state: _("State"),
     };
 
-    const isIfaceSelectable = (iface: import("../../pkg/networkmanager/interfaces.js").Interface) => {
+    const isIfaceSelectable = (iface: Interface) => {
         if (!iface.Device) {
             return false;
         }
@@ -163,10 +166,10 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
     };
 
     return (
-        <Table aria-label="Network interface selector" variant="compact">
+        <Table aria-label="Network interface selector" variant="compact" borders={false}>
             <Thead>
                 <Tr>
-                    <Th screenReaderText="Row select" />
+                    <Th screenReaderText={_("Row select")} />
                     <Th>{columnNames.name}</Th>
                     <Th>{columnNames.type}</Th>
                     <Th>{columnNames.mac}</Th>
@@ -188,31 +191,19 @@ export const NetworkInterfaceSelector: React.FunctionComponent<NetworkInterfaceS
                             }}
                         />
                         <Td dataLabel={columnNames.name}>{iface.Name}</Td>
-                        <Td dataLabel={columnNames.type}>{iface.Device?.DeviceType || "N/A"}</Td>
-                        <Td dataLabel={columnNames.mac}>{iface.Device?.HwAddress || "N/A"}</Td>
+                        <Td dataLabel={columnNames.type}>{iface.Device?.DeviceType || N_A}</Td>
+                        <Td dataLabel={columnNames.mac}>{iface.Device?.HwAddress || N_A}</Td>
                         <Td dataLabel={columnNames.model}>
                             {iface.Device?.IdVendor && iface.Device?.IdModel
                                 ? `${iface.Device.IdVendor} ${iface.Device.IdModel}`
-                                : iface.Device?.IdModel || iface.Device?.IdVendor || "N/A"}
+                                : iface.Device?.IdModel || iface.Device?.IdVendor || N_A}
                         </Td>
                         <Td dataLabel={columnNames.speed}>
-                            {iface.Device?.Speed ? `${iface.Device.Speed} Mbps` : "N/A"}
+                            {iface.Device?.Speed ? `${iface.Device.Speed} Mbps` : N_A}
                         </Td>
                         <Td dataLabel={columnNames.state}>
                             {device_state_text(iface.Device)}
-                            {iface.Device?.DeviceType === "ethernet" && (
-                                <span style={{ marginLeft: "0.5rem" }}>
-                                    {iface.Device.Carrier ? (
-                                        <Label isCompact status="success" icon={<ConnectedIcon />}>
-                                            {_("Cable connected")}
-                                        </Label>
-                                    ) : (
-                                        <Label isCompact status="warning" icon={<DisconnectedIcon />}>
-                                            {_("No cable detected")}
-                                        </Label>
-                                    )}
-                                </span>
-                            )}
+                            <WiredDeviceStatus device={iface.Device} />
                         </Td>
                     </Tr>
                 ))}
@@ -236,7 +227,7 @@ interface WifiNetwork {
     bssid: string;
 }
 
-export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorProps> = ({ interfaceName }) => {
+export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps) => {
     const { model, updateModel } = useModelContext();
     const [isScanning, setIsScanning] = React.useState(false);
     const [networks, setNetworks] = React.useState<WifiNetwork[]>([]);
@@ -244,12 +235,7 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
     const [selectedBssid, setSelectedBssid] = React.useState<string | null>(null);
     const hasPreSelected = React.useRef(false);
     // Store current connection details in a ref so it can be accessed in handleNetworkSelection
-    const currentConnectionRef = React.useRef<{
-        ssid: string;
-        bssid: string;
-        password: string;
-        security: "none" | "wep" | "wpa";
-    } | null>(null);
+    const currentConnectionRef = React.useRef<WifiConnection | null>(null);
 
     // Get current WiFi connection details and scan networks
     React.useEffect(() => {
@@ -284,20 +270,10 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
                         // Pre-select the current network
                         setSelectedBssid(matchingNetwork.bssid);
 
-                        // Map security string to the model's expected type
-                        let securityType: "none" | "wep" | "wpa" = "wpa";
-                        if (matchingNetwork.security === "None") {
-                            securityType = "none";
-                        } else if (matchingNetwork.security === "WEP") {
-                            securityType = "wep";
-                        } else {
-                            securityType = "wpa";
-                        }
-
                         // Update model with current network info
                         updateModel("networkInterface", {
                             wifiSsid: matchingNetwork.ssid,
-                            wifiSecurity: securityType,
+                            wifiSecurity: mapWifiSecurity(matchingNetwork.security),
                             wifiPassword: current.password, // Pre-fill password
                             interfaceType: "wifi",
                         });
@@ -323,18 +299,6 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
         // Find the selected network by BSSID
         const selectedNetwork = networks.find((n) => n.bssid === bssid);
         if (selectedNetwork) {
-            // Map security string to the model's expected type
-            // The model expects 'none' | 'wep' | 'wpa', so we simplify complex types
-            let securityType: "none" | "wep" | "wpa" = "wpa";
-            if (selectedNetwork.security === "None") {
-                securityType = "none";
-            } else if (selectedNetwork.security === "WEP") {
-                securityType = "wep";
-            } else {
-                // WPA, WPA2, WPA3, or any combination -> 'wpa'
-                securityType = "wpa";
-            }
-
             // Check if this is the currently connected network
             const isCurrentNetwork =
                 currentConnectionRef.current &&
@@ -343,7 +307,7 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
 
             updateModel("networkInterface", {
                 wifiSsid: selectedNetwork.ssid,
-                wifiSecurity: securityType,
+                wifiSecurity: mapWifiSecurity(selectedNetwork.security),
                 // Pre-fill password if this is the currently connected network
                 wifiPassword: isCurrentNetwork ? currentConnectionRef.current!.password : null,
                 interfaceType: "wifi",
@@ -386,12 +350,12 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
     };
 
     const columnNames = {
-        ssid: "SSID",
-        signal: "Signal",
-        security: "Security",
-        channel: "Channel",
-        band: "Band",
-        rate: "Rate",
+        ssid: _("SSID"),
+        signal: _("Signal"),
+        security: _("Security"),
+        channel: _("Channel"),
+        band: _("Band"),
+        rate: _("Rate"),
     };
 
     const scanUnavailable = !isScanning && scanError !== null && networks.length === 0;
@@ -539,85 +503,45 @@ export const NetworkWifiSelector: React.FunctionComponent<NetworkWifiSelectorPro
     );
 };
 
-export const NetworkVlanSelector: React.FunctionComponent = () => {
+export const NetworkVlanSelector = () => {
     const { model, updateModel } = useModelContext();
+    const [useVlan, setUseVlan] = React.useState(false);
     const [vlanError, setVlanError] = React.useState<string | null>(null);
 
-    const setUseVlan = (useVlan: boolean) => {
-        setVlanError(null);
-        if (useVlan) {
-            updateModel("networkInterface", { vlanId: 1 });
-        } else {
-            updateModel("networkInterface", { vlanId: null });
-        }
-    };
-
-    const setVlanId = (vlanId: number) => {
+    const setVlanId = (vlanId: number | null) => {
         updateModel("networkInterface", { vlanId });
     };
 
-    const onVlanIdChange = (event: React.FormEvent<HTMLInputElement>) => {
-        const raw = (event.target as HTMLInputElement).value;
-        const value = parseInt(raw, 10);
+    const onToggleUseVlan = (useVlan: boolean) => {
+        setVlanError(null);
+        setUseVlan(useVlan);
+    };
+
+    const onVlanIdChange = (_event: React.FormEvent<HTMLInputElement>, valStr: string) => {
+        const value = parseInt(valStr, 10);
         if (isNaN(value) || value < 1 || value > 4094) {
-            setVlanError(_("VLAN ID must be between 1 and 4094"));
+            setVlanError(_("VLAN ID must be a number between 1 and 4094"));
             return;
         }
         setVlanError(null);
         setVlanId(value);
     };
 
-    const onVlanIdMinus = () => {
-        setVlanError(null);
-        if (model.networkInterface.vlanId && model.networkInterface.vlanId > 1) {
-            setVlanId(model.networkInterface.vlanId - 1);
-        }
-    };
-
-    const onVlanIdPlus = () => {
-        setVlanError(null);
-        if (model.networkInterface.vlanId && model.networkInterface.vlanId < 4094) {
-            setVlanId(model.networkInterface.vlanId + 1);
-        }
-    };
-
-    const useVlan = model.networkInterface.vlanId !== null;
-
     return (
-        <div>
-            <Checkbox
-                id="vlan-checkbox"
-                label="VLAN ID"
-                isChecked={useVlan}
-                onChange={(_, checked) => setUseVlan(checked)}
-            />
-            {useVlan && (
-                <div style={{ marginTop: "1rem", marginLeft: "1.5rem" }}>
-                    <NumberInput
-                        value={model.networkInterface.vlanId || 1}
-                        min={1}
-                        max={4094}
-                        onChange={onVlanIdChange}
-                        onMinus={onVlanIdMinus}
-                        onPlus={onVlanIdPlus}
-                        inputName="vlan-id"
-                        inputAriaLabel="VLAN ID"
-                        widthChars={5}
-                        validated={vlanError ? "error" : "default"}
-                    />
-                    {vlanError && (
-                        <div
-                            style={{
-                                color: "var(--pf-global--danger-color--100)",
-                                fontSize: "var(--pf-global--FontSize--sm)",
-                                marginTop: "0.25rem",
-                            }}
-                        >
-                            {vlanError}
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
+        <FeatureSwitch fieldId="vlan-id" label={_("VLAN ID")} isChecked={useVlan} onToggle={onToggleUseVlan}>
+            <FormGroup label={_("VLAN ID")} isRequired fieldId="vlan-id">
+                <ValidatedTextInput
+                    id="vlan-id"
+                    value={model.networkInterface.vlanId || ""}
+                    error={vlanError}
+                    isRequired
+                    placeholder={_("Enter a number from 1-4094")}
+                    onChange={onVlanIdChange}
+                    helperText={_("Enter the 802.1Q VLAN ID assigned to this port")}
+                />
+            </FormGroup>
+        </FeatureSwitch>
     );
 };
+
+export default NetworkInterfaceSection;

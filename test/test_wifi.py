@@ -48,11 +48,7 @@ class TestWifi(testlib.MachineCase):
         b.wait_visible(".pf-v5-c-wizard")
 
         # Navigate to hostname page
-        b.wait_visible("#hostname-input")
-        b.set_input_text("#hostname-input", "test-device")
-
-        # Move to network interface page
-        b.click("button:contains('Next')")
+        b.wait_visible("#networkStep")
         b.wait_visible("table[aria-label='Network interface selector']")
 
         # WiFi interface should appear in the table (NetworkManager returns '802-11-wireless')
@@ -69,11 +65,7 @@ class TestWifi(testlib.MachineCase):
         b.wait_visible(".pf-v5-c-wizard")
 
         # Navigate to hostname page
-        b.wait_visible("#hostname-input")
-        b.set_input_text("#hostname-input", "test-device")
-
-        # Move to network interface page
-        b.click("button:contains('Next')")
+        b.wait_visible("#networkStep")
         b.wait_visible("table[aria-label='Network interface selector']")
 
         # Select WiFi interface
@@ -111,11 +103,7 @@ class TestWifi(testlib.MachineCase):
         b.wait_visible(".pf-v5-c-wizard")
 
         # Navigate to hostname page
-        b.wait_visible("#hostname-input")
-        b.set_input_text("#hostname-input", "test-device")
-
-        # Move to network interface page
-        b.click("button:contains('Next')")
+        b.wait_visible("#networkStep")
         b.wait_visible("table[aria-label='Network interface selector']")
 
         # Select WiFi interface
@@ -163,11 +151,7 @@ class TestWifi(testlib.MachineCase):
         b.wait_visible(".pf-v5-c-wizard")
 
         # Navigate to hostname page
-        b.wait_visible("#hostname-input")
-        b.set_input_text("#hostname-input", "test-device")
-
-        # Move to network interface page
-        b.click("button:contains('Next')")
+        b.wait_visible("#networkStep")
         b.wait_visible("table[aria-label='Network interface selector']")
 
         # Select WiFi interface
@@ -211,11 +195,7 @@ class TestWifi(testlib.MachineCase):
         b.wait_visible(".pf-v5-c-wizard")
 
         # Navigate to hostname page
-        b.wait_visible("#hostname-input")
-        b.set_input_text("#hostname-input", "test-device")
-
-        # Move to network interface page
-        b.click("button:contains('Next')")
+        b.wait_visible("#networkStep")
         b.wait_visible("table[aria-label='Network interface selector']")
 
         # Select WiFi interface
@@ -254,11 +234,7 @@ class TestWifi(testlib.MachineCase):
         b.wait_visible(".pf-v5-c-wizard")
 
         # Navigate to hostname page
-        b.wait_visible("#hostname-input")
-        b.set_input_text("#hostname-input", "test-device")
-
-        # Move to network interface page
-        b.click("button:contains('Next')")
+        b.wait_visible("#networkStep")
         b.wait_visible("table[aria-label='Network interface selector']")
 
         # Select WiFi interface

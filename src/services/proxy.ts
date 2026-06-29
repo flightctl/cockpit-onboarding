@@ -3,6 +3,7 @@ import type { ProxyConfig } from "../types";
 import { spawnWithParamsFile } from "./spawn-helpers";
 
 export async function applyProxyConfiguration(proxy: ProxyConfig): Promise<string[]> {
+    // TODO: Review backend wiring for proxy.applyForHttps (apply-proxy.sh).
     const results: string[] = [];
 
     if (!proxy.enabled || !proxy.hostname || !proxy.port) {

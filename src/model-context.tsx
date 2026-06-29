@@ -11,7 +11,7 @@ import {
     SystemOnboardingConfig,
 } from "./types";
 import { detectFlightctlConfig } from "./services/flightctl-config";
-import { parseIpv6Address } from "./services/network";
+import { parseIpv6Address, ConnectionIpSettings } from "./services/network";
 import { AttemptedMarkerData } from "./attempted-marker";
 
 // NetworkAddressConfig - internal type for compatibility with existing code
@@ -56,7 +56,6 @@ export interface Model {
         canCancel: boolean; // whether cancellation is possible
         overallProgress: number; // 0-100 percentage
     };
-    wizardStep: number;
 }
 
 // Default network address configuration (internal format)
@@ -123,6 +122,7 @@ const initialModel: Model = {
         proxy: {
             enabled: false,
             protocol: "http",
+            applyForHttps: true,
             hostname: null,
             port: null,
             username: null,
@@ -149,15 +149,16 @@ const initialModel: Model = {
         canCancel: false,
         overallProgress: 0,
     },
-    wizardStep: 1,
 };
 
 // Context type combining existing NetworkManager model and application model
+type ModelSectionUpdate<T extends keyof Model> = Model[T] extends object ? Partial<Model[T]> : Model[T];
+
 interface ModelContextType {
     networkManager?: NetworkManagerModel | undefined;
     model: Model;
     isInitialized: boolean;
-    updateModel: (section: keyof Model, updates: Partial<Model[keyof Model]>) => void;
+    updateModel: <T extends keyof Model>(section: T, updates: ModelSectionUpdate<T>) => void;
     updateNestedModel: <T extends keyof Model, K extends keyof Model[T]>(
         section: T,
         subsection: K,
@@ -258,10 +259,9 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     const activeConnection = iface.Device.ActiveConnection;
 
     // IPv4 configuration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ipv4Method = (iface.MainConnection?.Settings as any)?.ipv4?.method || "dhcp";
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ipv4ConnectionDns = (iface.MainConnection?.Settings as any)?.ipv4?.dns || [];
+    const ipv4Settings = iface.MainConnection?.Settings.ipv4 as ConnectionIpSettings | undefined;
+    const ipv4Method = ipv4Settings?.method || "dhcp";
+    const ipv4ConnectionDns = ipv4Settings?.dns || [];
 
     if (
         activeConnection.Ip4Config &&
@@ -270,8 +270,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     ) {
         const address = activeConnection.Ip4Config.Addresses[0];
         // Get DNS servers from active config (includes DHCP-provided DNS) and connection settings
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const activeDns = (activeConnection.Ip4Config as any).Nameservers || [];
+        const activeDns = activeConnection.Ip4Config.Nameservers || [];
         const hasStaticDns = ipv4ConnectionDns.length > 0;
         const dnsServers = hasStaticDns ? ipv4ConnectionDns : activeDns;
 
@@ -297,10 +296,9 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     }
 
     // IPv6 configuration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ipv6Method = (iface.MainConnection?.Settings as any)?.ipv6?.method || "dhcp";
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ipv6ConnectionDns = (iface.MainConnection?.Settings as any)?.ipv6?.dns || [];
+    const ipv6Settings = iface.MainConnection?.Settings.ipv6 as ConnectionIpSettings | undefined;
+    const ipv6Method = ipv6Settings?.method || "dhcp";
+    const ipv6ConnectionDns = ipv6Settings?.dns || [];
 
     if (
         activeConnection.Ip6Config &&
@@ -309,8 +307,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     ) {
         const address = activeConnection.Ip6Config.Addresses[0];
         // Get DNS servers from active config (includes DHCP-provided DNS) and connection settings
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const activeDns = (activeConnection.Ip6Config as any).Nameservers || [];
+        const activeDns = activeConnection.Ip6Config.Nameservers || [];
         const hasStaticDns = ipv6ConnectionDns.length > 0;
         const dnsServers = hasStaticDns ? ipv6ConnectionDns : activeDns;
 
@@ -362,7 +359,7 @@ export const ModelProvider: React.FunctionComponent<{
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
     const cancelEnrollmentRef = useRef<(() => void) | null>(null);
 
-    const updateModel = (section: keyof Model, updates: Partial<Model[keyof Model]>) => {
+    const updateModel = <T extends keyof Model>(section: T, updates: ModelSectionUpdate<T>) => {
         setModel((prev) => {
             if (typeof updates !== "object" || updates === null) {
                 return { ...prev, [section]: updates };
@@ -537,6 +534,8 @@ export const ModelProvider: React.FunctionComponent<{
                         ...(defaults?.proxy && {
                             enabled: defaults.proxy.enabled ?? prev.networkServices.proxy.enabled,
                             protocol: defaults.proxy.protocol ?? prev.networkServices.proxy.protocol,
+                            applyForHttps:
+                                defaults.proxy.applyForHttps ?? prev.networkServices.proxy.applyForHttps,
                             hostname: defaults.proxy.hostname ?? prev.networkServices.proxy.hostname,
                             port: defaults.proxy.port ?? prev.networkServices.proxy.port,
                             username: defaults.proxy.username ?? prev.networkServices.proxy.username,
@@ -587,7 +586,9 @@ export const ModelProvider: React.FunctionComponent<{
     }, [networkManager, networkManager?.ready, isInitialized]);
 
     useEffect(() => {
-        if (!isInitialized || !previousAttempt) {return}
+        if (!isInitialized || !previousAttempt) {
+            return;
+        }
 
         setModel((prev) => ({
             ...prev,

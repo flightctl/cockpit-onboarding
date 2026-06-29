@@ -14,6 +14,8 @@ import unittest
 
 from testlib import MachineCase, nondestructive
 
+from wizard_navigation import complete_network_step
+
 
 @nondestructive
 class TestEnrollment(MachineCase):
@@ -80,17 +82,17 @@ exit 0
         )
         self.machine.execute("chmod +x /etc/cockpit/system-onboarding.d/example-enroll.sh")
 
+    def navigate_to_enrollment_step(self):
+        b = self.browser
+        complete_network_step(b)
+        b.wait_visible("#enrollmentStep")
+
     def testEnrollmentPageDisplay(self):
         """Test that enrollment services are displayed correctly"""
         b = self.browser
 
         self.login_and_go("/system-onboarding")
-
-        # Navigate to enrollment page (assuming it's in the wizard)
-        # This depends on the wizard step order - adjust as needed
-        for _ in range(5):  # Skip to enrollment page
-            b.click("button:contains('Next')")
-            b.wait_visible(".pf-v5-c-wizard__main")
+        self.navigate_to_enrollment_step()
 
         # Check that service is displayed
         b.wait_in_text(".pf-v5-c-card", "Test Management Service")
@@ -101,11 +103,7 @@ exit 0
         b = self.browser
 
         self.login_and_go("/system-onboarding")
-
-        # Navigate to enrollment page
-        for _ in range(5):
-            b.click("button:contains('Next')")
-            b.wait_visible(".pf-v5-c-wizard__main")
+        self.navigate_to_enrollment_step()
 
         # Service should not be selected initially
         checkbox_selector = "#service-test-service"
@@ -132,11 +130,7 @@ exit 0
         b = self.browser
 
         self.login_and_go("/system-onboarding")
-
-        # Navigate to enrollment page
-        for _ in range(5):
-            b.click("button:contains('Next')")
-            b.wait_visible(".pf-v5-c-wizard__main")
+        self.navigate_to_enrollment_step()
 
         # Select service
         b.click("#service-test-service")
@@ -155,11 +149,7 @@ exit 0
         b = self.browser
 
         self.login_and_go("/system-onboarding")
-
-        # Navigate to enrollment page
-        for _ in range(5):
-            b.click("button:contains('Next')")
-            b.wait_visible(".pf-v5-c-wizard__main")
+        self.navigate_to_enrollment_step()
 
         # Select service
         b.click("#service-test-service")
@@ -188,25 +178,16 @@ exit 0
         )
 
         self.login_and_go("/system-onboarding")
-
-        # Navigate to enrollment page
-        for _ in range(5):
-            b.click("button:contains('Next')")
-            b.wait_visible(".pf-v5-c-wizard__main")
-
-        # Should show info message
-        b.wait_in_text(".pf-v5-c-alert", "No enrollment services configured")
+        complete_network_step(b)
+        b.wait_not_present("#enrollmentStep")
+        b.wait_visible("#connectivityTestStep")
 
     def testEnrollmentCredentialsValidation(self):
         """Test that credentials are validated"""
         b = self.browser
 
         self.login_and_go("/system-onboarding")
-
-        # Navigate to enrollment page
-        for _ in range(5):
-            b.click("button:contains('Next')")
-            b.wait_visible(".pf-v5-c-wizard__main")
+        self.navigate_to_enrollment_step()
 
         # Select service
         b.click("#service-test-service")

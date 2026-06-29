@@ -1,16 +1,75 @@
 import cockpit from "cockpit";
-import { Interface, NetworkManagerModel } from "../../pkg/networkmanager/interfaces.js";
+import { Interface, Ipv4Config, Ipv6Config, NetworkManagerModel } from "../../pkg/networkmanager/interfaces.js";
 import { Model } from "../model-context";
 import { ONBOARDING_PROFILE_PREFIX } from "../paths";
 import { waitForProxy, waitForProxyWithTimeout } from "./dbus-helpers";
+import { WifiSecurity } from "../types.js";
 
 export interface NetworkApplyResult {
     results: string[];
     singleNic: boolean;
 }
 
+interface IpAddressData {
+    address: string;
+    prefix: string;
+}
+
+interface IpConfigWithAddressData {
+    AddressData?: IpAddressData[];
+}
+
+export interface ConnectionIpSettings {
+    method?: string;
+    dns?: string[];
+}
+
+interface NmDbusVariant<T = unknown> {
+    v?: T;
+}
+
+interface NmConnectionSettings {
+    connection?: {
+        id?: NmDbusVariant<string> | string;
+    };
+}
+
+type ActiveConnectionProxy = cockpit.DBusProxy & {
+    wait(callback?: () => void): void;
+    State?: number;
+};
+
+function getAddressData(config: Ipv4Config | Ipv6Config): IpAddressData[] {
+    return (config as IpConfigWithAddressData).AddressData || [];
+}
+
+function dbusPathResult(result: unknown[]): string {
+    const value = result[0];
+    return typeof value === "string" ? value : "/";
+}
+
+function dbusPathListResult(result: unknown[]): string[] {
+    const value = result[0];
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    return value.filter((path): path is string => typeof path === "string");
+}
+
 function isLocalhost(hostname: string): boolean {
     return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+export function mapWifiSecurity(security: string): WifiSecurity {
+    switch (security) {
+        case "None":
+            return "none";
+        case "WEP":
+            return "wep";
+        default:
+            // WPA, WPA2, WPA3, or any combination -> 'wpa'
+            return "wpa";
+    }
 }
 
 export function getSetupInterface(interfaces: Interface[]): string | null {
@@ -27,8 +86,7 @@ export function getSetupInterface(interfaces: Interface[]): string | null {
 
         const ip4Config = iface.Device.Ip4Config;
         if (ip4Config) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const addressData: { address: string; prefix: string }[] = (ip4Config as any).AddressData || [];
+            const addressData = getAddressData(ip4Config);
             for (const addr of addressData) {
                 if (addr.address === hostname) {
                     return iface.Name;
@@ -38,8 +96,7 @@ export function getSetupInterface(interfaces: Interface[]): string | null {
 
         const ip6Config = iface.Device.Ip6Config;
         if (ip6Config) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const addressData: { address: string; prefix: string }[] = (ip6Config as any).AddressData || [];
+            const addressData = getAddressData(ip6Config);
             for (const addr of addressData) {
                 if (addr.address === hostname) {
                     return iface.Name;
@@ -78,6 +135,8 @@ export async function getDefaultInterface(interfaces: Interface[]): Promise<stri
     return activeInterface ? activeInterface.Name : null;
 }
 
+const DHCP_HOSTNAME_OPTION = "12";
+
 export async function getDhcpHostname(interfaces: Interface[]): Promise<string> {
     try {
         const defaultIface = await getDefaultInterface(interfaces);
@@ -90,8 +149,8 @@ export async function getDhcpHostname(interfaces: Interface[]): Promise<string> 
             return "";
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const ipv4Method = (iface.MainConnection?.Settings as any)?.ipv4?.method;
+        const ipv4Settings = iface.MainConnection?.Settings.ipv4 as ConnectionIpSettings | undefined;
+        const ipv4Method = ipv4Settings?.method;
         if (ipv4Method === "manual") {
             return "";
         }
@@ -104,18 +163,16 @@ export async function getDhcpHostname(interfaces: Interface[]): Promise<string> 
         // polkit rule authorizes the onboarding user
         const nmClient = cockpit.dbus("org.freedesktop.NetworkManager");
         try {
-            const ip4ConfigProxy = nmClient.proxy(
-                "org.freedesktop.NetworkManager.IP4Config",
-                activeConnection.Ip4Config as unknown as string
+            const ip4ConfigProxy = await waitForProxyWithTimeout<{ DhcpOptions?: Record<string, string> }>(
+                nmClient.proxy(
+                    "org.freedesktop.NetworkManager.IP4Config",
+                    activeConnection.Ip4Config as unknown as string
+                ),
+                2000
             );
-            await waitForProxyWithTimeout(ip4ConfigProxy, 2000);
 
-            const dhcpOptions =
-                (ip4ConfigProxy as cockpit.DBusProxy & { data: { DhcpOptions?: Record<string, string> } }).data
-                    .DhcpOptions || {};
-
-            // DHCP option 12 is the hostname option
-            return dhcpOptions["12"] || "";
+            const dhcpOptions = ip4ConfigProxy.data.DhcpOptions || {};
+            return dhcpOptions[DHCP_HOSTNAME_OPTION] || "";
         } finally {
             nmClient.close();
         }
@@ -161,15 +218,17 @@ function resolveVlanInfo(ifaceName: string, interfaceType: string, vlanId: numbe
     return { isVlan, effectiveIfaceName };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function waitForActivation(nmClient: any, activeConnPath: string): Promise<void> {
+function waitForActivation(nmClient: cockpit.DBusClient, activeConnPath: string): Promise<void> {
     const NM_ACTIVE_CONNECTION_STATE_ACTIVATED = 2;
     const NM_ACTIVE_CONNECTION_STATE_DEACTIVATED = 4;
     const TIMEOUT_MS = 30000;
     const POLL_MS = 500;
 
     return new Promise((resolve, reject) => {
-        const proxy = nmClient.proxy("org.freedesktop.NetworkManager.Connection.Active", activeConnPath);
+        const proxy = nmClient.proxy(
+            "org.freedesktop.NetworkManager.Connection.Active",
+            activeConnPath
+        ) as ActiveConnectionProxy;
 
         let timer: ReturnType<typeof setTimeout> | null = null;
         let pollInterval: ReturnType<typeof setInterval> | null = null;
@@ -188,8 +247,7 @@ function waitForActivation(nmClient: any, activeConnPath: string): Promise<void>
             resolve();
         }, TIMEOUT_MS);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (proxy as any).wait(() => {
+        proxy.wait(() => {
             if (!proxy.valid) {
                 cleanup();
                 resolve();
@@ -197,8 +255,7 @@ function waitForActivation(nmClient: any, activeConnPath: string): Promise<void>
             }
 
             const checkState = () => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const state = (proxy as any).State;
+                const state = proxy.State;
                 if (state === NM_ACTIVE_CONNECTION_STATE_ACTIVATED) {
                     cleanup();
                     resolve();
@@ -225,8 +282,7 @@ function buildConnectionSettings(
 
     const nmType = isVlan ? "vlan" : interfaceType === "wifi" ? "802-11-wireless" : "802-3-ethernet";
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const settings: Record<string, Record<string, any>> = {
+    const settings: Record<string, Record<string, unknown>> = {
         connection: {
             id: { t: "s", v: connectionId },
             type: { t: "s", v: nmType },
@@ -467,9 +523,7 @@ export async function applyNetworkConfiguration(
             );
             await waitForProxy(settingsProxy);
 
-            // Call AddConnection to create the new profile
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const newConnectionPath = await (nmClient as any).call(
+            const newConnectionPath = await nmClient.call(
                 "/org/freedesktop/NetworkManager/Settings",
                 "org.freedesktop.NetworkManager.Settings",
                 "AddConnection",
@@ -484,27 +538,25 @@ export async function applyNetworkConfiguration(
             } else {
                 let devicePath = "/";
                 if (!isVlan) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const devicePathResult = await (nmClient as any).call(
+                    const devicePathResult = await nmClient.call(
                         "/org/freedesktop/NetworkManager",
                         "org.freedesktop.NetworkManager",
                         "GetDeviceByIpIface",
                         [ifaceName]
                     );
-                    devicePath = Array.isArray(devicePathResult) ? devicePathResult[0] : devicePathResult;
+                    devicePath = dbusPathResult(devicePathResult);
                 }
 
                 console.log("Activating connection on device:", devicePath);
 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const activeConnResult = await (nmClient as any).call(
+                const activeConnResult = await nmClient.call(
                     "/org/freedesktop/NetworkManager",
                     "org.freedesktop.NetworkManager",
                     "ActivateConnection",
                     [newConnectionPath[0] || newConnectionPath, devicePath, "/"]
                 );
 
-                const activeConnPath = Array.isArray(activeConnResult) ? activeConnResult[0] : activeConnResult;
+                const activeConnPath = dbusPathResult(activeConnResult);
                 if (!isSingleNic) {
                     await waitForActivation(nmClient, activeConnPath);
                 }
@@ -566,42 +618,36 @@ async function deleteOnboardingProfiles(ifaceName?: string): Promise<void> {
         );
         await waitForProxy(settingsProxy);
 
-        // List all connections
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const connectionsResult = await (nmClient as any).call(
+        const connectionsResult = await nmClient.call(
             "/org/freedesktop/NetworkManager/Settings",
             "org.freedesktop.NetworkManager.Settings",
             "ListConnections",
             []
         );
 
-        const connectionPaths: string[] = connectionsResult[0] || connectionsResult;
+        const connectionPaths = dbusPathListResult(connectionsResult);
 
         for (const connPath of connectionPaths) {
             try {
-                // Get the connection settings to check its ID
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const connSettings = await (nmClient as any).call(
+                const connSettings = await nmClient.call(
                     connPath,
                     "org.freedesktop.NetworkManager.Settings.Connection",
                     "GetSettings",
                     []
                 );
 
-                const connData = connSettings[0] || connSettings;
-                const connId = connData?.connection?.id?.v || connData?.connection?.id || "";
+                const connData = (connSettings[0] || connSettings) as NmConnectionSettings;
+                const connectionId = connData.connection?.id;
+                const connId =
+                    typeof connectionId === "object" && connectionId !== null
+                        ? connectionId.v || ""
+                        : connectionId || "";
 
                 const prefix = ifaceName ? `${ONBOARDING_PROFILE_PREFIX}${ifaceName}` : ONBOARDING_PROFILE_PREFIX;
 
                 if (typeof connId === "string" && connId.startsWith(prefix)) {
                     console.log(`Deleting onboarding profile: ${connId} at ${connPath}`);
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    await (nmClient as any).call(
-                        connPath,
-                        "org.freedesktop.NetworkManager.Settings.Connection",
-                        "Delete",
-                        []
-                    );
+                    await nmClient.call(connPath, "org.freedesktop.NetworkManager.Settings.Connection", "Delete", []);
                 }
             } catch (connError) {
                 console.warn(`Failed to inspect/delete connection ${connPath}:`, connError);

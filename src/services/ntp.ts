@@ -52,15 +52,14 @@ export async function configureNtpServers(servers: string[], autoConfig: boolean
     // polkit rule authorizes the onboarding user
     const timedateClient = cockpit.dbus("org.freedesktop.timedate1");
     try {
-        const timedateProxy = timedateClient.proxy("org.freedesktop.timedate1", "/org/freedesktop/timedate1");
-        await waitForProxy(timedateProxy);
+        const timedateProxy = await waitForProxy(
+            timedateClient.proxy("org.freedesktop.timedate1", "/org/freedesktop/timedate1")
+        );
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (timedateProxy as any).call("SetNTP", [true, true]);
+        await timedateProxy.call("SetNTP", [true, true]);
 
         // Disable NTP before changing server config
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (timedateProxy as any).call("SetNTP", [false, true]);
+        await timedateProxy.call("SetNTP", [false, true]);
 
         // Write NTP config files via a helper script run with sudo.
         // We can't use serverTime.js set_custom_ntp() because it uses
@@ -83,8 +82,7 @@ export async function configureNtpServers(servers: string[], autoConfig: boolean
         }
 
         // Re-enable NTP
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (timedateProxy as any).call("SetNTP", [true, true]);
+        await timedateProxy.call("SetNTP", [true, true]);
     } catch (error) {
         throw new Error(`NTP configuration failed: ${String(error)}`);
     } finally {

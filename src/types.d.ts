@@ -30,6 +30,7 @@ export interface ConfigDefaults {
     proxy?: {
         enabled?: boolean;
         protocol?: ProxyProtocol;
+        applyForHttps?: boolean;
         hostname?: string;
         port?: number;
         username?: string;
@@ -106,12 +107,14 @@ export interface HostnameState {
     dhcpHostname?: string;
 }
 
+export type WifiSecurity = "none" | "wep" | "wpa";
+
 export interface NetworkInterfaceState {
     selectedInterface: string | null;
     interfaceType: "ethernet" | "wifi" | null;
     wifiSsid: string | null;
     wifiPassword: string | null;
-    wifiSecurity: "none" | "wep" | "wpa" | null;
+    wifiSecurity: WifiSecurity | null;
     vlanId: number | null;
 }
 
@@ -154,6 +157,8 @@ export type ProxyProtocol = "http" | "https" | "socks5";
 export interface ProxyConfig {
     enabled: boolean;
     protocol: ProxyProtocol;
+    /** UI-only until backend wiring is reviewed. See NetworkProxySection TODO. */
+    applyForHttps: boolean;
     hostname: string | null;
     port: number | null;
     username: string | null;
@@ -188,7 +193,7 @@ export interface NetworkInterface {
 export interface WifiNetwork {
     ssid: string;
     strength: number;
-    security: "none" | "wep" | "wpa";
+    security: WifiSecurity;
     frequency: number;
 }
 

@@ -17,61 +17,59 @@
  * along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
  */
 
-import cockpit from "cockpit";
-
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
-import { useEvent, useObject } from "hooks";
+import { ExclamationCircleIcon } from "@patternfly/react-icons";
+import { Button, ButtonVariant } from "@patternfly/react-core/dist/esm/components/Button/index.js";
+import {
+    ActionList,
+    ActionListGroup,
+    ActionListItem,
+} from "@patternfly/react-core/dist/esm/components/ActionList/index.js";
+import { Form } from "@patternfly/react-core/dist/esm/components/Form/index";
+import { Modal, ModalBody, ModalFooter, ModalHeader } from "@patternfly/react-core/dist/esm/components/Modal/index.js";
+import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist/esm/components/Page/index.js";
+import {
+    Wizard,
+    WizardBasicStep,
+    WizardFooterWrapper,
+    WizardStep,
+} from "@patternfly/react-core/dist/esm/components/Wizard/index.js";
 
+import cockpit from "cockpit";
 import * as service from "service.js";
+import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
+import { useEvent, useObject } from "hooks";
+import { WithDialogs } from "dialogs.jsx";
+
 import { NetworkManagerModel, Interface } from "../pkg/networkmanager/interfaces.js";
 
-import { EmptyStatePanel } from "cockpit-components-empty-state.jsx";
 import { ModelProvider, useModelContext } from "./model-context";
 import { loadConfig } from "./config-loader";
 import { readAttemptedMarker, AttemptedMarkerData } from "./attempted-marker";
 import { SystemOnboardingConfig } from "./types";
 
-import { Alert, AlertActionCloseButton } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
-import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
-import { Page, PageSection, PageSectionTypes } from "@patternfly/react-core/dist/esm/components/Page/index.js";
-import { ExclamationCircleIcon } from "@patternfly/react-icons";
-import { Wizard, WizardStep } from "@patternfly/react-core/dist/esm/components/Wizard/index.js";
-
 import { HostnamePage } from "./wizard/HostnamePage.tsx";
-import { NetworkInterfacePage } from "./wizard/NetworkInterfacePage.tsx";
-import { NetworkAddressPage } from "./wizard/NetworkAddressPage.tsx";
-import { NetworkServicesPage } from "./wizard/NetworkServicesPage.tsx";
+import { NetworkPage } from "./wizard/NetworkPage.tsx";
 import { EnrollmentPage } from "./wizard/EnrollmentPage.tsx";
+import { EnrollmentProgressPage } from "./wizard/EnrollmentProgressPage.tsx";
 import { ConnectivityTestPage } from "./wizard/ConnectivityTestPage.tsx";
 import { LabelsPage } from "./wizard/LabelsPage.tsx";
 import { ReviewPage } from "./wizard/ReviewPage.tsx";
-import { EnrollmentProgressPage } from "./wizard/EnrollmentProgressPage.tsx";
-import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from "./paths";
+import RestoredConfigurationSection, { WatchdogStatusData } from "./wizard/RestoredConfigurationSection.tsx";
 import {
+    stepIds,
+    WIZARD_STEP_IDS,
+    type WizardStepId,
     validateHostnameStep,
-    validateNetworkInterfaceStep,
-    validateNetworkAddressStep,
-    validateNetworkServicesStep,
+    validateNetworkStep,
     validateEnrollmentStep,
     validateConnectivityTestStep,
     validateLabelsStep,
-} from "./wizard/step-validation";
+} from "./wizard/WizardSteps.ts";
 
-import { WithDialogs } from "dialogs.jsx";
+import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from "./paths";
 
 const _ = cockpit.gettext;
-
-interface WatchdogStatusData {
-    status: "success" | "app_failure" | "network_failure";
-    message: string;
-    details?: {
-        carrierDetected: boolean;
-        dnsResolved: boolean;
-        pingSucceeded: boolean;
-        testedHost: string;
-        activeConnections: string;
-    };
-}
 
 // Configuration context to provide loaded configuration throughout the app
 interface ConfigContextType {
@@ -104,8 +102,7 @@ export const Application = () => {
     useEvent(networkManager, "changed");
 
     const nmRunning_ref = useRef<boolean | undefined>(undefined);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useEvent(networkManager.client as any, "owner", (_event, owner) => {
+    useEvent(networkManager.client, "owner", (_event, owner) => {
         nmRunning_ref.current = owner !== null;
     });
 
@@ -167,7 +164,9 @@ export const Application = () => {
     }, []);
 
     // Show loading while checking marker file or loading configuration
-    if (checkingMarker || !isConfigLoaded || networkManager.ready === undefined) {return <EmptyStatePanel loading />}
+    if (checkingMarker || !isConfigLoaded || networkManager.ready === undefined) {
+        return <EmptyStatePanel loading />;
+    }
 
     // Show message if onboarding is already complete
     if (onboardingComplete) {
@@ -249,7 +248,7 @@ export const Application = () => {
                 <WithDialogs key="1">
                     <SystemOnboardingWizardWrapper
                         interfaces={interfaces}
-                        previousAttempt={previousAttempt}
+                        hasPreviousAttempt={Boolean(previousAttempt)}
                         watchdogStatus={watchdogStatus}
                     />
                 </WithDialogs>
@@ -258,12 +257,18 @@ export const Application = () => {
     );
 };
 
+// Wraps each page in a Form so that all PatternFly styles apply correctly.
+// We can't wrap the entire wizard in a Form as it makes the steps adjust to the content height.
+const FormWrapper = ({ children }: React.PropsWithChildren) => {
+    return <Form onSubmit={(event) => event.preventDefault()}>{children}</Form>;
+};
+
 // Wrapper to wait for model initialization before showing wizard
 const SystemOnboardingWizardWrapper: React.FunctionComponent<{
     interfaces: Interface[];
-    previousAttempt?: AttemptedMarkerData | null;
+    hasPreviousAttempt: boolean;
     watchdogStatus?: WatchdogStatusData | null;
-}> = ({ interfaces, previousAttempt, watchdogStatus }) => {
+}> = ({ interfaces, hasPreviousAttempt, watchdogStatus }) => {
     const { isInitialized } = useModelContext();
 
     if (!isInitialized) {
@@ -273,7 +278,7 @@ const SystemOnboardingWizardWrapper: React.FunctionComponent<{
     return (
         <SystemOnboardingWizard
             interfaces={interfaces}
-            previousAttempt={previousAttempt}
+            hasPreviousAttempt={hasPreviousAttempt}
             watchdogStatus={watchdogStatus}
         />
     );
@@ -281,22 +286,22 @@ const SystemOnboardingWizardWrapper: React.FunctionComponent<{
 
 interface SystemOnboardingWizardProps {
     interfaces: Interface[];
-    previousAttempt?: AttemptedMarkerData | null | undefined;
+    hasPreviousAttempt?: boolean;
     watchdogStatus?: WatchdogStatusData | null | undefined;
 }
 
 export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWizardProps> = ({
     interfaces,
-    previousAttempt,
+    hasPreviousAttempt,
     watchdogStatus,
 }) => {
     const { config } = useConfig();
     const { model, cancelEnrollmentRef } = useModelContext();
-    const [currentStepIndex, setCurrentStepIndex] = useState(1);
-    const [maxReachedStep, setMaxReachedStep] = useState(1);
-    const [showRestoredAlert, setShowRestoredAlert] = useState(Boolean(previousAttempt));
+    const [maxReachedStep, setMaxReachedStep] = useState<WizardStepId>(WIZARD_STEP_IDS.network);
+    const [showRestoredConfigurationSection, setShowRestoredConfigurationSection] = useState(hasPreviousAttempt);
+    const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
 
-    // Check if enrollment services are configured (controls whether step 5 is shown)
+    // Check if enrollment services are configured (controls whether enrollment step is shown)
     const hasEnrollmentServices = Boolean(config && config.enrollmentServices && config.enrollmentServices.length > 0);
     // Check if the user actually selected any enrollment services
     const hasSelectedEnrollments = hasEnrollmentServices && model.enrollment.selectedServices.length > 0;
@@ -304,74 +309,104 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     const finalStepName = hasSelectedEnrollments ? _("Apply and enroll") : _("Apply configuration");
 
     // Compute validation state for each step
-    const isHostnameValid = validateHostnameStep(model);
-    const isNetworkInterfaceValid = validateNetworkInterfaceStep(model);
-    const isNetworkAddressValid = validateNetworkAddressStep(model);
-    const isNetworkServicesValid = validateNetworkServicesStep(model);
-    const isEnrollmentValid = validateEnrollmentStep(model, config?.enrollmentServices);
-    const isConnectivityTestValid = validateConnectivityTestStep(model);
-    const isLabelsValid = validateLabelsStep(model);
+    const isHostnameStepValid = validateHostnameStep(model);
+    const isNetworkStepValid = validateNetworkStep(model);
+    const isEnrollmentStepValid = validateEnrollmentStep(model, config?.enrollmentServices);
+    const isConnectivityTestStepValid = validateConnectivityTestStep(model);
+    const isLabelsStepValid = validateLabelsStep(model);
 
     // Map step index to validation state
     const stepValidations = [
-        isHostnameValid, // step 1
-        isNetworkInterfaceValid, // step 2
-        isNetworkAddressValid, // step 3
-        isNetworkServicesValid, // step 4
-        isEnrollmentValid, // step 5 (if enrollment enabled)
-        isConnectivityTestValid, // step 6 (connectivity test)
-        isLabelsValid, // step 7 (labels)
-        true, // review step - always valid
-        true, // progress step - always valid
+        isNetworkStepValid,
+        isEnrollmentStepValid,
+        isConnectivityTestStepValid,
+        isHostnameStepValid,
+        isLabelsStepValid,
+        true,
+        true,
     ];
 
-    // Handle step navigation - using PatternFly Wizard's correct signature
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-    const handleStepChange = (_event: any, currentStep: any, _prevStep: any) => {
-        const stepId = typeof currentStep.id === "string" ? currentStep.id : "";
-        const stepNumber = parseInt(stepId.split("-").pop() || "1", 10);
+    const visibleStepIds: readonly WizardStepId[] = hasEnrollmentServices
+        ? stepIds
+        : stepIds.filter((id) => id !== WIZARD_STEP_IDS.enrollment);
 
-        setCurrentStepIndex(stepNumber);
+    const getStepValidation = (stepId: WizardStepId): boolean => {
+        const index = stepIds.indexOf(stepId);
+        return index >= 0 ? stepValidations[index] : false;
+    };
+
+    // Handle step navigation - using PatternFly Wizard's correct signature
+    const handleStepChange = (_event: React.MouseEvent<HTMLButtonElement>, currentStep: WizardBasicStep) => {
+        const stepId = currentStep.id.toString() as WizardStepId;
+        const stepIndex = visibleStepIds.indexOf(stepId);
+        const maxReachIndex = visibleStepIds.indexOf(maxReachedStep);
 
         // Update max reached step if user progresses forward with valid data
-        if (stepNumber > maxReachedStep && stepValidations[currentStepIndex - 1]) {
-            setMaxReachedStep(stepNumber);
+        if (stepIndex > maxReachIndex && getStepValidation(visibleStepIds[maxReachIndex])) {
+            setMaxReachedStep(stepId);
         }
     };
 
-    // Determine which steps should be disabled
     // Users can only navigate to steps they've reached or the next step if current is valid
-    const canNavigateToStep = (stepNumber: number): boolean => {
-        // Can always go to steps we've already reached
-        if (stepNumber <= maxReachedStep) {
-            return false; // not disabled
+    const isStepDisabled = (stepId: WizardStepId): boolean => {
+        const stepIndex = visibleStepIds.indexOf(stepId);
+        const maxReachIndex = visibleStepIds.indexOf(maxReachedStep);
+
+        if (stepIndex === -1) {
+            return true;
         }
 
-        // Can go to the next step only if current step is valid
-        if (stepNumber === maxReachedStep + 1 && stepValidations[maxReachedStep - 1]) {
-            return false; // not disabled
+        // Users can go back to a step that has already been reached
+        if (stepIndex <= maxReachIndex) {
+            return false;
         }
 
-        // Cannot skip ahead
-        return true; // disabled
+        // Users can proceed to the next step only if the furthest reached step is valid
+        if (stepIndex === maxReachIndex + 1 && getStepValidation(visibleStepIds[maxReachIndex])) {
+            return false;
+        }
+
+        // Cannot skip ahead past an invalid step
+        return true;
     };
 
     // Dynamic footer configuration for EnrollmentProgressPage
     const enrollmentExecutionState = model.enrollmentProgress.executionState;
+
+    useEffect(() => {
+        if (enrollmentExecutionState !== "running") {
+            setIsCancelConfirmOpen(false);
+        }
+    }, [enrollmentExecutionState]);
+
+    const confirmApplyCancel = () => {
+        setIsCancelConfirmOpen(false);
+        if (cancelEnrollmentRef.current) {
+            cancelEnrollmentRef.current();
+        }
+    };
+
     const getProgressPageFooter = () => {
         if (enrollmentExecutionState === "running") {
-            // While running: disable Back, enable Next as "Cancel"
-            return {
-                isBackDisabled: true,
-                isNextDisabled: false,
-                nextButtonText: _("Cancel"),
-                onNext: () => {
-                    if (cancelEnrollmentRef.current) {
-                        cancelEnrollmentRef.current();
-                    }
-                },
-                isCancelHidden: true,
-            };
+            // While running: disable Back, show a danger Cancel button that asks for confirmation
+            return (
+                <WizardFooterWrapper>
+                    <ActionList>
+                        <ActionListGroup>
+                            <ActionListItem>
+                                <Button variant={ButtonVariant.secondary} isDisabled>
+                                    {_("Back")}
+                                </Button>
+                            </ActionListItem>
+                            <ActionListItem>
+                                <Button variant={ButtonVariant.danger} onClick={() => setIsCancelConfirmOpen(true)}>
+                                    {_("Cancel")}
+                                </Button>
+                            </ActionListItem>
+                        </ActionListGroup>
+                    </ActionList>
+                </WizardFooterWrapper>
+            );
         } else if (enrollmentExecutionState === "success") {
             // On success: navigate to completion page immediately, then run cleanup
             // after a short delay. Cleanup tears down the WiFi AP, so we must show
@@ -419,48 +454,12 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     };
 
     return (
-        <Page className="no-masthead-sidebar" isContentFilled id="system-onboarding-wizard">
-            {showRestoredAlert && (
-                <PageSection>
-                    <Alert
-                        variant={watchdogStatus?.status === "network_failure" ? "warning" : "info"}
-                        title={
-                            watchdogStatus?.status === "network_failure"
-                                ? _("Network configuration rolled back")
-                                : watchdogStatus?.status === "app_failure"
-                                  ? _("Enrollment did not complete")
-                                  : _("Previous configuration restored")
-                        }
-                        isInline
-                        actionClose={<AlertActionCloseButton onClose={() => setShowRestoredAlert(false)} />}
-                    >
-                        {watchdogStatus?.status === "network_failure"
-                            ? _(
-                                  "The watchdog timer rolled back your configuration because network connectivity could not be established."
-                              ) +
-                              (watchdogStatus.details
-                                  ? ` ${
-                                        !watchdogStatus.details.carrierDetected
-                                            ? _("No network carrier was detected on any interface.")
-                                            : !watchdogStatus.details.dnsResolved
-                                              ? cockpit.format(
-                                                    _("DNS resolution failed for $0."),
-                                                    watchdogStatus.details.testedHost
-                                                )
-                                              : _("Network connectivity check failed.")
-                                    }`
-                                  : "") +
-                              " " +
-                              _("Review and modify the settings as needed before re-applying.")
-                            : watchdogStatus?.status === "app_failure"
-                              ? _(
-                                    "Network connectivity is working, but enrollment did not complete. You can retry without changing network settings."
-                                )
-                              : _(
-                                    "Your previous onboarding configuration has been restored. Review and modify the settings as needed before re-applying."
-                                )}
-                    </Alert>
-                </PageSection>
+        <Page className="no-masthead-sidebar" id="system-onboarding-wizard">
+            {showRestoredConfigurationSection && (
+                <RestoredConfigurationSection
+                    onDismiss={() => setShowRestoredConfigurationSection(false)}
+                    watchdogStatus={watchdogStatus}
+                />
             )}
             <PageSection
                 hasBodyWrapper={false}
@@ -470,101 +469,104 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
             >
                 <Wizard onStepChange={handleStepChange}>
                     <WizardStep
-                        name={_("Hostname")}
-                        id="wizard-step-1"
-                        footer={{ isNextDisabled: !isHostnameValid, isCancelHidden: true }}
-                        isDisabled={canNavigateToStep(1)}
+                        name={_("Network")}
+                        id={WIZARD_STEP_IDS.network}
+                        footer={{ isNextDisabled: !isNetworkStepValid, isCancelHidden: true }}
                     >
-                        <HostnamePage />
-                    </WizardStep>
-                    <WizardStep
-                        name={_("Network interface")}
-                        id="wizard-step-2"
-                        footer={{ isNextDisabled: !isNetworkInterfaceValid, isCancelHidden: true }}
-                        isDisabled={canNavigateToStep(2)}
-                    >
-                        <NetworkInterfacePage interfaces={interfaces} />
-                    </WizardStep>
-                    <WizardStep
-                        name={_("Network address")}
-                        id="wizard-step-3"
-                        footer={{ isNextDisabled: !isNetworkAddressValid, isCancelHidden: true }}
-                        isDisabled={canNavigateToStep(3)}
-                    >
-                        <NetworkAddressPage />
-                    </WizardStep>
-                    <WizardStep
-                        name={_("Network services")}
-                        id="wizard-step-4"
-                        footer={{ isNextDisabled: !isNetworkServicesValid, isCancelHidden: true }}
-                        isDisabled={canNavigateToStep(4)}
-                    >
-                        <NetworkServicesPage />
+                        <FormWrapper>
+                            <NetworkPage interfaces={interfaces} />
+                        </FormWrapper>
                     </WizardStep>
                     {hasEnrollmentServices && (
                         <WizardStep
                             name={_("Enrollment server")}
-                            id="wizard-step-5"
-                            footer={{ isNextDisabled: !isEnrollmentValid, isCancelHidden: true }}
-                            isDisabled={canNavigateToStep(5)}
+                            id={WIZARD_STEP_IDS.enrollment}
+                            footer={{ isNextDisabled: !isEnrollmentStepValid, isCancelHidden: true }}
+                            isDisabled={isStepDisabled(WIZARD_STEP_IDS.enrollment)}
                         >
-                            <EnrollmentPage />
+                            <FormWrapper>
+                                <EnrollmentPage />
+                            </FormWrapper>
                         </WizardStep>
                     )}
                     <WizardStep
                         name={_("Connectivity test")}
-                        id={hasEnrollmentServices ? "wizard-step-6" : "wizard-step-5"}
-                        footer={{ isNextDisabled: !isConnectivityTestValid, isCancelHidden: true }}
-                        isDisabled={canNavigateToStep(hasEnrollmentServices ? 6 : 5)}
+                        id={WIZARD_STEP_IDS.connectivityTest}
+                        footer={{ isNextDisabled: !isConnectivityTestStepValid, isCancelHidden: true }}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.connectivityTest)}
                     >
-                        <ConnectivityTestPage />
+                        <FormWrapper>
+                            <ConnectivityTestPage />
+                        </FormWrapper>
+                    </WizardStep>
+                    <WizardStep
+                        name={_("Hostname")}
+                        id={WIZARD_STEP_IDS.hostname}
+                        footer={{ isNextDisabled: !isHostnameStepValid, isCancelHidden: true }}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.hostname)}
+                    >
+                        <FormWrapper>
+                            <HostnamePage />
+                        </FormWrapper>
                     </WizardStep>
                     <WizardStep
                         name={_("Device labels")}
-                        id={hasEnrollmentServices ? "wizard-step-7" : "wizard-step-6"}
-                        footer={{ isNextDisabled: !isLabelsValid, isCancelHidden: true }}
-                        isDisabled={canNavigateToStep(hasEnrollmentServices ? 7 : 6)}
+                        id={WIZARD_STEP_IDS.labels}
+                        footer={{ isNextDisabled: !isLabelsStepValid, isCancelHidden: true }}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.labels)}
                     >
-                        <LabelsPage />
+                        <FormWrapper>
+                            <LabelsPage />
+                        </FormWrapper>
                     </WizardStep>
                     <WizardStep
                         name={_("Review")}
-                        id={(() => {
-                            let n = 7;
-                            if (hasEnrollmentServices) {n++}
-                            return `wizard-step-${n}`;
-                        })()}
+                        id={WIZARD_STEP_IDS.review}
                         footer={{ nextButtonText: reviewButtonText, isCancelHidden: true }}
-                        isDisabled={canNavigateToStep(
-                            (() => {
-                                let n = 7;
-                                if (hasEnrollmentServices) {n++}
-                                return n;
-                            })()
-                        )}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.review)}
                     >
-                        <ReviewPage hasEnrollmentScripts={hasEnrollmentServices} />
+                        <FormWrapper>
+                            <ReviewPage hasEnrollmentScripts={hasEnrollmentServices} />
+                        </FormWrapper>
                     </WizardStep>
                     <WizardStep
                         name={finalStepName}
-                        id={(() => {
-                            let n = 8;
-                            if (hasEnrollmentServices) {n++}
-                            return `wizard-step-${n}`;
-                        })()}
+                        id={WIZARD_STEP_IDS.progress}
                         footer={getProgressPageFooter()}
-                        isDisabled={canNavigateToStep(
-                            (() => {
-                                let n = 8;
-                                if (hasEnrollmentServices) {n++}
-                                return n;
-                            })()
-                        )}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.progress)}
                     >
-                        <EnrollmentProgressPage />
+                        <FormWrapper>
+                            <EnrollmentProgressPage />
+                        </FormWrapper>
                     </WizardStep>
                 </Wizard>
             </PageSection>
+            <Modal
+                isOpen={isCancelConfirmOpen}
+                onClose={() => setIsCancelConfirmOpen(false)}
+                variant="small"
+                aria-labelledby="cancel-apply-title"
+                aria-describedby="cancel-apply-body"
+            >
+                <ModalHeader
+                    title={_("Cancel applying changes?")}
+                    titleIconVariant="warning"
+                    labelId="cancel-apply-title"
+                />
+                <ModalBody id="cancel-apply-body">
+                    {_(
+                        "Applying changes is in progress. Cancelling will stop the process and roll back network changes."
+                    )}
+                </ModalBody>
+                <ModalFooter>
+                    <Button key="confirm" variant={ButtonVariant.danger} onClick={confirmApplyCancel}>
+                        {_("Cancel applying changes")}
+                    </Button>
+                    <Button key="back" variant={ButtonVariant.link} onClick={() => setIsCancelConfirmOpen(false)}>
+                        {_("Keep applying")}
+                    </Button>
+                </ModalFooter>
+            </Modal>
         </Page>
     );
 };

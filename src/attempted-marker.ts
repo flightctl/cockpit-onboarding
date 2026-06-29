@@ -1,7 +1,7 @@
 import cockpit from "cockpit";
 import { Model } from "./model-context";
 import { MARKER_ATTEMPTED } from "./paths";
-import { ProxyProtocol } from "./types";
+import { ProxyProtocol, WifiSecurity } from "./types";
 
 export interface AttemptedMarkerData {
     attemptedAt: string;
@@ -13,7 +13,7 @@ export interface AttemptedMarkerData {
         selectedInterface: string | null;
         interfaceType: "ethernet" | "wifi" | null;
         wifiSsid: string | null;
-        wifiSecurity: "none" | "wep" | "wpa" | null;
+        wifiSecurity: WifiSecurity | null;
         vlanId: number | null;
     };
     networkAddress: Model["networkAddress"];

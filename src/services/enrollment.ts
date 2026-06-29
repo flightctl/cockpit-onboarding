@@ -15,7 +15,9 @@ const EXIT_CODE_MESSAGES: Record<number, string> = {
 
 function getExitCodeMessage(exitCode: number, endpoint?: string): string | null {
     const template = EXIT_CODE_MESSAGES[exitCode];
-    if (!template) {return null}
+    if (!template) {
+        return null;
+    }
     if (exitCode === 3 && endpoint) {
         return `${template} at ${endpoint}`;
     }
@@ -42,6 +44,7 @@ export function buildEnrollmentParams(model: Model, service: EnrollmentService):
         ENROLLMENT_USE_EXISTING: isUsingExisting,
         ENROLLMENT_HOSTNAME: model.hostname.value,
         ENROLLMENT_INTERFACE: model.networkInterface.selectedInterface || "",
+        // TODO: Review backend wiring for proxy.applyForHttps (flightctl-enroll.sh).
         ENROLLMENT_PROXY_ENABLED: model.networkServices.proxy.enabled,
         ENROLLMENT_PROXY_PROTOCOL: model.networkServices.proxy.protocol || "http",
         ENROLLMENT_PROXY_HOSTNAME: model.networkServices.proxy.hostname || "",
@@ -76,7 +79,9 @@ export async function executeEnrollmentScript(
         const proc = cockpit.spawn(["sudo", scriptPath, paramsFile], {
             err: "out",
         });
-        if (signal) {signal.process = proc}
+        if (signal) {
+            signal.process = proc;
+        }
 
         proc.stream((data) => {
             capturedOutput += data;
@@ -84,7 +89,9 @@ export async function executeEnrollmentScript(
         });
 
         await proc;
-        if (signal) {signal.process = undefined}
+        if (signal) {
+            signal.process = undefined;
+        }
         console.log(`Script ${scriptPath} completed successfully`);
 
         const deviceUrlMatch = capturedOutput.match(/^DEVICE_URL:\s*(.+)$/m);
@@ -105,7 +112,9 @@ export async function executeEnrollmentScript(
             output: capturedOutput || "Script completed successfully",
         };
     } catch (error) {
-        if (signal) {signal.process = undefined}
+        if (signal) {
+            signal.process = undefined;
+        }
         console.error(`Script ${scriptPath} failed:`, error);
 
         let errorMsg = "";
@@ -115,17 +124,12 @@ export async function executeEnrollmentScript(
             errorMsg = capturedOutput.trim();
         }
 
-        if (error && typeof error === "object") {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const processError = error as any;
+        if (error instanceof cockpit.ProcessError && error.exit_status !== null) {
+            const exitCode = error.exit_status;
+            friendlyMsg = getExitCodeMessage(exitCode, endpoint) || "";
 
-            if (processError.exit_status !== undefined) {
-                const exitCode = processError.exit_status;
-                friendlyMsg = getExitCodeMessage(exitCode, endpoint) || "";
-
-                const statusMsg = `Script exited with status ${exitCode}`;
-                errorMsg = errorMsg ? `${errorMsg}\n${statusMsg}` : statusMsg;
-            }
+            const statusMsg = `Script exited with status ${exitCode}`;
+            errorMsg = errorMsg ? `${errorMsg}\n${statusMsg}` : statusMsg;
         }
 
         const fullMsg = friendlyMsg ? `${friendlyMsg}\n\n${errorMsg}` : errorMsg || "Script failed with unknown error";

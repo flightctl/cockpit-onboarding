@@ -6,20 +6,24 @@
  */
 
 import React, { useState, useEffect, useMemo } from "react";
+import cockpit from "cockpit";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
-import { FormGroup, FormHelperText } from "@patternfly/react-core/dist/esm/components/Form/index.js";
+import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { Card, CardBody, CardTitle } from "@patternfly/react-core/dist/esm/components/Card/index.js";
 import { Alert, AlertVariant } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
-import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/components/HelperText/index.js";
+
 import { useModelContext } from "../model-context";
 import { useConfig } from "../app";
 import { validateURL } from "../validation";
 import { evaluateSkipConditions, SkipResult } from "../services/skip-conditions";
 import type { EnrollmentService } from "../types";
+import DefaultHelperText, { ErrorHelperText } from "../components/HelperTexts";
+
+const _ = cockpit.gettext;
 
 /**
  * JSON Schema Form Renderer
@@ -136,13 +140,7 @@ const SchemaFields: React.FC<{
                                         validated={validationState}
                                         isRequired={isRequired}
                                     />
-                                    {showError && (
-                                        <FormHelperText>
-                                            <HelperText>
-                                                <HelperTextItem variant="error">{error}</HelperTextItem>
-                                            </HelperText>
-                                        </FormHelperText>
-                                    )}
+                                    {showError && <ErrorHelperText error={error} />}
                                 </FormGroup>
                             </StackItem>
                         );
@@ -159,13 +157,7 @@ const SchemaFields: React.FC<{
                                         validated={validationState}
                                         isRequired={isRequired}
                                     />
-                                    {showError && (
-                                        <FormHelperText>
-                                            <HelperText>
-                                                <HelperTextItem variant="error">{error}</HelperTextItem>
-                                            </HelperText>
-                                        </FormHelperText>
-                                    )}
+                                    {showError && <ErrorHelperText error={error} />}
                                 </FormGroup>
                             </StackItem>
                         );
@@ -245,7 +237,7 @@ const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onCha
             {/* Render radio buttons when schema has oneOf */}
             {schema.oneOf && schema.oneOf.length > 0 && (
                 <StackItem>
-                    <FormGroup label="Authentication method">
+                    <FormGroup label={_("Authentication method")}>
                         <Stack>
                             {schema.oneOf.map((variant, index) => (
                                 <StackItem key={index}>
@@ -464,7 +456,11 @@ export const EnrollmentPage: React.FunctionComponent = () => {
 
                             {isSelected && isConnectivityOnly && skip?.action === "connectivityOnly" && (
                                 <CardBody>
-                                    <Alert variant={AlertVariant.info} isInline title="Existing credentials detected">
+                                    <Alert
+                                        variant={AlertVariant.info}
+                                        isInline
+                                        title={_("Existing credentials detected")}
+                                    >
                                         {skip.reason}
                                     </Alert>
                                 </CardBody>
@@ -474,14 +470,16 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                                     <Stack hasGutter>
                                         {detectedExisting[service.id] && (
                                             <StackItem>
-                                                <FormGroup label="Enrollment credentials">
+                                                <FormGroup label={_("Enrollment credentials")}>
                                                     <Stack>
                                                         <StackItem>
                                                             <Radio
                                                                 id={`use-existing-${service.id}`}
                                                                 name={`credential-mode-${service.id}`}
-                                                                label="Use existing enrollment credentials"
-                                                                description="The device already has enrollment credentials configured. The agent will be restarted to pick up any label and proxy changes."
+                                                                label={_("Use existing enrollment credentials")}
+                                                                description={_(
+                                                                    "The device already has enrollment credentials configured. The agent will be restarted to pick up any label and proxy changes."
+                                                                )}
                                                                 isChecked={isUsingExisting}
                                                                 onChange={() => setUseExisting(service.id, true)}
                                                             />
@@ -490,8 +488,10 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                                                             <Radio
                                                                 id={`configure-new-${service.id}`}
                                                                 name={`credential-mode-${service.id}`}
-                                                                label="Configure new enrollment"
-                                                                description="Provide an endpoint and credentials to enroll this device."
+                                                                label={_("Configure new enrollment")}
+                                                                description={_(
+                                                                    "Provide an endpoint and credentials to enroll this device."
+                                                                )}
                                                                 isChecked={!isUsingExisting}
                                                                 onChange={() => setUseExisting(service.id, false)}
                                                             />
@@ -505,7 +505,7 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                                             <>
                                                 {/* Endpoint URL (with optional override) */}
                                                 <StackItem>
-                                                    <FormGroup label="Service Endpoint" isRequired>
+                                                    <FormGroup label={_("Service Endpoint")} isRequired>
                                                         <TextInput
                                                             id={`endpoint-${service.id}`}
                                                             value={serviceEndpoint}
@@ -515,32 +515,18 @@ export const EnrollmentPage: React.FunctionComponent = () => {
                                                             isDisabled={!service.endpoint.allowUserOverride}
                                                             validated={endpointValidated}
                                                         />
-                                                        {showEndpointError && (
-                                                            <FormHelperText>
-                                                                <HelperText>
-                                                                    <HelperTextItem variant="error">
-                                                                        {endpointError}
-                                                                    </HelperTextItem>
-                                                                </HelperText>
-                                                            </FormHelperText>
-                                                        )}
+                                                        {showEndpointError && <ErrorHelperText error={endpointError} />}
                                                         {!service.endpoint.allowUserOverride && (
-                                                            <div
-                                                                style={{
-                                                                    fontSize: "var(--pf-global--FontSize--sm)",
-                                                                    color: "var(--pf-global--Color--200)",
-                                                                    marginTop: "0.25rem",
-                                                                }}
-                                                            >
-                                                                Endpoint is configured by the administrator
-                                                            </div>
+                                                            <DefaultHelperText
+                                                                text={_("Endpoint is configured by the administrator")}
+                                                            />
                                                         )}
                                                     </FormGroup>
                                                 </StackItem>
 
                                                 {/* Credentials Form (dynamic based on schema) */}
                                                 <StackItem>
-                                                    <FormGroup label="Credentials">
+                                                    <FormGroup label={_("Credentials")}>
                                                         <JsonSchemaForm
                                                             schema={service.credentialsSchema}
                                                             formData={serviceCredentials}
