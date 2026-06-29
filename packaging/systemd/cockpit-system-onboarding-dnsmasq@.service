@@ -1,7 +1,7 @@
 [Unit]
 Description=Cockpit Onboarding DHCP/DNS on %i
-BindsTo=cockpit-system-onboarding-wifi-ap@%i.service
-After=cockpit-system-onboarding-wifi-ap@%i.service
+PartOf=cockpit-system-onboarding-setup.service
+After=cockpit-system-onboarding-setup.service
 
 [Service]
 Type=simple
