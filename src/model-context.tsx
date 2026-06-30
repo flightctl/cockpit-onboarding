@@ -534,8 +534,7 @@ export const ModelProvider: React.FunctionComponent<{
                         ...(defaults?.proxy && {
                             enabled: defaults.proxy.enabled ?? prev.networkServices.proxy.enabled,
                             protocol: defaults.proxy.protocol ?? prev.networkServices.proxy.protocol,
-                            applyForHttps:
-                                defaults.proxy.applyForHttps ?? prev.networkServices.proxy.applyForHttps,
+                            applyForHttps: defaults.proxy.applyForHttps ?? prev.networkServices.proxy.applyForHttps,
                             hostname: defaults.proxy.hostname ?? prev.networkServices.proxy.hostname,
                             port: defaults.proxy.port ?? prev.networkServices.proxy.port,
                             username: defaults.proxy.username ?? prev.networkServices.proxy.username,

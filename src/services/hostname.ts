@@ -16,7 +16,9 @@ interface HostnameData {
 export async function getHostnameInfo(): Promise<HostnameInfo> {
     const hostnameClient = cockpit.dbus("org.freedesktop.hostname1");
     try {
-        const hostnameProxy = await waitForProxy<HostnameData>(hostnameClient.proxy("org.freedesktop.hostname1", "/org/freedesktop/hostname1"));
+        const hostnameProxy = await waitForProxy<HostnameData>(
+            hostnameClient.proxy("org.freedesktop.hostname1", "/org/freedesktop/hostname1")
+        );
 
         const hostnameData = hostnameProxy.data;
         const info: HostnameInfo = {
