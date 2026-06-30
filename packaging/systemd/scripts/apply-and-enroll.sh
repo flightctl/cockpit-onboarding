@@ -148,10 +148,19 @@ else
     log "No carrier file for $INTERFACE_NAME, skipping carrier wait"
 fi
 
+is_ip_address() {
+    [[ "$1" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || [[ "$1" =~ ^[0-9a-fA-F:]+$ ]]
+}
+
 log "Waiting for network connectivity (up to ${CONNECTIVITY_TIMEOUT} retries)..."
 for i in $(seq 1 $CONNECTIVITY_TIMEOUT); do
-    if getent hosts "${CONNECTIVITY_TEST_HOST}" >/dev/null 2>&1; then
-        log "Network connectivity confirmed"
+    if is_ip_address "$CONNECTIVITY_TEST_HOST"; then
+        if ping -c1 -W2 "$CONNECTIVITY_TEST_HOST" >/dev/null 2>&1; then
+            log "Network connectivity confirmed (ping)"
+            break
+        fi
+    elif resolvectl query --interface="$EFFECTIVE_IFACE" "$CONNECTIVITY_TEST_HOST" >/dev/null 2>&1; then
+        log "Network connectivity confirmed (DNS)"
         break
     fi
     if [ "$i" -eq "$CONNECTIVITY_TIMEOUT" ]; then
