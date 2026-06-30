@@ -15,7 +15,7 @@ import { getSetupInterface, applyNetworkConfiguration, rollbackNetworkConfigurat
 import { evaluateSkipConditions, SkipResult } from "../services/skip-conditions";
 import { writeAttemptedMarker } from "../attempted-marker";
 import { SCRIPT_RUN_APPLY_ENROLL } from "../paths";
-import { armWatchdog } from "../services/watchdog";
+import { armWatchdog, disarmWatchdog } from "../services/watchdog";
 import { testNetworkConnectivity, verifyServiceConnectivity, CancellationSignal } from "../services/connectivity";
 import { buildEnrollmentParams, executeEnrollmentScript, finalizeEnrollment } from "../services/enrollment";
 import { createSecureTempFile } from "../services/spawn-helpers";
@@ -338,6 +338,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             if (!configResult.success) {
                 onOutput("Failed to apply hostname/NTP configuration");
                 setSteps((prev) => prev.map((s) => (s.id === "apply-config" ? { ...s, status: "failed" } : s)));
+                await disarmWatchdog();
                 updateModel("enrollmentProgress", { executionState: "failed" });
                 return;
             }
@@ -352,6 +353,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         } catch (error) {
             onOutput(`Failed: ${String(error)}`);
             setSteps((prev) => prev.map((s) => (s.id === "apply-config" ? { ...s, status: "failed" } : s)));
+            await disarmWatchdog();
             updateModel("enrollmentProgress", { executionState: "failed" });
             return;
         }
@@ -412,6 +414,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                 cockpit.spawn(["rm", "-f", f], { err: "message" }).catch(() => {});
             }
             setSteps((prev) => prev.map((s) => (s.status === "delegated" ? { ...s, status: "failed" } : s)));
+            await disarmWatchdog();
             updateModel("enrollmentProgress", { executionState: "failed" });
             return;
         }
@@ -447,6 +450,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         for (const step of steps) {
             if (shouldCancelRef.current) {
                 console.log("Enrollment cancelled by user");
+                await disarmWatchdog();
                 updateModel("enrollmentProgress", { executionState: "failed" });
                 return;
             }
@@ -499,6 +503,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                         console.error("Network rollback failed:", rollbackError);
                     }
                 }
+                await disarmWatchdog();
                 updateModel("enrollmentProgress", { executionState: "failed" });
                 return;
             }
