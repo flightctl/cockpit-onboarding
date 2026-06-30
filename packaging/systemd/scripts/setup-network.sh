@@ -7,8 +7,12 @@ set -e
 # shellcheck source=common.sh
 . /usr/libexec/cockpit-system-onboarding/common.sh
 
+RUNTIME_DIR="$ONBOARDING_RUNTIME_DIR"
 DEFAULT_IP="192.168.100.1"
 DEFAULT_PREFIX="24"
+DEFAULT_DHCP_RANGE_START="192.168.100.10"
+DEFAULT_DHCP_RANGE_END="192.168.100.50"
+DEFAULT_NETMASK="255.255.255.0"
 
 # Check if either config file exists
 if [ ! -f "$ONBOARDING_USER_CONFIG" ] && [ ! -f "$ONBOARDING_DEFAULT_CONFIG" ]; then
@@ -69,4 +73,31 @@ nmcli connection add \
 nmcli connection up "$CONNECTION_NAME" || true
 
 echo "Configured $ETHERNET_INTERFACE with IP $STATIC_IP"
+
+# Optionally start a DHCP server so directly-connected laptops auto-get an IP
+if command -v dnsmasq >/dev/null 2>&1; then
+    mkdir -p "$RUNTIME_DIR"
+
+    DNSMASQ_CONF="$RUNTIME_DIR/dnsmasq-${ETHERNET_INTERFACE}.conf"
+    cat > "$DNSMASQ_CONF" <<EOF
+interface=${ETHERNET_INTERFACE}
+bind-interfaces
+dhcp-range=${DEFAULT_DHCP_RANGE_START},${DEFAULT_DHCP_RANGE_END},${DEFAULT_NETMASK},1h
+dhcp-option=3,${STATIC_IP}
+dhcp-option=6,${STATIC_IP}
+no-resolv
+no-hosts
+dhcp-leasefile=/tmp/dnsmasq-${ETHERNET_INTERFACE}.leases
+pid-file=/tmp/dnsmasq-${ETHERNET_INTERFACE}.pid
+EOF
+    echo "Generated dnsmasq DHCP config for $ETHERNET_INTERFACE"
+
+    systemctl enable "cockpit-system-onboarding-dnsmasq@${ETHERNET_INTERFACE}.service" 2>/dev/null || true
+    systemctl start "cockpit-system-onboarding-dnsmasq@${ETHERNET_INTERFACE}.service"
+    echo "DHCP server started on $ETHERNET_INTERFACE (range ${DEFAULT_DHCP_RANGE_START}-${DEFAULT_DHCP_RANGE_END})"
+else
+    echo "dnsmasq is not installed, skipping DHCP server setup"
+    echo "Technicians will need to manually configure a static IP to reach this device"
+fi
+
 echo "System accessible at: http://$STATIC_IP:9090"
