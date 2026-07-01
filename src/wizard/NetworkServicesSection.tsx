@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import cockpit from "cockpit";
 
-import { Divider } from "@patternfly/react-core/dist/esm/components/Divider/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
@@ -9,11 +8,9 @@ import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/ind
 import { MinusCircleIcon, PlusCircleIcon } from "@patternfly/react-icons";
 
 import ValidatedTextInput from "../components/ValidatedTextInput";
-import { LabelHeading } from "../components/Headings";
+import FeatureSwitch from "../components/FeatureSwitch";
 import { useModelContext } from "../model-context";
-import { validateHostnameOrIP, validateManualNtpServers } from "../validation";
-import { Radio } from "@patternfly/react-core/dist/esm/components/Radio";
-import ValidatedRadioLabel from "../components/ValidatedRadioLabel";
+import { validateHostnameOrIP } from "../validation";
 import NetworkProxySection from "./NetworkProxySection";
 
 const _ = cockpit.gettext;
@@ -36,9 +33,6 @@ const NetworkServicesSection = () => {
 
     const storedNtpServers = model.networkServices.ntp.servers || [];
     const ntpServers = storedNtpServers.length > 0 ? storedNtpServers : emptyNtpServers;
-    const isValidManualNtp =
-        model.networkServices.ntp.autoConfig ||
-        validateManualNtpServers(storedNtpServers.length > 0 ? storedNtpServers : emptyNtpServers);
 
     const setAutoNtp = (autoConfig: boolean) => {
         updateNestedModel("networkServices", "ntp", { autoConfig, servers: emptyNtpServers });
@@ -89,79 +83,62 @@ const NetworkServicesSection = () => {
     return (
         <Stack hasGutter>
             <StackItem>
-                <LabelHeading text={_("Configure NTP Servers:")} />
-            </StackItem>
-            <StackItem>
-                <FormGroup label={_("Time servers configuration:")}>
+                <FeatureSwitch
+                    fieldId="ntp-servers"
+                    label={_("NTP Servers")}
+                    isChecked={!model.networkServices.ntp.autoConfig}
+                    onToggle={(checked) => setAutoNtp(!checked)}
+                >
                     <Stack hasGutter>
-                        <StackItem>
-                            <Radio
-                                id="auto-ntp-radio"
-                                name="ntp-method"
-                                label={_("Automatic")}
-                                isChecked={model.networkServices.ntp.autoConfig}
-                                onChange={() => setAutoNtp(true)}
-                            />
-                        </StackItem>
-                        <StackItem>
-                            <Radio
-                                id="manual-ntp-radio"
-                                name="ntp-method"
-                                label={<ValidatedRadioLabel label={_("Manual")} isValid={isValidManualNtp} />}
-                                isChecked={!model.networkServices.ntp.autoConfig}
-                                onChange={() => setAutoNtp(false)}
-                            />
-                        </StackItem>
-                    </Stack>
-                </FormGroup>
-            </StackItem>
-            {!model.networkServices.ntp.autoConfig && (
-                <StackItem>
-                    <Stack hasGutter>
-                        {ntpServers.map((server, index) => (
-                            <StackItem key={index}>
-                                <Flex>
-                                    <FlexItem flex={{ default: "flex_1" }}>
-                                        <FormGroup
-                                            label={index === 0 ? _("NTP Server Hostname") : undefined}
-                                            isRequired
+                        {ntpServers.map((server, index) => {
+                            let minusAlign: "alignSelfCenter" | "alignSelfFlexStart" | "alignSelfFlexEnd";
+                            if (index === 0) {
+                                minusAlign = ntpValidationErrors[index] ? "alignSelfCenter" : "alignSelfFlexEnd";
+                            } else {
+                                minusAlign = "alignSelfFlexStart";
+                            }
+                            return (
+                                <StackItem key={index}>
+                                    <Flex>
+                                        <FlexItem flex={{ default: "flex_1" }}>
+                                            <FormGroup
+                                                label={index === 0 ? _("NTP Server Hostname") : undefined}
+                                                isRequired
+                                            >
+                                                <ValidatedTextInput
+                                                    id={index === 0 ? "ntp-server-input" : `ntp-server-input-${index}`}
+                                                    value={server}
+                                                    error={ntpValidationErrors[index]}
+                                                    onChange={(_, value) => handleNtpServerChange(index, value)}
+                                                    placeholder={_("e.g. pool.ntp.org")}
+                                                />
+                                            </FormGroup>
+                                        </FlexItem>
+                                        <FlexItem
+                                            alignSelf={{
+                                                default: minusAlign,
+                                            }}
                                         >
-                                            <ValidatedTextInput
-                                                id={index === 0 ? "ntp-server-input" : `ntp-server-input-${index}`}
-                                                value={server}
-                                                error={ntpValidationErrors[index]}
-                                                onChange={(_, value) => handleNtpServerChange(index, value)}
-                                                placeholder={_("e.g. pool.ntp.org")}
-                                            />
-                                        </FormGroup>
-                                    </FlexItem>
-                                    <FlexItem
-                                        alignSelf={{ default: index === 0 ? "alignSelfFlexEnd" : "alignSelfFlexStart" }}
-                                    >
-                                        <Button
-                                            variant="plain"
-                                            aria-label={_("Remove NTP server")}
-                                            onClick={() => removeNtpServer(index)}
-                                        >
-                                            <MinusCircleIcon />
-                                        </Button>
-                                    </FlexItem>
-                                </Flex>
-                            </StackItem>
-                        ))}
+                                            <Button
+                                                variant="plain"
+                                                aria-label={_("Remove NTP server")}
+                                                onClick={() => removeNtpServer(index)}
+                                            >
+                                                <MinusCircleIcon />
+                                            </Button>
+                                        </FlexItem>
+                                    </Flex>
+                                </StackItem>
+                            );
+                        })}
                         <StackItem>
                             <Button variant="link" isInline icon={<PlusCircleIcon />} onClick={addNtpServerRow}>
                                 {_("Add another NTP server")}
                             </Button>
                         </StackItem>
                     </Stack>
-                </StackItem>
-            )}
-
-            <StackItem>
-                <Divider />
+                </FeatureSwitch>
             </StackItem>
-
             <StackItem>
                 <NetworkProxySection />
             </StackItem>

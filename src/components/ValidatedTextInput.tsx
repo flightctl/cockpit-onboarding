@@ -3,7 +3,7 @@ import * as React from "react";
 import { TextInput, TextInputProps } from "@patternfly/react-core/dist/esm/components/TextInput";
 import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
 
-import DefaultHelperText, { ErrorHelperText } from "./HelperTexts";
+import FormHelperText from "./HelperTexts";
 
 type ValidationError = string | null | undefined;
 
@@ -28,8 +28,8 @@ const ValidatedTextInput = ({ value, helperText, error, ...props }: ValidatedTex
     return (
         <>
             <TextInput value={value ?? ""} validated={validated} {...props} />
-            {helperText && <DefaultHelperText text={helperText} />}
-            {error && <ErrorHelperText error={error} />}
+            {helperText && <FormHelperText content={helperText} />}
+            {error && <FormHelperText content={error} variant="error" />}
         </>
     );
 };

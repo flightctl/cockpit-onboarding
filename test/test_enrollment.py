@@ -3,7 +3,7 @@
 """
 Integration test for enrollment functionality
 
-Tests the enrollment page UI and enrollment script execution.
+Tests the Flight Control enrollment page UI.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from wizard_navigation import complete_network_step
 
 @nondestructive
 class TestEnrollment(MachineCase):
-    """Test enrollment service selection and credential input"""
+    """Test Flight Control enrollment selection and credential input"""
 
     provision: typing.ClassVar = {
         "0": {"memory_mb": 512}
@@ -28,59 +28,19 @@ class TestEnrollment(MachineCase):
     def setUp(self):
         super().setUp()
 
-        # Create test enrollment configuration
         self.config = {
             "version": "1.0",
             "runOnce": False,
             "hideModules": False,
-            "enrollmentServices": [
-                {
-                    "id": "test-service",
-                    "name": "Test Management Service",
-                    "description": "A test enrollment service",
-                    "endpoint": {
-                        "url": "https://test.example.com",
-                        "allowUserOverride": True
-                    },
-                    "credentialsSchema": {
-                        "type": "object",
-                        "properties": {
-                            "username": {
-                                "type": "string",
-                                "title": "Username"
-                            },
-                            "password": {
-                                "type": "string",
-                                "title": "Password",
-                                "format": "password"
-                            }
-                        },
-                        "required": ["username", "password"]
-                    },
-                    "scriptPath": "/etc/cockpit/system-onboarding.d/example-enroll.sh"
-                }
-            ]
+            "flightctl": {
+                "defaultEndpoint": "https://test.example.com"
+            }
         }
 
-        # Write configuration file
         self.machine.write(
             "/etc/cockpit/system-onboarding/config.json",
             json.dumps(self.config)
         )
-
-        # Create example enrollment script
-        script_content = '''#!/bin/bash
-set -euo pipefail
-echo "Enrolling device..."
-echo "DEVICE_URL: https://test.example.com/devices/test-device-001"
-exit 0
-'''
-        self.machine.execute("mkdir -p /etc/cockpit/system-onboarding.d")
-        self.machine.write(
-            "/etc/cockpit/system-onboarding.d/example-enroll.sh",
-            script_content
-        )
-        self.machine.execute("chmod +x /etc/cockpit/system-onboarding.d/example-enroll.sh")
 
     def navigate_to_enrollment_step(self):
         b = self.browser
@@ -88,42 +48,35 @@ exit 0
         b.wait_visible("#enrollmentStep")
 
     def testEnrollmentPageDisplay(self):
-        """Test that enrollment services are displayed correctly"""
+        """Test that Flight Control enrollment is displayed correctly"""
         b = self.browser
 
         self.login_and_go("/system-onboarding")
         self.navigate_to_enrollment_step()
 
-        # Check that service is displayed
-        b.wait_in_text(".pf-v5-c-card", "Test Management Service")
-        b.wait_in_text(".pf-v5-c-card", "A test enrollment service")
+        b.wait_in_text(".pf-v5-c-card", "Flight Control")
+        b.wait_in_text(".pf-v5-c-card", "Enroll this device into Flight Control fleet management")
 
     def testEnrollmentServiceSelection(self):
-        """Test selecting and deselecting enrollment services"""
+        """Test selecting and deselecting Flight Control enrollment"""
         b = self.browser
 
         self.login_and_go("/system-onboarding")
         self.navigate_to_enrollment_step()
 
-        # Service should not be selected initially
-        checkbox_selector = "#service-test-service"
+        checkbox_selector = "#flightctl-enrollment"
         b.wait_visible(checkbox_selector)
         self.assertFalse(b.is_present(f"{checkbox_selector}:checked"))
 
-        # Select service
         b.click(checkbox_selector)
         b.wait_visible(f"{checkbox_selector}:checked")
 
-        # Credentials form should now be visible
-        b.wait_visible("#field-username")
-        b.wait_visible("#field-password")
+        b.wait_visible("#credential-token")
 
-        # Deselect service
         b.click(checkbox_selector)
         self.assertFalse(b.is_present(f"{checkbox_selector}:checked"))
 
-        # Credentials form should be hidden
-        b.wait_not_present("#field-username")
+        b.wait_not_present("#credential-token")
 
     def testEnrollmentCredentialsInput(self):
         """Test entering credentials for enrollment"""
@@ -132,17 +85,12 @@ exit 0
         self.login_and_go("/system-onboarding")
         self.navigate_to_enrollment_step()
 
-        # Select service
-        b.click("#service-test-service")
-        b.wait_visible("#service-test-service:checked")
+        b.click("#flightctl-enrollment")
+        b.wait_visible("#flightctl-enrollment:checked")
 
-        # Enter credentials
-        b.set_input_text("#field-username", "testuser")
-        b.set_input_text("#field-password", "testpassword")
+        b.set_input_text("#credential-token", "test-token")
 
-        # Verify values are set
-        self.assertEqual(b.val("#field-username"), "testuser")
-        self.assertEqual(b.val("#field-password"), "testpassword")
+        self.assertEqual(b.val("#credential-token"), "test-token")
 
     def testEnrollmentEndpointOverride(self):
         """Test overriding the enrollment endpoint URL"""
@@ -151,36 +99,23 @@ exit 0
         self.login_and_go("/system-onboarding")
         self.navigate_to_enrollment_step()
 
-        # Select service
-        b.click("#service-test-service")
-        b.wait_visible("#service-test-service:checked")
+        b.click("#flightctl-enrollment")
+        b.wait_visible("#flightctl-enrollment:checked")
 
-        # Check that endpoint field is visible and editable
-        endpoint_selector = "#endpoint-test-service"
+        endpoint_selector = "#endpoint-flightctl"
         b.wait_visible(endpoint_selector)
         self.assertEqual(b.val(endpoint_selector), "https://test.example.com")
 
-        # Change endpoint
         b.set_input_text(endpoint_selector, "https://custom.example.com")
         self.assertEqual(b.val(endpoint_selector), "https://custom.example.com")
 
-    def testNoEnrollmentServicesConfigured(self):
-        """Test behavior when no enrollment services are configured"""
+    def testEnrollmentStepAlwaysVisible(self):
+        """Enrollment step is always available for Flight Control"""
         b = self.browser
-        m = self.machine
-
-        # Clear enrollment services from config
-        config_no_services = self.config.copy()
-        config_no_services["enrollmentServices"] = []
-        m.write(
-            "/etc/cockpit/system-onboarding/config.json",
-            json.dumps(config_no_services)
-        )
 
         self.login_and_go("/system-onboarding")
         complete_network_step(b)
-        b.wait_not_present("#enrollmentStep")
-        b.wait_visible("#connectivityTestStep")
+        b.wait_visible("#enrollmentStep")
 
     def testEnrollmentCredentialsValidation(self):
         """Test that credentials are validated"""
@@ -189,24 +124,15 @@ exit 0
         self.login_and_go("/system-onboarding")
         self.navigate_to_enrollment_step()
 
-        # Select service
-        b.click("#service-test-service")
-        b.wait_visible("#service-test-service:checked")
+        b.click("#flightctl-enrollment")
+        b.wait_visible("#flightctl-enrollment:checked")
 
-        # Try to proceed without entering credentials
-        # The Next button should be disabled or validation should prevent progress
-        # (This depends on the wizard's validation implementation)
+        b.click("#auth-password")
+        b.wait_visible("#credential-username")
+        b.wait_visible("#credential-password")
 
-        # Enter only username
-        b.set_input_text("#field-username", "testuser")
-
-        # Password is still empty - validation error should appear
-        # (Implementation depends on when validation is triggered)
-
-        # Complete credentials
-        b.set_input_text("#field-password", "testpassword")
-
-        # Now validation should pass
+        b.set_input_text("#credential-username", "testuser")
+        b.set_input_text("#credential-password", "testpassword")
 
 
 if __name__ == '__main__':

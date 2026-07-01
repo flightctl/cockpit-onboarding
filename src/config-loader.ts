@@ -13,11 +13,6 @@ import { SystemOnboardingConfig } from "./types";
 const DEFAULT_CONFIG_PATH = "/usr/share/cockpit/system-onboarding/config.json";
 const USER_CONFIG_PATH = "/etc/cockpit/system-onboarding/config.json";
 
-const ALLOWED_SCRIPT_DIRS = [
-    "/usr/share/cockpit/system-onboarding/system-onboarding.d/",
-    "/etc/cockpit/system-onboarding.d/",
-];
-
 // Default configuration if no files are found
 const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
     version: "1.0",
@@ -25,7 +20,9 @@ const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
     keepCockpit: false,
     hideModules: true,
     autoReboot: false,
-    enrollmentServices: [],
+    flightctl: {
+        defaultEndpoint: "",
+    },
     network: {
         ethernet: {
             enabled: true,
@@ -104,7 +101,11 @@ export async function loadConfig(): Promise<SystemOnboardingConfig> {
             ...defaultConfig.led,
             ...userConfig.led,
         },
-        enrollmentServices: userConfig.enrollmentServices || defaultConfig.enrollmentServices || [],
+        flightctl: {
+            ...BUILT_IN_DEFAULTS.flightctl,
+            ...defaultConfig.flightctl,
+            ...userConfig.flightctl,
+        },
         defaults: {
             ...defaultConfig.defaults,
             ...userConfig.defaults,
@@ -146,105 +147,15 @@ export function validateConfig(config: SystemOnboardingConfig): void {
         throw new Error(`Configuration validation failed: version must be '1.0', got '${config.version}'`);
     }
 
-    // Validate enrollment services if present
-    if (config.enrollmentServices && Array.isArray(config.enrollmentServices)) {
-        config.enrollmentServices.forEach((service, index) => {
-            // Required fields
-            if (!service.id || typeof service.id !== "string") {
-                throw new Error(`Enrollment service at index ${index}: 'id' is required and must be a string`);
-            }
-
-            if (!/^[a-z0-9-]+$/.test(service.id)) {
-                throw new Error(
-                    `Enrollment service '${service.id}': id must contain only lowercase letters, numbers, and hyphens`
-                );
-            }
-
-            if (!service.name || typeof service.name !== "string") {
-                throw new Error(`Enrollment service '${service.id}': 'name' is required and must be a string`);
-            }
-
-            if (service.name.length < 1 || service.name.length > 100) {
-                throw new Error(`Enrollment service '${service.id}': name length must be between 1 and 100 characters`);
-            }
-
-            if (!service.endpoint || typeof service.endpoint !== "object") {
-                throw new Error(`Enrollment service '${service.id}': 'endpoint' is required and must be an object`);
-            }
-
-            if (typeof service.endpoint.url !== "string") {
-                throw new Error(`Enrollment service '${service.id}': endpoint.url must be a string`);
-            }
-
-            // Empty URL is allowed when allowUserOverride is true (user provides it)
-            if (service.endpoint.url && !/^https?:\/\//.test(service.endpoint.url)) {
-                throw new Error(`Enrollment service '${service.id}': endpoint.url must start with http:// or https://`);
-            }
-
-            if (!service.credentialsSchema || typeof service.credentialsSchema !== "object") {
-                throw new Error(
-                    `Enrollment service '${service.id}': 'credentialsSchema' is required and must be an object`
-                );
-            }
-
-            if (service.credentialsSchema.type !== "object") {
-                throw new Error(`Enrollment service '${service.id}': credentialsSchema.type must be 'object'`);
-            }
-
-            // credentialsSchema must have either top-level properties or oneOf variants
-            const hasProperties =
-                service.credentialsSchema.properties && typeof service.credentialsSchema.properties === "object";
-            const hasOneOf =
-                Array.isArray(service.credentialsSchema.oneOf) && service.credentialsSchema.oneOf.length > 0;
-            if (!hasProperties && !hasOneOf) {
-                throw new Error(
-                    `Enrollment service '${service.id}': credentialsSchema must have 'properties' or 'oneOf'`
-                );
-            }
-
-            if (!service.scriptPath || typeof service.scriptPath !== "string") {
-                throw new Error(`Enrollment service '${service.id}': 'scriptPath' is required and must be a string`);
-            }
-
-            if (!ALLOWED_SCRIPT_DIRS.some((dir) => service.scriptPath.startsWith(dir))) {
-                throw new Error(
-                    `Enrollment service '${service.id}': scriptPath must be within an allowed directory ` +
-                        `(${ALLOWED_SCRIPT_DIRS.join(" or ")}), got '${service.scriptPath}'`
-                );
-            }
-
-            if (service.scriptPath.includes("..")) {
-                throw new Error(`Enrollment service '${service.id}': scriptPath must not contain '..'`);
-            }
-
-            if (service.skipWhen !== undefined) {
-                if (!Array.isArray(service.skipWhen)) {
-                    throw new Error(`Enrollment service '${service.id}': 'skipWhen' must be an array`);
-                }
-                service.skipWhen.forEach((condition, condIndex) => {
-                    if (!condition.action || (condition.action !== "skip" && condition.action !== "connectivityOnly")) {
-                        throw new Error(
-                            `Enrollment service '${service.id}': skipWhen[${condIndex}].action must be 'skip' or 'connectivityOnly'`
-                        );
-                    }
-                    if (!condition.reason || typeof condition.reason !== "string") {
-                        throw new Error(
-                            `Enrollment service '${service.id}': skipWhen[${condIndex}].reason is required`
-                        );
-                    }
-                    if (condition.allPathsExist !== undefined && !Array.isArray(condition.allPathsExist)) {
-                        throw new Error(
-                            `Enrollment service '${service.id}': skipWhen[${condIndex}].allPathsExist must be an array`
-                        );
-                    }
-                    if (condition.anyPathExists !== undefined && !Array.isArray(condition.anyPathExists)) {
-                        throw new Error(
-                            `Enrollment service '${service.id}': skipWhen[${condIndex}].anyPathExists must be an array`
-                        );
-                    }
-                });
-            }
-        });
+    // Validate flightctl configuration if present
+    if (config.flightctl?.defaultEndpoint !== undefined) {
+        const endpoint = config.flightctl.defaultEndpoint;
+        if (typeof endpoint !== "string") {
+            throw new Error("flightctl.defaultEndpoint must be a string");
+        }
+        if (endpoint && !/^https?:\/\//.test(endpoint)) {
+            throw new Error("flightctl.defaultEndpoint must start with http:// or https://");
+        }
     }
 
     // Validate network configuration

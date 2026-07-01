@@ -48,11 +48,10 @@ import { loadConfig } from "./config-loader";
 import { readAttemptedMarker, AttemptedMarkerData } from "./attempted-marker";
 import { SystemOnboardingConfig } from "./types";
 
-import { HostnamePage } from "./wizard/HostnamePage.tsx";
 import { NetworkPage } from "./wizard/NetworkPage.tsx";
+import { NetworkServicesPage } from "./wizard/NetworkServicesPage.tsx";
 import { EnrollmentPage } from "./wizard/EnrollmentPage.tsx";
 import { EnrollmentProgressPage } from "./wizard/EnrollmentProgressPage.tsx";
-import { ConnectivityTestPage } from "./wizard/ConnectivityTestPage.tsx";
 import { LabelsPage } from "./wizard/LabelsPage.tsx";
 import { ReviewPage } from "./wizard/ReviewPage.tsx";
 import RestoredConfigurationSection, { WatchdogStatusData } from "./wizard/RestoredConfigurationSection.tsx";
@@ -60,11 +59,10 @@ import {
     stepIds,
     WIZARD_STEP_IDS,
     type WizardStepId,
-    validateHostnameStep,
     validateNetworkStep,
     validateEnrollmentStep,
-    validateConnectivityTestStep,
     validateLabelsStep,
+    validateNetworkServicesConfig,
 } from "./wizard/WizardSteps.ts";
 
 import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from "./paths";
@@ -301,34 +299,25 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     const [showRestoredConfigurationSection, setShowRestoredConfigurationSection] = useState(hasPreviousAttempt);
     const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
 
-    // Check if enrollment services are configured (controls whether enrollment step is shown)
-    const hasEnrollmentServices = Boolean(config && config.enrollmentServices && config.enrollmentServices.length > 0);
-    // Check if the user actually selected any enrollment services
-    const hasSelectedEnrollments = hasEnrollmentServices && model.enrollment.selectedServices.length > 0;
-    const reviewButtonText = hasSelectedEnrollments ? _("Enroll") : _("Apply");
-    const finalStepName = hasSelectedEnrollments ? _("Apply and enroll") : _("Apply configuration");
+    const isEnrollmentSelected = model.enrollment.selected;
+    const reviewButtonText = isEnrollmentSelected ? _("Enroll") : _("Apply");
+    const finalStepName = isEnrollmentSelected ? _("Apply and enroll") : _("Apply configuration");
 
     // Compute validation state for each step
-    const isHostnameStepValid = validateHostnameStep(model);
     const isNetworkStepValid = validateNetworkStep(model);
-    const isEnrollmentStepValid = validateEnrollmentStep(model, config?.enrollmentServices);
-    const isConnectivityTestStepValid = validateConnectivityTestStep(model);
+    const isNetworkServicesConfigValid = validateNetworkServicesConfig(model);
+    const isEnrollmentStepValid = validateEnrollmentStep(model);
     const isLabelsStepValid = validateLabelsStep(model);
 
     // Map step index to validation state
     const stepValidations = [
         isNetworkStepValid,
+        isNetworkServicesConfigValid,
         isEnrollmentStepValid,
-        isConnectivityTestStepValid,
-        isHostnameStepValid,
         isLabelsStepValid,
         true,
         true,
     ];
-
-    const visibleStepIds: readonly WizardStepId[] = hasEnrollmentServices
-        ? stepIds
-        : stepIds.filter((id) => id !== WIZARD_STEP_IDS.enrollment);
 
     const getStepValidation = (stepId: WizardStepId): boolean => {
         const index = stepIds.indexOf(stepId);
@@ -338,19 +327,19 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     // Handle step navigation - using PatternFly Wizard's correct signature
     const handleStepChange = (_event: React.MouseEvent<HTMLButtonElement>, currentStep: WizardBasicStep) => {
         const stepId = currentStep.id.toString() as WizardStepId;
-        const stepIndex = visibleStepIds.indexOf(stepId);
-        const maxReachIndex = visibleStepIds.indexOf(maxReachedStep);
+        const stepIndex = stepIds.indexOf(stepId);
+        const maxReachIndex = stepIds.indexOf(maxReachedStep);
 
         // Update max reached step if user progresses forward with valid data
-        if (stepIndex > maxReachIndex && getStepValidation(visibleStepIds[maxReachIndex])) {
+        if (stepIndex > maxReachIndex && getStepValidation(stepIds[maxReachIndex])) {
             setMaxReachedStep(stepId);
         }
     };
 
     // Users can only navigate to steps they've reached or the next step if current is valid
     const isStepDisabled = (stepId: WizardStepId): boolean => {
-        const stepIndex = visibleStepIds.indexOf(stepId);
-        const maxReachIndex = visibleStepIds.indexOf(maxReachedStep);
+        const stepIndex = stepIds.indexOf(stepId);
+        const maxReachIndex = stepIds.indexOf(maxReachedStep);
 
         if (stepIndex === -1) {
             return true;
@@ -362,7 +351,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
         }
 
         // Users can proceed to the next step only if the furthest reached step is valid
-        if (stepIndex === maxReachIndex + 1 && getStepValidation(visibleStepIds[maxReachIndex])) {
+        if (stepIndex === maxReachIndex + 1 && getStepValidation(stepIds[maxReachIndex])) {
             return false;
         }
 
@@ -477,36 +466,23 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                             <NetworkPage interfaces={interfaces} />
                         </FormWrapper>
                     </WizardStep>
-                    {hasEnrollmentServices && (
-                        <WizardStep
-                            name={_("Enrollment server")}
-                            id={WIZARD_STEP_IDS.enrollment}
-                            footer={{ isNextDisabled: !isEnrollmentStepValid, isCancelHidden: true }}
-                            isDisabled={isStepDisabled(WIZARD_STEP_IDS.enrollment)}
-                        >
-                            <FormWrapper>
-                                <EnrollmentPage />
-                            </FormWrapper>
-                        </WizardStep>
-                    )}
                     <WizardStep
-                        name={_("Connectivity test")}
-                        id={WIZARD_STEP_IDS.connectivityTest}
-                        footer={{ isNextDisabled: !isConnectivityTestStepValid, isCancelHidden: true }}
-                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.connectivityTest)}
+                        name={_("Network services")}
+                        id={WIZARD_STEP_IDS.networkServices}
+                        footer={{ isNextDisabled: !isNetworkServicesConfigValid, isCancelHidden: true }}
                     >
                         <FormWrapper>
-                            <ConnectivityTestPage />
+                            <NetworkServicesPage />
                         </FormWrapper>
                     </WizardStep>
                     <WizardStep
-                        name={_("Hostname")}
-                        id={WIZARD_STEP_IDS.hostname}
-                        footer={{ isNextDisabled: !isHostnameStepValid, isCancelHidden: true }}
-                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.hostname)}
+                        name={_("Enrollment")}
+                        id={WIZARD_STEP_IDS.enrollment}
+                        footer={{ isNextDisabled: !isEnrollmentStepValid, isCancelHidden: true }}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.enrollment)}
                     >
                         <FormWrapper>
-                            <HostnamePage />
+                            <EnrollmentPage />
                         </FormWrapper>
                     </WizardStep>
                     <WizardStep
@@ -526,7 +502,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         isDisabled={isStepDisabled(WIZARD_STEP_IDS.review)}
                     >
                         <FormWrapper>
-                            <ReviewPage hasEnrollmentScripts={hasEnrollmentServices} />
+                            <ReviewPage hasSelectedEnrollments={isEnrollmentSelected} />
                         </FormWrapper>
                     </WizardStep>
                     <WizardStep

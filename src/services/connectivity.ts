@@ -1,6 +1,4 @@
 import cockpit from "cockpit";
-import type { EnrollmentService } from "../types";
-import type { SkipResult } from "./skip-conditions";
 
 const IPV4_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
 const IPV6_RE = /^[0-9a-fA-F:]+$/;
@@ -102,14 +100,15 @@ export async function testNetworkConnectivity(
 }
 
 export async function verifyServiceConnectivity(
-    service: EnrollmentService,
     endpoint: string,
-    skipInfo: SkipResult | undefined,
+    useExisting: boolean,
     signal?: CancellationSignal,
     onOutput?: (output: string) => void
 ): Promise<ConnectivityResult> {
-    if (skipInfo?.action === "connectivityOnly") {
-        onOutput?.(`${skipInfo.reason}\n`);
+    if (useExisting) {
+        onOutput?.(
+            "Enrollment credentials are already configured on this device. Verifying connectivity to the server.\n"
+        );
     }
 
     if (!endpoint) {

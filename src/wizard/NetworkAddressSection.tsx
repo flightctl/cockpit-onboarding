@@ -11,7 +11,7 @@ import { getSetupInterface } from "../services/network";
 import { validateIpv4StaticConfig, validateIpv6StaticConfig } from "../validation";
 
 import FeatureSwitch from "../components/FeatureSwitch";
-import { LabelHeading, SubtleHeading } from "../components/Headings.tsx";
+import { LabelHeading } from "../components/Headings.tsx";
 import ValidatedRadioLabel from "../components/ValidatedRadioLabel.tsx";
 import { NetworkAddressDns } from "./NetworkAddressDns";
 import { StaticIpv4Configuration } from "./StaticIpv4Configuration.tsx";
@@ -37,19 +37,16 @@ const NetworkAddressSection = () => {
                 </Title>
             </StackItem>
             <StackItem>
-                <SubtleHeading text={_("Configure IPv4 and IPv6")} />
+                <NetworkConfigIPv4 isSetupInterface={isSetupInterface} />
+            </StackItem>
+            <StackItem>
+                <NetworkConfigIPv6 isSetupInterface={isSetupInterface} />
             </StackItem>
             {isMissingNetworkConfig && (
                 <StackItem className="pf-v6-u-my-md">
                     <Alert variant="warning" isInline title={_("Configure IPv4, IPv6, or both to continue.")} />
                 </StackItem>
             )}
-            <StackItem>
-                <NetworkConfigIPv4 isSetupInterface={isSetupInterface} />
-            </StackItem>
-            <StackItem>
-                <NetworkConfigIPv6 isSetupInterface={isSetupInterface} />
-            </StackItem>
         </Stack>
     );
 };

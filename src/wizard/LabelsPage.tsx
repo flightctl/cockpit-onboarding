@@ -2,19 +2,40 @@ import React from "react";
 import cockpit from "cockpit";
 
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
-import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
-import { FormSelect, FormSelectOption } from "@patternfly/react-core/dist/esm/components/FormSelect/index.js";
-import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
-import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { Divider } from "@patternfly/react-core/dist/esm/components/Divider/Divider";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
-import { MinusCircleIcon } from "@patternfly/react-icons";
-import { useModelContext } from "../model-context";
+import { FormGroup, FormSection } from "@patternfly/react-core/dist/esm/components/Form/index.js";
+import { MenuToggle, MenuToggleElement } from "@patternfly/react-core/dist/esm/components/MenuToggle/index.js";
+import { MenuFooter } from "@patternfly/react-core/dist/esm/components/Menu/MenuFooter";
+import { MinusCircleIcon, PlusCircleIcon } from "@patternfly/react-icons";
+import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
+import { Select, SelectList, SelectOption } from "@patternfly/react-core/dist/esm/components/Select/index.js";
+import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
+import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
+
+import { SubtleHeading } from "../components/Headings";
+import FormHelperText from "../components/HelperTexts";
+import ValidatedTextInput from "../components/ValidatedTextInput";
+import { AliasMode, useModelContext } from "../model-context";
+import { ALIAS_LABEL_KEY } from "../services/alias";
+import {
+    getDuplicateLabelKeys,
+    getOverlappingLabelKeys,
+    validateHostname,
+    validateLabelKey,
+    validateLabelValue,
+} from "../validation";
+import { CustomLabelRow, type DeviceLabelEntry } from "./CustomLabelRow";
 
 const _ = cockpit.gettext;
 
+// SYSTEM_INFO_FIELDS includes all built-in system info fields that the flighctl-agent will collect and report.
+// To include additional fields, users need to configure them manually as "custom-info.d" scripts, and then they need to
+// select them manually in the system information mapping section.
 const SYSTEM_INFO_FIELDS = [
-    "hostname",
     "architecture",
+    "hostname",
     "kernel",
     "distroName",
     "distroVersion",
@@ -24,12 +45,9 @@ const SYSTEM_INFO_FIELDS = [
     "netInterfaceDefault",
     "netIpDefault",
     "netMacDefault",
-    "cpuCores",
-    "cpuModel",
-    "memoryTotalKb",
-    "gpu",
-    "biosVendor",
-    "biosVersion",
+    "managementCertNotAfter",
+    "managementCertSerial",
+    "tpmVendorInfo",
 ];
 
 const CUSTOM_INFO_SENTINEL = "__customInfo__";
@@ -40,175 +58,501 @@ const isCustomInfoField = (field: string): boolean => field.startsWith(CUSTOM_IN
 const getCustomInfoKey = (field: string): string =>
     isCustomInfoField(field) ? field.slice(CUSTOM_INFO_PREFIX.length) : "";
 
-export const LabelsPage: React.FunctionComponent = () => {
-    const { model, updateModel } = useModelContext();
+const getSystemInfoFieldLabel = (value: string): string => {
+    if (!value) {
+        return _("Select system info field");
+    }
+    if (isCustomInfoField(value)) {
+        return _("Use custom system info field");
+    }
+    return value;
+};
+
+type SystemInfoFieldSelectProps = {
+    id: string;
+    value: string;
+    onChange: (value: string) => void;
+};
+
+const SystemInfoFieldSelect = ({ id, value, onChange }: SystemInfoFieldSelectProps) => {
+    const [isOpen, setIsOpen] = React.useState(false);
+    const selectedValue = isCustomInfoField(value) ? CUSTOM_INFO_SENTINEL : value;
+    const selectedLabel = getSystemInfoFieldLabel(value);
+
+    const onSelect = (
+        _event: React.MouseEvent<Element, MouseEvent> | undefined,
+        selection: string | number | undefined
+    ) => {
+        if (selection) {
+            onChange(selection as string);
+        }
+        setIsOpen(false);
+    };
+
+    const toggle = (toggleRef: React.Ref<MenuToggleElement>) => (
+        <MenuToggle
+            ref={toggleRef}
+            id={id}
+            onClick={() => setIsOpen(!isOpen)}
+            isExpanded={isOpen}
+            isFullWidth
+            isPlaceholder={!selectedValue}
+        >
+            {selectedLabel}
+        </MenuToggle>
+    );
+
+    return (
+        <Select
+            id={`${id}-menu`}
+            isOpen={isOpen}
+            selected={selectedValue || undefined}
+            onSelect={onSelect}
+            onOpenChange={setIsOpen}
+            toggle={toggle}
+            shouldFocusToggleOnSelect
+            popperProps={{ preventOverflow: true, width: "trigger" }}
+        >
+            <SelectList style={{ maxHeight: "20rem", overflow: "auto" }}>
+                {SYSTEM_INFO_FIELDS.map((field) => (
+                    <SelectOption key={field} value={field}>
+                        {field}
+                    </SelectOption>
+                ))}
+            </SelectList>
+            <Divider />
+            <MenuFooter>
+                <Button
+                    variant="link"
+                    isInline
+                    onClick={() => {
+                        onChange(CUSTOM_INFO_SENTINEL);
+                        setIsOpen(false);
+                    }}
+                >
+                    {_("Use custom system info field")}
+                </Button>
+            </MenuFooter>
+        </Select>
+    );
+};
+
+let nextDeviceLabelRowKey = 0;
+const createDeviceLabelRowKey = () => nextDeviceLabelRowKey++;
+
+let nextSystemInfoMappingRowKey = 0;
+const createSystemInfoMappingRowKey = () => nextSystemInfoMappingRowKey++;
+
+type SystemInfoMappingEntry = { rowKey: number; key: string; value: string };
+
+const toDisplayDeviceLabels = (labels: { key: string; value: string }[]): DeviceLabelEntry[] => {
+    const source = labels.length > 0 ? labels : [{ key: "", value: "" }];
+    return source.map((label) => ({ rowKey: createDeviceLabelRowKey(), ...label }));
+};
+
+const toModelDeviceLabels = (entries: DeviceLabelEntry[]): { key: string; value: string }[] =>
+    entries.map(({ key, value }) => ({ key, value }));
+
+const createEmptyDeviceLabelEntry = (): DeviceLabelEntry => ({
+    rowKey: createDeviceLabelRowKey(),
+    key: "",
+    value: "",
+});
+
+const toDisplaySystemInfoMappings = (mappings: { key: string; value: string }[]): SystemInfoMappingEntry[] => {
+    const source = mappings.length > 0 ? mappings : [{ key: "", value: "" }];
+    return source.map((mapping) => ({ rowKey: createSystemInfoMappingRowKey(), ...mapping }));
+};
+
+const toModelSystemInfoMappings = (entries: SystemInfoMappingEntry[]): { key: string; value: string }[] =>
+    entries.map(({ key, value }) => ({ key, value }));
+
+const createEmptySystemInfoMappingEntry = (): SystemInfoMappingEntry => ({
+    rowKey: createSystemInfoMappingRowKey(),
+    key: "",
+    value: "",
+});
+
+const getSystemInfoMappingErrors = (key: string, value: string): { key: string; value: string } => {
+    const isCustomInfo = value.startsWith(CUSTOM_INFO_PREFIX);
+    const hasField = isCustomInfo ? getCustomInfoKey(value).length > 0 : value.length > 0;
+    const hasKey = key.length > 0;
+
+    if (!hasKey && !hasField) {
+        return { key: "", value: "" };
+    }
+    if (!hasKey) {
+        return { key: _("Label key is required"), value: "" };
+    }
+    if (!hasField) {
+        return {
+            key: "",
+            value: _("The system info field for this mapping is required"),
+        };
+    }
+
+    if (key === ALIAS_LABEL_KEY) {
+        return { key: _("The 'alias' label key is reserved"), value: "" };
+    }
+
+    return {
+        key: validateLabelKey(key) ?? "",
+        value: "",
+    };
+};
+
+const formatQuotedLabelKey = (key: string): string => `'${key}'`;
+
+const formatQuotedLabelKeys = (keys: string[]): string => keys.map(formatQuotedLabelKey).join(", ");
+
+const formatDuplicateLabelKeysError = (duplicateKeys: string[]): string =>
+    cockpit.format(_("Label keys must be unique. Duplicate keys found: $0"), formatQuotedLabelKeys(duplicateKeys));
+
+const formatOverlappingLabelKeysWarning = (overlappingKeys: string[]): string =>
+    cockpit.format(
+        _(
+            "The following system information mapping keys have been also defined as custom labels, and will be ignored: $0."
+        ),
+        formatQuotedLabelKeys(overlappingKeys)
+    );
+
+export const LabelsPage = () => {
+    const { model, isInitialized, updateModel } = useModelContext();
+    const { mode: aliasMode, customValue: customAliasValue } = model.alias;
     const { deviceLabels, systemInfoMappings } = model.labels;
+    const [displayDeviceLabels, setDisplayDeviceLabels] = React.useState<DeviceLabelEntry[]>(() =>
+        toDisplayDeviceLabels(deviceLabels)
+    );
+    const [displaySystemInfoMappings, setDisplaySystemInfoMappings] = React.useState<SystemInfoMappingEntry[]>(() =>
+        toDisplaySystemInfoMappings(systemInfoMappings)
+    );
+    const hasSyncedModelLabels = React.useRef(deviceLabels.length > 0);
+    const hasSyncedModelSystemInfoMappings = React.useRef(systemInfoMappings.length > 0);
+    const [hostnameValidationError, setHostnameValidationError] = React.useState<string | null>(null);
+    const [aliasValidationError, setAliasValidationError] = React.useState<string | null>(null);
 
-    const setDeviceLabels = (labels: typeof deviceLabels) => {
-        updateModel("labels", { deviceLabels: labels });
+    React.useEffect(() => {
+        if (!isInitialized || hasSyncedModelLabels.current) {
+            return;
+        }
+        hasSyncedModelLabels.current = true;
+        if (deviceLabels.length > 0) {
+            setDisplayDeviceLabels(toDisplayDeviceLabels(deviceLabels));
+        }
+    }, [isInitialized, deviceLabels]);
+
+    React.useEffect(() => {
+        if (!isInitialized || hasSyncedModelSystemInfoMappings.current) {
+            return;
+        }
+        hasSyncedModelSystemInfoMappings.current = true;
+        if (systemInfoMappings.length > 0) {
+            setDisplaySystemInfoMappings(toDisplaySystemInfoMappings(systemInfoMappings));
+        }
+    }, [isInitialized, systemInfoMappings]);
+
+    const setHostname = (value: string) => {
+        const error = validateHostname(value);
+        setHostnameValidationError(error);
+        updateModel("hostname", { value });
     };
 
-    const setSystemInfoMappings = (mappings: typeof systemInfoMappings) => {
-        updateModel("labels", { systemInfoMappings: mappings });
-    };
-
-    const addDeviceLabel = () => {
-        setDeviceLabels([...deviceLabels, { key: "", value: "" }]);
-    };
-
-    const updateDeviceLabel = (index: number, field: "key" | "value", value: string) => {
-        const updated = deviceLabels.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry));
-        setDeviceLabels(updated);
-    };
-
-    const removeDeviceLabel = (index: number) => {
-        setDeviceLabels(deviceLabels.filter((_, i) => i !== index));
-    };
-
-    const addSystemInfoMapping = () => {
-        setSystemInfoMappings([...systemInfoMappings, { labelKey: "", systemInfoField: SYSTEM_INFO_FIELDS[0] }]);
-    };
-
-    const updateSystemInfoMapping = (index: number, field: "labelKey" | "systemInfoField", value: string) => {
-        const updated = systemInfoMappings.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry));
-        setSystemInfoMappings(updated);
-    };
-
-    const handleSystemInfoFieldChange = (index: number, value: string) => {
-        if (value === CUSTOM_INFO_SENTINEL) {
-            updateSystemInfoMapping(index, "systemInfoField", CUSTOM_INFO_PREFIX);
-        } else {
-            updateSystemInfoMapping(index, "systemInfoField", value);
+    const setAliasMode = (mode: AliasMode) => {
+        updateModel("alias", { mode });
+        if (mode !== AliasMode.CUSTOM) {
+            setAliasValidationError(null);
         }
     };
 
-    const handleCustomInfoKeyChange = (index: number, key: string) => {
-        updateSystemInfoMapping(index, "systemInfoField", CUSTOM_INFO_PREFIX + key);
+    const setCustomAlias = (value: string) => {
+        const error = validateLabelValue(value);
+        setAliasValidationError(value.length > 0 ? error : _("Alias value is required"));
+        updateModel("alias", { mode: AliasMode.CUSTOM, customValue: value });
     };
 
-    const removeSystemInfoMapping = (index: number) => {
-        setSystemInfoMappings(systemInfoMappings.filter((_, i) => i !== index));
-    };
+    const applyDeviceLabelsUpdate = React.useCallback(
+        (updater: (prev: DeviceLabelEntry[]) => DeviceLabelEntry[]) => {
+            hasSyncedModelLabels.current = true;
+            let modelLabels: { key: string; value: string }[] = [];
+            setDisplayDeviceLabels((prev) => {
+                const updated = updater(prev);
+                modelLabels = toModelDeviceLabels(updated);
+                return updated;
+            });
+            updateModel("labels", { deviceLabels: modelLabels });
+        },
+        [updateModel]
+    );
+
+    const addDeviceLabelRow = React.useCallback(() => {
+        applyDeviceLabelsUpdate((prev) => [...prev, createEmptyDeviceLabelEntry()]);
+    }, [applyDeviceLabelsUpdate]);
+
+    const updateDeviceLabel = React.useCallback(
+        (rowKey: number, newEntry: DeviceLabelEntry) => {
+            applyDeviceLabelsUpdate((prev) => prev.map((entry) => (entry.rowKey === rowKey ? newEntry : entry)));
+        },
+        [applyDeviceLabelsUpdate]
+    );
+
+    const removeDeviceLabel = React.useCallback(
+        (rowKey: number) => {
+            applyDeviceLabelsUpdate((prev) =>
+                prev.length === 1 ? [createEmptyDeviceLabelEntry()] : prev.filter((entry) => entry.rowKey !== rowKey)
+            );
+        },
+        [applyDeviceLabelsUpdate]
+    );
+
+    const applySystemInfoMappingsUpdate = React.useCallback(
+        (updater: (prev: SystemInfoMappingEntry[]) => SystemInfoMappingEntry[]) => {
+            hasSyncedModelSystemInfoMappings.current = true;
+            let modelMappings: { key: string; value: string }[] = [];
+            setDisplaySystemInfoMappings((prev) => {
+                const updated = updater(prev);
+                modelMappings = toModelSystemInfoMappings(updated);
+                return updated;
+            });
+            updateModel("labels", { systemInfoMappings: modelMappings });
+        },
+        [updateModel]
+    );
+
+    const addSystemInfoMappingRow = React.useCallback(() => {
+        applySystemInfoMappingsUpdate((prev) => [...prev, createEmptySystemInfoMappingEntry()]);
+    }, [applySystemInfoMappingsUpdate]);
+
+    const updateSystemInfoMapping = React.useCallback(
+        (rowKey: number, newEntry: SystemInfoMappingEntry) => {
+            applySystemInfoMappingsUpdate((prev) => prev.map((entry) => (entry.rowKey === rowKey ? newEntry : entry)));
+        },
+        [applySystemInfoMappingsUpdate]
+    );
+
+    const removeSystemInfoMapping = React.useCallback(
+        (rowKey: number) => {
+            applySystemInfoMappingsUpdate((prev) =>
+                prev.length === 1
+                    ? [createEmptySystemInfoMappingEntry()]
+                    : prev.filter((entry) => entry.rowKey !== rowKey)
+            );
+        },
+        [applySystemInfoMappingsUpdate]
+    );
+
+    const duplicateDeviceLabelKeys = getDuplicateLabelKeys(displayDeviceLabels);
+    const duplicateSystemInfoLabelKeys = getDuplicateLabelKeys(displaySystemInfoMappings);
+    const overlappingLabelKeys = getOverlappingLabelKeys(displayDeviceLabels, displaySystemInfoMappings);
 
     return (
         <Stack hasGutter>
             <StackItem>
-                <p>{_("Custom labels for fleet assignment (e.g., region, site, role)")}</p>
-                <Stack hasGutter>
-                    {deviceLabels.map((entry, index) => (
-                        <StackItem key={index}>
-                            <Flex alignItems={{ default: "alignItemsCenter" }}>
-                                <FlexItem flex={{ default: "flex_1" }}>
-                                    <FormGroup label={_("Key")}>
-                                        <TextInput
-                                            id={`device-label-key-${index}`}
-                                            value={entry.key}
-                                            onChange={(_, value) => updateDeviceLabel(index, "key", value)}
-                                            placeholder={_("key")}
-                                        />
-                                    </FormGroup>
-                                </FlexItem>
-                                <FlexItem flex={{ default: "flex_1" }}>
-                                    <FormGroup label={_("Value")}>
-                                        <TextInput
-                                            id={`device-label-value-${index}`}
-                                            value={entry.value}
-                                            onChange={(_, value) => updateDeviceLabel(index, "value", value)}
-                                            placeholder={_("value")}
-                                        />
-                                    </FormGroup>
-                                </FlexItem>
-                                <FlexItem>
-                                    <Button
-                                        variant="plain"
-                                        aria-label={_("Remove label")}
-                                        onClick={() => removeDeviceLabel(index)}
-                                        style={{ marginTop: "1.5rem" }}
-                                    >
-                                        <MinusCircleIcon />
-                                    </Button>
-                                </FlexItem>
-                            </Flex>
+                <Title headingLevel="h1" size="2xl">
+                    {_("Device labels")}
+                </Title>
+            </StackItem>
+            <StackItem>
+                <FormSection title={_("Hostname and Alias")}>
+                    <Stack hasGutter>
+                        <StackItem>
+                            <FormGroup label={_("Hostname")} isRequired>
+                                <ValidatedTextInput
+                                    id="hostname-input"
+                                    value={model.hostname.value}
+                                    error={hostnameValidationError}
+                                    onChange={(_, value) => setHostname(value)}
+                                    placeholder={_("e.g. my-system.example.com")}
+                                    isDisabled={!isInitialized}
+                                />
+                            </FormGroup>
                         </StackItem>
-                    ))}
-                    <StackItem>
-                        <Button variant="secondary" onClick={addDeviceLabel}>
-                            {_("Add label")}
-                        </Button>
-                    </StackItem>
-                </Stack>
+                        <StackItem>
+                            <FormGroup label={_("Alias")} fieldId="alias-mode">
+                                <Stack hasGutter>
+                                    <StackItem>
+                                        <Radio
+                                            id="alias-mode-hostname"
+                                            name="alias-mode"
+                                            label={_("Use hostname as alias")}
+                                            isChecked={aliasMode === AliasMode.HOSTNAME}
+                                            onChange={() => setAliasMode(AliasMode.HOSTNAME)}
+                                        />
+                                    </StackItem>
+                                    <StackItem>
+                                        <Radio
+                                            id="alias-mode-custom"
+                                            name="alias-mode"
+                                            label={_("Set a custom alias")}
+                                            isChecked={aliasMode === AliasMode.CUSTOM}
+                                            onChange={() => setAliasMode(AliasMode.CUSTOM)}
+                                            body={
+                                                aliasMode === AliasMode.CUSTOM && (
+                                                    <FormGroup label={_("Custom alias")} isRequired>
+                                                        <ValidatedTextInput
+                                                            id="alias-custom-input"
+                                                            value={customAliasValue}
+                                                            error={aliasValidationError}
+                                                            onChange={(_, value) => setCustomAlias(value)}
+                                                            placeholder={_("e.g. edge-gateway-01")}
+                                                        />
+                                                    </FormGroup>
+                                                )
+                                            }
+                                        />
+                                    </StackItem>
+                                    <StackItem>
+                                        <Radio
+                                            id="alias-mode-none"
+                                            name="alias-mode"
+                                            label={_("Do not set an alias")}
+                                            isChecked={aliasMode === AliasMode.NONE}
+                                            onChange={() => setAliasMode(AliasMode.NONE)}
+                                        />
+                                    </StackItem>
+                                </Stack>
+                            </FormGroup>
+                        </StackItem>
+                    </Stack>
+                </FormSection>
             </StackItem>
 
-            <StackItem style={{ marginTop: "1rem" }}>
-                <p>{_("Automatically derive labels from device hardware and OS information")}</p>
-                <Stack hasGutter>
-                    {systemInfoMappings.map((entry, index) => (
-                        <StackItem key={index}>
-                            <Flex alignItems={{ default: "alignItemsCenter" }}>
-                                <FlexItem flex={{ default: "flex_1" }}>
-                                    <FormGroup label={_("Label key")}>
-                                        <TextInput
-                                            id={`sysinfo-label-key-${index}`}
-                                            value={entry.labelKey}
-                                            onChange={(_, value) => updateSystemInfoMapping(index, "labelKey", value)}
-                                            placeholder={_("label key")}
-                                        />
-                                    </FormGroup>
-                                </FlexItem>
-                                <FlexItem flex={{ default: "flex_1" }}>
-                                    <FormGroup label={_("System info field")}>
-                                        <FormSelect
-                                            id={`sysinfo-field-${index}`}
-                                            value={
-                                                isCustomInfoField(entry.systemInfoField)
-                                                    ? CUSTOM_INFO_SENTINEL
-                                                    : entry.systemInfoField
-                                            }
-                                            onChange={(_, value) => handleSystemInfoFieldChange(index, value)}
-                                        >
-                                            {SYSTEM_INFO_FIELDS.map((field) => (
-                                                <FormSelectOption key={field} value={field} label={field} />
-                                            ))}
-                                            <FormSelectOption
-                                                key={CUSTOM_INFO_SENTINEL}
-                                                value={CUSTOM_INFO_SENTINEL}
-                                                label={_("Custom info...")}
-                                            />
-                                        </FormSelect>
-                                    </FormGroup>
-                                </FlexItem>
-                                {isCustomInfoField(entry.systemInfoField) && (
-                                    <FlexItem flex={{ default: "flex_1" }}>
-                                        <FormGroup label={_("Custom info key")}>
-                                            <TextInput
-                                                id={`custom-info-key-${index}`}
-                                                value={getCustomInfoKey(entry.systemInfoField)}
-                                                onChange={(_, value) => handleCustomInfoKeyChange(index, value)}
-                                                placeholder={_("e.g. siteId")}
-                                            />
-                                        </FormGroup>
-                                    </FlexItem>
-                                )}
-                                <FlexItem>
-                                    <Button
-                                        variant="plain"
-                                        aria-label={_("Remove mapping")}
-                                        onClick={() => removeSystemInfoMapping(index)}
-                                        style={{ marginTop: "1.5rem" }}
-                                    >
-                                        <MinusCircleIcon />
-                                    </Button>
-                                </FlexItem>
-                            </Flex>
-                        </StackItem>
-                    ))}
-                    <StackItem>
-                        <Button variant="secondary" onClick={addSystemInfoMapping}>
-                            {_("Add mapping")}
-                        </Button>
-                    </StackItem>
-                </Stack>
+            <StackItem>
+                <Divider />
             </StackItem>
+
+            <StackItem>
+                <FormSection title={_("Custom labels")}>
+                    <Stack hasGutter>
+                        {displayDeviceLabels.map((entry) => (
+                            <StackItem key={entry.rowKey}>
+                                <CustomLabelRow
+                                    entry={entry}
+                                    onUpdate={updateDeviceLabel}
+                                    onRemove={removeDeviceLabel}
+                                />
+                            </StackItem>
+                        ))}
+                        {duplicateDeviceLabelKeys.length > 0 && (
+                            <StackItem>
+                                <FormHelperText
+                                    content={formatDuplicateLabelKeysError(duplicateDeviceLabelKeys)}
+                                    variant="error"
+                                />
+                            </StackItem>
+                        )}
+                        <StackItem>
+                            <Button variant="link" isInline icon={<PlusCircleIcon />} onClick={addDeviceLabelRow}>
+                                {_("Add another label")}
+                            </Button>
+                        </StackItem>
+                    </Stack>
+                </FormSection>
+            </StackItem>
+
+            <StackItem>
+                <Divider />
+            </StackItem>
+
+            <StackItem>
+                <FormSection title={_("System information mapping")}>
+                    <SubtleHeading text={_("Automatically derive labels from device hardware and OS information")} />
+                    <Stack hasGutter>
+                        {displaySystemInfoMappings.map((entry) => {
+                            const mappingErrors = getSystemInfoMappingErrors(entry.key, entry.value);
+
+                            const handleKeyChange = (value: string) => {
+                                updateSystemInfoMapping(entry.rowKey, { ...entry, key: value });
+                            };
+
+                            const handleFieldChange = (value: string) => {
+                                const fieldValue = value === CUSTOM_INFO_SENTINEL ? CUSTOM_INFO_PREFIX : value;
+                                updateSystemInfoMapping(entry.rowKey, { ...entry, value: fieldValue });
+                            };
+
+                            const handleCustomInfoKeyChange = (key: string) => {
+                                updateSystemInfoMapping(entry.rowKey, {
+                                    ...entry,
+                                    value: CUSTOM_INFO_PREFIX + key,
+                                });
+                            };
+
+                            return (
+                                <StackItem key={entry.rowKey}>
+                                    <Flex alignItems={{ default: "alignItemsFlexEnd" }}>
+                                        <FlexItem flex={{ default: "flex_1" }}>
+                                            <FormGroup label={_("Label key")}>
+                                                <TextInput
+                                                    id={`sysinfo-label-key-${entry.rowKey}`}
+                                                    value={entry.key}
+                                                    onChange={(_, value) => handleKeyChange(value)}
+                                                    placeholder={_("Enter label key")}
+                                                />
+                                            </FormGroup>
+                                        </FlexItem>
+                                        <FlexItem flex={{ default: "flex_1" }}>
+                                            <FormGroup label={_("System info field")}>
+                                                <SystemInfoFieldSelect
+                                                    id={`sysinfo-field-${entry.rowKey}`}
+                                                    value={entry.value}
+                                                    onChange={handleFieldChange}
+                                                />
+                                            </FormGroup>
+                                        </FlexItem>
+                                        {isCustomInfoField(entry.value) && (
+                                            <FlexItem flex={{ default: "flex_1" }}>
+                                                <FormGroup label={_("Custom info key")}>
+                                                    <TextInput
+                                                        id={`custom-info-key-${entry.rowKey}`}
+                                                        value={getCustomInfoKey(entry.value)}
+                                                        onChange={(_, value) => handleCustomInfoKeyChange(value)}
+                                                        placeholder={_("e.g. siteId")}
+                                                    />
+                                                </FormGroup>
+                                            </FlexItem>
+                                        )}
+                                        <FlexItem>
+                                            <Button
+                                                variant="plain"
+                                                aria-label={_("Remove mapping")}
+                                                onClick={() => removeSystemInfoMapping(entry.rowKey)}
+                                            >
+                                                <MinusCircleIcon />
+                                            </Button>
+                                        </FlexItem>
+                                    </Flex>
+                                    {mappingErrors.key && (
+                                        <FormHelperText content={mappingErrors.key} variant="error" />
+                                    )}
+                                    {mappingErrors.value && (
+                                        <FormHelperText content={mappingErrors.value} variant="error" />
+                                    )}
+                                </StackItem>
+                            );
+                        })}
+                        {duplicateSystemInfoLabelKeys.length > 0 && (
+                            <StackItem>
+                                <FormHelperText
+                                    content={formatDuplicateLabelKeysError(duplicateSystemInfoLabelKeys)}
+                                    variant="error"
+                                />
+                            </StackItem>
+                        )}
+                        <StackItem>
+                            <Button variant="link" isInline icon={<PlusCircleIcon />} onClick={addSystemInfoMappingRow}>
+                                {_("Add another mapping")}
+                            </Button>
+                        </StackItem>
+                    </Stack>
+                </FormSection>
+            </StackItem>
+            {overlappingLabelKeys.length > 0 && (
+                <StackItem>
+                    <FormHelperText
+                        content={formatOverlappingLabelKeysWarning(overlappingLabelKeys)}
+                        variant="warning"
+                    />
+                </StackItem>
+            )}
         </Stack>
     );
 };

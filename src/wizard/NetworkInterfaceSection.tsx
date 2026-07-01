@@ -16,11 +16,14 @@ import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js
 import { SubtleHeading } from "../components/Headings.tsx";
 import FeatureSwitch from "../components/FeatureSwitch.tsx";
 import ValidatedTextInput from "../components/ValidatedTextInput.tsx";
+import NetworkInterfaceModel from "./NetworkInterfaceModel.tsx";
 
 import { useModelContext } from "../model-context.js";
 import { mapWifiSecurity } from "../services/network.js";
 import { getCurrentWifiConnection, scanWifiNetworks, WifiConnection } from "../services/wifi.js";
 import { Device, device_state_text, is_managed, type Interface } from "../../pkg/networkmanager/interfaces.js";
+import { Flex } from "@patternfly/react-core/dist/esm/layouts/Flex/Flex";
+import { FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/FlexItem";
 
 const _ = cockpit.gettext;
 
@@ -166,7 +169,7 @@ export const NetworkInterfaceSelector = ({ interfaces }: { interfaces: Interface
     };
 
     return (
-        <Table aria-label="Network interface selector" variant="compact" borders={false}>
+        <Table aria-label={_("Network interface selector")} variant="compact" borders={false}>
             <Thead>
                 <Tr>
                     <Th screenReaderText={_("Row select")} />
@@ -194,9 +197,7 @@ export const NetworkInterfaceSelector = ({ interfaces }: { interfaces: Interface
                         <Td dataLabel={columnNames.type}>{iface.Device?.DeviceType || N_A}</Td>
                         <Td dataLabel={columnNames.mac}>{iface.Device?.HwAddress || N_A}</Td>
                         <Td dataLabel={columnNames.model}>
-                            {iface.Device?.IdVendor && iface.Device?.IdModel
-                                ? `${iface.Device.IdVendor} ${iface.Device.IdModel}`
-                                : iface.Device?.IdModel || iface.Device?.IdVendor || N_A}
+                            {iface.Device ? <NetworkInterfaceModel device={iface.Device} /> : N_A}
                         </Td>
                         <Td dataLabel={columnNames.speed}>
                             {iface.Device?.Speed ? `${iface.Device.Speed} Mbps` : N_A}
@@ -382,7 +383,9 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
     return (
         <Stack hasGutter>
             <StackItem>
-                <p>{_("Select a WiFi network to connect to:")}</p>
+                <Title headingLevel="h3" size="md" className="pf-v6-u-mb-sm">
+                    {_("Select a WiFi network to connect to:")}
+                </Title>
             </StackItem>
 
             {isScanning && (
@@ -394,7 +397,7 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
             {!isScanning && (
                 <>
                     <StackItem>
-                        <Table aria-label="WiFi network selector" variant="compact">
+                        <Table aria-label={_("WiFi network selector")} variant="compact">
                             <Thead>
                                 <Tr>
                                     <Th screenReaderText="Row select" />
@@ -458,29 +461,33 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
                                 id="wifi-ssid"
                                 value={model.networkInterface.wifiSsid || ""}
                                 onChange={(_, value) => handleSsidChange(value)}
-                                aria-label="WiFi SSID"
+                                aria-label={_("WiFi SSID")}
                                 placeholder={_("Enter network name")}
                             />
                         </FormGroup>
                     </StackItem>
                     <StackItem>
                         <FormGroup label={_("Security")} fieldId="wifi-security">
-                            <div style={{ display: "flex", gap: "1.5rem" }}>
-                                <Radio
-                                    id="wifi-security-wpa"
-                                    name="wifi-security"
-                                    label="WPA/WPA2/WPA3"
-                                    isChecked={model.networkInterface.wifiSecurity !== "none"}
-                                    onChange={() => handleSecurityChange("wpa")}
-                                />
-                                <Radio
-                                    id="wifi-security-none"
-                                    name="wifi-security"
-                                    label={_("None (open)")}
-                                    isChecked={model.networkInterface.wifiSecurity === "none"}
-                                    onChange={() => handleSecurityChange("none")}
-                                />
-                            </div>
+                            <Flex justifyContent={{ default: "justifyContentSpaceBetween" }}>
+                                <FlexItem>
+                                    <Radio
+                                        id="wifi-security-wpa"
+                                        name="wifi-security"
+                                        label={_("WPA/WPA2/WPA3")}
+                                        isChecked={model.networkInterface.wifiSecurity !== "none"}
+                                        onChange={() => handleSecurityChange("wpa")}
+                                    />
+                                </FlexItem>
+                                <FlexItem>
+                                    <Radio
+                                        id="wifi-security-none"
+                                        name="wifi-security"
+                                        label={_("None (open)")}
+                                        isChecked={model.networkInterface.wifiSecurity === "none"}
+                                        onChange={() => handleSecurityChange("none")}
+                                    />
+                                </FlexItem>
+                            </Flex>
                         </FormGroup>
                     </StackItem>
                     {showPassword && (
@@ -491,7 +498,7 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
                                     id="wifi-password"
                                     value={model.networkInterface.wifiPassword || ""}
                                     onChange={(_, value) => handlePasswordChange(value)}
-                                    aria-label="WiFi password"
+                                    aria-label={_("WiFi password")}
                                     placeholder={_("Enter WiFi password")}
                                 />
                             </FormGroup>

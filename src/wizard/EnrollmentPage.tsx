@@ -1,550 +1,359 @@
 /**
  * Enrollment Page
  *
- * Allows users to select management services and provide credentials for enrollment.
- * Dynamically renders credential forms based on each service's JSON schema.
+ * Allows users to enroll the device into Flight Control.
  */
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import cockpit from "cockpit";
-import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
-import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
-import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
-import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
-import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
+import ExternalLinkAltIcon from "@patternfly/react-icons/dist/esm/icons/external-link-alt-icon";
+import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Card, CardBody, CardTitle } from "@patternfly/react-core/dist/esm/components/Card/index.js";
-import { Alert, AlertVariant } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
-import { ValidatedOptions } from "@patternfly/react-core/dist/esm/helpers/constants.js";
+import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
+import { Content } from "@patternfly/react-core/dist/esm/components/Content";
+import { Divider } from "@patternfly/react-core/dist/esm/components/Divider/index.js";
+import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex";
+import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
+import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
+import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
+import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 
 import { useModelContext } from "../model-context";
 import { useConfig } from "../app";
 import { validateURL } from "../validation";
-import { evaluateSkipConditions, SkipResult } from "../services/skip-conditions";
-import type { EnrollmentService } from "../types";
-import DefaultHelperText, { ErrorHelperText } from "../components/HelperTexts";
+import ValidatedTextInput from "../components/ValidatedTextInput";
+import { LabelHeading } from "../components/Headings";
+import WithTooltip from "../components/WithTooltip";
+import type {
+    FlightctlAuthMethod,
+    FlightctlPasswordCredentials,
+    FlightctlTokenCredentials,
+    ServiceEnrollmentConfig,
+} from "../types";
+import { detectFlightctlConfig } from "../services/flightctl-config";
 
 const _ = cockpit.gettext;
 
-/**
- * JSON Schema Form Renderer
- *
- * Renders a form based on a JSON Schema (Draft 7) using PatternFly components.
- * Supports: string, number, boolean types with validation.
- */
-interface FieldSchema {
-    type: string;
-    title?: string;
-    format?: string;
-    minimum?: number;
-    maximum?: number;
-    minLength?: number;
-    maxLength?: number;
-}
-
-interface SchemaVariant {
-    title?: string;
-    properties: Record<string, FieldSchema>;
-    required?: string[];
-}
-
-interface JsonSchemaFormProps {
-    schema: {
-        type: string;
-        properties?: Record<string, FieldSchema>;
-        required?: string[];
-        oneOf?: SchemaVariant[];
-    };
-    formData: Record<string, unknown>;
-    onChange: (formData: Record<string, unknown>) => void;
-}
-
-/**
- * Validate a single field against its schema and required list.
- */
-function validateField(fieldName: string, value: unknown, fieldSchema: FieldSchema, required: string[]): string | null {
-    if (required.includes(fieldName)) {
-        if (value === undefined || value === null || value === "") {
-            return "This field is required";
-        }
-    }
-
-    if (value !== undefined && value !== null && value !== "") {
-        switch (fieldSchema.type) {
-            case "string": {
-                const strValue = String(value);
-                if (fieldSchema.minLength && strValue.length < fieldSchema.minLength) {
-                    return `Minimum length is ${fieldSchema.minLength}`;
-                }
-                if (fieldSchema.maxLength && strValue.length > fieldSchema.maxLength) {
-                    return `Maximum length is ${fieldSchema.maxLength}`;
-                }
-                break;
-            }
-            case "number": {
-                const numValue = Number(value);
-                if (isNaN(numValue)) {
-                    return "Must be a valid number";
-                }
-                if (fieldSchema.minimum !== undefined && numValue < fieldSchema.minimum) {
-                    return `Minimum value is ${fieldSchema.minimum}`;
-                }
-                if (fieldSchema.maximum !== undefined && numValue > fieldSchema.maximum) {
-                    return `Maximum value is ${fieldSchema.maximum}`;
-                }
-                break;
-            }
-        }
-    }
-
-    return null;
-}
-
-/**
- * Renders fields for a flat set of properties.
- */
-const SchemaFields: React.FC<{
-    properties: Record<string, FieldSchema>;
-    required: string[];
-    formData: Record<string, unknown>;
-    onFieldChange: (fieldName: string, value: unknown) => void;
-    errors: Record<string, string>;
-    touched: Record<string, boolean>;
-}> = ({ properties, required, formData, onFieldChange, errors, touched }) => {
-    return (
-        <>
-            {Object.entries(properties).map(([fieldName, fieldSchema]) => {
-                const isRequired = required.includes(fieldName);
-                const label = fieldSchema.title || fieldName;
-                const value = formData[fieldName];
-                const error = errors[fieldName];
-                const showError = touched[fieldName] && error;
-
-                const validationState = error
-                    ? ValidatedOptions.error
-                    : value && String(value).trim()
-                      ? ValidatedOptions.success
-                      : isRequired
-                        ? ValidatedOptions.warning
-                        : ValidatedOptions.default;
-
-                switch (fieldSchema.type) {
-                    case "string":
-                        return (
-                            <StackItem key={fieldName}>
-                                <FormGroup label={label} isRequired={isRequired}>
-                                    <TextInput
-                                        id={`field-${fieldName}`}
-                                        type={fieldSchema.format === "password" ? "password" : "text"}
-                                        value={String(value || "")}
-                                        onChange={(_event, val) => onFieldChange(fieldName, val)}
-                                        validated={validationState}
-                                        isRequired={isRequired}
-                                    />
-                                    {showError && <ErrorHelperText error={error} />}
-                                </FormGroup>
-                            </StackItem>
-                        );
-
-                    case "number":
-                        return (
-                            <StackItem key={fieldName}>
-                                <FormGroup label={label} isRequired={isRequired}>
-                                    <TextInput
-                                        id={`field-${fieldName}`}
-                                        type="number"
-                                        value={String(value || "")}
-                                        onChange={(_event, val) => onFieldChange(fieldName, Number(val))}
-                                        validated={validationState}
-                                        isRequired={isRequired}
-                                    />
-                                    {showError && <ErrorHelperText error={error} />}
-                                </FormGroup>
-                            </StackItem>
-                        );
-
-                    case "boolean":
-                        return (
-                            <StackItem key={fieldName}>
-                                <Checkbox
-                                    id={`field-${fieldName}`}
-                                    label={label}
-                                    isChecked={Boolean(value)}
-                                    onChange={(_event, checked) => onFieldChange(fieldName, checked)}
-                                />
-                            </StackItem>
-                        );
-
-                    default:
-                        return (
-                            <StackItem key={fieldName}>
-                                <Alert
-                                    variant={AlertVariant.warning}
-                                    isInline
-                                    title={`Unsupported field type: ${fieldSchema.type}`}
-                                />
-                            </StackItem>
-                        );
-                }
-            })}
-        </>
-    );
-};
-
-const JsonSchemaForm: React.FC<JsonSchemaFormProps> = ({ schema, formData, onChange }) => {
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [touched, setTouched] = useState<Record<string, boolean>>({});
-
-    // Track which oneOf variant is selected (stored as _variantIndex in formData)
-    const selectedVariant = typeof formData._variantIndex === "number" ? (formData._variantIndex as number) : 0;
-
-    // Resolve the active properties and required fields
-    const { activeProperties, activeRequired } = useMemo(() => {
-        if (schema.oneOf && schema.oneOf.length > 0) {
-            const variant = schema.oneOf[selectedVariant] || schema.oneOf[0];
-            return {
-                activeProperties: variant.properties,
-                activeRequired: variant.required || [],
-            };
-        }
-        return {
-            activeProperties: schema.properties || {},
-            activeRequired: schema.required || [],
-        };
-    }, [schema, selectedVariant]);
-
-    const handleFieldChange = (fieldName: string, value: unknown) => {
-        const newFormData = { ...formData, [fieldName]: value };
-        onChange(newFormData);
-
-        setTouched((prev) => ({ ...prev, [fieldName]: true }));
-
-        const fieldSchema = activeProperties[fieldName];
-        if (fieldSchema) {
-            const error = validateField(fieldName, value, fieldSchema, activeRequired);
-            setErrors((prev) => ({ ...prev, [fieldName]: error || "" }));
-        }
-    };
-
-    const handleVariantChange = (variantIndex: number) => {
-        // Clear form data when switching variants, preserving only the variant index
-        onChange({ _variantIndex: variantIndex });
-        setErrors({});
-        setTouched({});
-    };
-
-    return (
-        <Stack hasGutter>
-            {/* Render radio buttons when schema has oneOf */}
-            {schema.oneOf && schema.oneOf.length > 0 && (
-                <StackItem>
-                    <FormGroup label={_("Authentication method")}>
-                        <Stack>
-                            {schema.oneOf.map((variant, index) => (
-                                <StackItem key={index}>
-                                    <Radio
-                                        id={`variant-${index}`}
-                                        name="auth-method"
-                                        label={variant.title || `Option ${index + 1}`}
-                                        isChecked={selectedVariant === index}
-                                        onChange={() => handleVariantChange(index)}
-                                    />
-                                </StackItem>
-                            ))}
-                        </Stack>
-                    </FormGroup>
-                </StackItem>
-            )}
-
-            {/* Render fields for the active variant */}
-            <SchemaFields
-                properties={activeProperties}
-                required={activeRequired}
-                formData={formData}
-                onFieldChange={handleFieldChange}
-                errors={errors}
-                touched={touched}
-            />
-        </Stack>
-    );
-};
-
-/**
- * Enrollment Page Component
- */
-export const EnrollmentPage: React.FunctionComponent = () => {
+export const EnrollmentPage = () => {
     const { config } = useConfig();
     const { model, updateModel } = useModelContext();
+    const enrollment = model.enrollment;
+    const defaultEndpoint = config?.flightctl?.defaultEndpoint ?? "";
+    const serviceEndpoint = enrollment.endpoint ?? defaultEndpoint;
 
-    const enrollmentServices = useMemo(() => config?.enrollmentServices || [], [config?.enrollmentServices]);
-    const selectedServices = useMemo(
-        () => model.enrollment.selectedServices || [],
-        [model.enrollment.selectedServices]
-    );
-    const credentials = model.enrollment.credentials || {};
-    const endpoints = useMemo(() => model.enrollment.endpoints || {}, [model.enrollment.endpoints]);
-    const useExisting = useMemo(() => model.enrollment.useExisting || {}, [model.enrollment.useExisting]);
+    const [hasExistingCredentials, setHasExistingCredentials] = useState(false);
+    const [existingServerUrl, setExistingServerUrl] = useState("");
+    const [endpointTouched, setEndpointTouched] = useState(false);
+    const [endpointError, setEndpointError] = useState<string | undefined>();
 
-    const [skipResults, setSkipResults] = useState<Record<string, SkipResult>>({});
-    const [detectedExisting, setDetectedExisting] = useState<Record<string, boolean>>({});
+    const credentials = enrollment.credentials;
+    const authMethod = credentials?.authMethod ?? "token";
+    const isUsingExisting = hasExistingCredentials && (enrollment.useExisting ?? false);
+    const isEndpointFromExistingConfig = Boolean(existingServerUrl) && serviceEndpoint === existingServerUrl;
 
-    // Track endpoint validation errors and touched state
-    const [endpointErrors, setEndpointErrors] = useState<Record<string, string>>({});
-    const [endpointTouched, setEndpointTouched] = useState<Record<string, boolean>>({});
+    const newToken = credentials?.authMethod === "token" ? credentials.token : "";
+    const newUsername = credentials?.authMethod === "password" ? credentials.username : "";
+    const newPassword = credentials?.authMethod === "password" ? credentials.password : "";
 
-    // Capture which services had existing credentials detected at init time
-    useEffect(() => {
-        setDetectedExisting({ ...useExisting });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    const updateEnrollment = (patch: Partial<ServiceEnrollmentConfig>) => {
+        updateModel("enrollment", patch);
+    };
 
-    // Evaluate skipWhen conditions on mount
+    const updateServiceCredentials = (patch: FlightctlTokenCredentials | FlightctlPasswordCredentials) => {
+        updateModel("enrollment", {
+            credentials: patch,
+        });
+    };
+
     useEffect(() => {
         let cancelled = false;
-        const evaluate = async () => {
-            const results: Record<string, SkipResult> = {};
-            for (const service of enrollmentServices) {
-                results[service.id] = await evaluateSkipConditions(service.skipWhen);
-            }
-            if (!cancelled) {
-                setSkipResults(results);
 
-                // Auto-set useExisting for connectivityOnly services so that
-                // step validation does not require credentials.
-                const updates: Record<string, boolean> = {};
-                for (const service of enrollmentServices) {
-                    if (results[service.id]?.action === "connectivityOnly") {
-                        updates[service.id] = true;
-                    }
-                }
-                if (Object.keys(updates).length > 0) {
-                    updateModel("enrollment", {
-                        useExisting: { ...useExisting, ...updates },
-                    });
-                }
+        detectFlightctlConfig().then((flightctlConfig) => {
+            if (cancelled) {
+                return;
             }
-        };
-        evaluate();
+            setHasExistingCredentials(flightctlConfig.hasCredentials);
+            setExistingServerUrl(flightctlConfig.serverUrl ?? defaultEndpoint);
+            if (flightctlConfig.hasCredentials && enrollment.useExisting === undefined) {
+                updateEnrollment({ useExisting: true });
+            } else if (!flightctlConfig.hasCredentials) {
+                updateEnrollment({ useExisting: false });
+            }
+        });
+
         return () => {
             cancelled = true;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [enrollmentServices]);
+    }, []);
 
-    // Validate endpoints on mount and when they change
     useEffect(() => {
-        const errors: Record<string, string> = {};
-        for (const serviceId of selectedServices) {
-            if (useExisting[serviceId]) {
-                continue;
-            }
-            const service = enrollmentServices.find((s) => s.id === serviceId);
-            if (service) {
-                const endpoint = endpoints[serviceId] || service.endpoint.url;
-                const error = validateURL(endpoint, true);
-                if (error) {
-                    errors[serviceId] = error;
-                }
-            }
+        if (!enrollment.selected || isUsingExisting) {
+            return;
         }
-        setEndpointErrors(errors);
-    }, [endpoints, selectedServices, enrollmentServices, useExisting]);
+        setEndpointError(validateURL(serviceEndpoint, true) || undefined);
+    }, [enrollment.selected, isUsingExisting, serviceEndpoint]);
 
-    const toggleServiceSelection = (serviceId: string) => {
-        const newSelectedServices = selectedServices.includes(serviceId)
-            ? selectedServices.filter((id) => id !== serviceId)
-            : [...selectedServices, serviceId];
-
-        updateModel("enrollment", {
-            selectedServices: newSelectedServices,
-        });
+    const handleSelectionChange = () => {
+        if (enrollment.selected) {
+            setEndpointTouched(false);
+            setEndpointError(undefined);
+        }
+        updateEnrollment({ selected: !enrollment.selected });
     };
 
-    const updateServiceCredentials = (serviceId: string, credentialsData: Record<string, unknown>) => {
-        updateModel("enrollment", {
-            credentials: {
-                ...credentials,
-                [serviceId]: credentialsData,
-            },
-        });
+    const handleEndpointChange = (value: string) => {
+        setEndpointTouched(true);
+        setEndpointError(validateURL(value, true) || undefined);
+        updateEnrollment({ endpoint: value });
     };
 
-    const updateServiceEndpoint = (serviceId: string, endpoint: string) => {
-        setEndpointTouched((prev) => ({ ...prev, [serviceId]: true }));
-
-        const error = validateURL(endpoint, true);
-        setEndpointErrors((prev) => ({ ...prev, [serviceId]: error || "" }));
-
-        updateModel("enrollment", {
-            endpoints: {
-                ...endpoints,
-                [serviceId]: endpoint,
-            },
+    const handleAuthMethodChange = (method: FlightctlAuthMethod) => {
+        if (method === "token") {
+            updateServiceCredentials({
+                authMethod: "token",
+                token: newToken,
+            });
+            return;
+        }
+        updateServiceCredentials({
+            authMethod: "password",
+            username: newUsername,
+            password: newPassword,
         });
     };
-
-    const setUseExisting = (serviceId: string, value: boolean) => {
-        updateModel("enrollment", {
-            useExisting: {
-                ...useExisting,
-                [serviceId]: value,
-            },
-        });
-    };
-
-    // If no enrollment services are configured, show info message
-    if (enrollmentServices.length === 0) {
-        return (
-            <Stack hasGutter>
-                <StackItem>
-                    <Alert variant={AlertVariant.info} isInline title="No enrollment services configured">
-                        No enrollment services are currently configured. You can skip this step or configure services in{" "}
-                        <code>/etc/cockpit/system-onboarding/config.json</code>.
-                    </Alert>
-                </StackItem>
-            </Stack>
-        );
-    }
 
     return (
         <Stack hasGutter>
             <StackItem>
-                <p>Select the management services you want to enroll this device into:</p>
+                <Title headingLevel="h2" size="md">
+                    {_("Flight Control enrollment")}
+                </Title>
             </StackItem>
 
-            {enrollmentServices.map((service: EnrollmentService) => {
-                const skip = skipResults[service.id];
+            <StackItem>
+                <Checkbox
+                    id="flightctl-enrollment"
+                    label={_("Enroll this device into Flight Control")}
+                    isChecked={enrollment.selected}
+                    onChange={handleSelectionChange}
+                />
+            </StackItem>
 
-                if (skip?.action === "skip") {
-                    return (
-                        <StackItem key={service.id}>
-                            <Alert variant={AlertVariant.info} isInline title={service.name}>
-                                {skip.reason}
-                            </Alert>
-                        </StackItem>
-                    );
-                }
-
-                const isSelected = selectedServices.includes(service.id);
-                const isConnectivityOnly = skip?.action === "connectivityOnly";
-                const isUsingExisting = useExisting[service.id] ?? false;
-                const serviceCredentials = credentials[service.id] || {};
-                // Use nullish coalescing to only fall back to default if undefined/null, not empty string
-                const serviceEndpoint = endpoints[service.id] ?? service.endpoint.url;
-                const endpointError = endpointErrors[service.id];
-                const showEndpointError = endpointTouched[service.id] && endpointError;
-
-                // Determine validation state for endpoint
-                // Show warning if empty, error if invalid, success if valid
-                const endpointValidated = endpointError
-                    ? ValidatedOptions.error
-                    : serviceEndpoint?.trim()
-                      ? ValidatedOptions.success
-                      : ValidatedOptions.warning;
-
-                return (
-                    <StackItem key={service.id}>
-                        <Card isCompact>
-                            <CardTitle>
-                                <Checkbox
-                                    id={`service-${service.id}`}
-                                    label={service.name}
-                                    isChecked={isSelected}
-                                    onChange={() => toggleServiceSelection(service.id)}
-                                    description={service.description}
-                                />
-                            </CardTitle>
-
-                            {isSelected && isConnectivityOnly && skip?.action === "connectivityOnly" && (
-                                <CardBody>
-                                    <Alert
-                                        variant={AlertVariant.info}
-                                        isInline
-                                        title={_("Existing credentials detected")}
-                                    >
-                                        {skip.reason}
-                                    </Alert>
-                                </CardBody>
-                            )}
-                            {isSelected && !isConnectivityOnly && (
-                                <CardBody>
+            {enrollment.selected && (
+                <StackItem>
+                    <Card isCompact>
+                        <CardTitle>
+                            <LabelHeading text={_("Credentials")} />
+                        </CardTitle>
+                        <CardBody>
+                            <Stack hasGutter>
+                                <StackItem>
                                     <Stack hasGutter>
-                                        {detectedExisting[service.id] && (
-                                            <StackItem>
-                                                <FormGroup label={_("Enrollment credentials")}>
-                                                    <Stack>
-                                                        <StackItem>
-                                                            <Radio
-                                                                id={`use-existing-${service.id}`}
-                                                                name={`credential-mode-${service.id}`}
-                                                                label={_("Use existing enrollment credentials")}
-                                                                description={_(
-                                                                    "The device already has enrollment credentials configured. The agent will be restarted to pick up any label and proxy changes."
-                                                                )}
-                                                                isChecked={isUsingExisting}
-                                                                onChange={() => setUseExisting(service.id, true)}
-                                                            />
-                                                        </StackItem>
-                                                        <StackItem>
-                                                            <Radio
-                                                                id={`configure-new-${service.id}`}
-                                                                name={`credential-mode-${service.id}`}
-                                                                label={_("Configure new enrollment")}
-                                                                description={_(
-                                                                    "Provide an endpoint and credentials to enroll this device."
-                                                                )}
-                                                                isChecked={!isUsingExisting}
-                                                                onChange={() => setUseExisting(service.id, false)}
-                                                            />
-                                                        </StackItem>
-                                                    </Stack>
-                                                </FormGroup>
-                                            </StackItem>
-                                        )}
+                                        <StackItem>
+                                            <WithTooltip
+                                                showTooltip={!hasExistingCredentials}
+                                                content={_("No existing credentials found")}
+                                            >
+                                                <Radio
+                                                    id="use-existing-flightctl"
+                                                    name="credential-mode-flightctl"
+                                                    label={_("Use existing")}
+                                                    isChecked={isUsingExisting}
+                                                    isDisabled={!hasExistingCredentials}
+                                                    onChange={() => updateEnrollment({ useExisting: true })}
+                                                    body={
+                                                        isUsingExisting && (
+                                                            <Flex>
+                                                                <FlexItem>
+                                                                    <LabelHeading text={_("Credentials for server:")} />
+                                                                </FlexItem>
+                                                                <FlexItem>
+                                                                    <Content>
+                                                                        {existingServerUrl || serviceEndpoint}
+                                                                    </Content>
+                                                                </FlexItem>
+                                                            </Flex>
+                                                        )
+                                                    }
+                                                />
+                                            </WithTooltip>
+                                        </StackItem>
+                                        <StackItem>
+                                            <Radio
+                                                id="configure-new-flightctl"
+                                                name="credential-mode-flightctl"
+                                                label={_("Add a new credential")}
+                                                isChecked={!isUsingExisting}
+                                                onChange={() => updateEnrollment({ useExisting: false })}
+                                                body={
+                                                    !isUsingExisting && (
+                                                        <Stack hasGutter>
+                                                            <StackItem>
+                                                                <FormGroup label={_("Authentication method")}>
+                                                                    <Stack hasGutter>
+                                                                        <StackItem>
+                                                                            <Radio
+                                                                                id="auth-token"
+                                                                                name="auth-method"
+                                                                                label={_("Token")}
+                                                                                isChecked={authMethod === "token"}
+                                                                                onChange={() =>
+                                                                                    handleAuthMethodChange("token")
+                                                                                }
+                                                                                body={
+                                                                                    authMethod === "token" && (
+                                                                                        <FormGroup
+                                                                                            label={_("Token")}
+                                                                                            isRequired
+                                                                                        >
+                                                                                            <TextInput
+                                                                                                id="credential-token"
+                                                                                                type="password"
+                                                                                                value={newToken}
+                                                                                                onChange={(
+                                                                                                    _event,
+                                                                                                    value
+                                                                                                ) =>
+                                                                                                    updateServiceCredentials(
+                                                                                                        {
+                                                                                                            authMethod:
+                                                                                                                "token",
+                                                                                                            token: value,
+                                                                                                        }
+                                                                                                    )
+                                                                                                }
+                                                                                                isRequired
+                                                                                            />
+                                                                                            <Button
+                                                                                                variant="link"
+                                                                                                isInline
+                                                                                                className="pf-v6-u-mt-sm"
+                                                                                                iconPosition="end"
+                                                                                                icon={
+                                                                                                    <ExternalLinkAltIcon />
+                                                                                                }
+                                                                                            >
+                                                                                                {_(
+                                                                                                    "Where can I get my token?"
+                                                                                                )}
+                                                                                            </Button>
+                                                                                        </FormGroup>
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </StackItem>
+                                                                        <StackItem>
+                                                                            <Radio
+                                                                                id="auth-password"
+                                                                                name="auth-method"
+                                                                                label={_("Username and password")}
+                                                                                isChecked={authMethod === "password"}
+                                                                                onChange={() =>
+                                                                                    handleAuthMethodChange("password")
+                                                                                }
+                                                                                body={
+                                                                                    authMethod === "password" && (
+                                                                                        <>
+                                                                                            <FormGroup
+                                                                                                label={_("Username")}
+                                                                                                isRequired
+                                                                                            >
+                                                                                                <TextInput
+                                                                                                    id="credential-username"
+                                                                                                    value={newUsername}
+                                                                                                    onChange={(
+                                                                                                        _event,
+                                                                                                        value
+                                                                                                    ) =>
+                                                                                                        updateServiceCredentials(
+                                                                                                            {
+                                                                                                                authMethod:
+                                                                                                                    "password",
+                                                                                                                username:
+                                                                                                                    value,
+                                                                                                                password:
+                                                                                                                    newPassword,
+                                                                                                            }
+                                                                                                        )
+                                                                                                    }
+                                                                                                    isRequired
+                                                                                                />
+                                                                                            </FormGroup>
+                                                                                            <FormGroup
+                                                                                                label={_("Password")}
+                                                                                                isRequired
+                                                                                            >
+                                                                                                <TextInput
+                                                                                                    id="credential-password"
+                                                                                                    type="password"
+                                                                                                    value={newPassword}
+                                                                                                    onChange={(
+                                                                                                        _event,
+                                                                                                        value
+                                                                                                    ) =>
+                                                                                                        updateServiceCredentials(
+                                                                                                            {
+                                                                                                                authMethod:
+                                                                                                                    "password",
+                                                                                                                username:
+                                                                                                                    newUsername,
+                                                                                                                password:
+                                                                                                                    value,
+                                                                                                            }
+                                                                                                        )
+                                                                                                    }
+                                                                                                    isRequired
+                                                                                                />
+                                                                                            </FormGroup>
+                                                                                        </>
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </StackItem>
+                                                                    </Stack>
+                                                                </FormGroup>
+                                                            </StackItem>
 
-                                        {!isUsingExisting && (
-                                            <>
-                                                {/* Endpoint URL (with optional override) */}
-                                                <StackItem>
-                                                    <FormGroup label={_("Service Endpoint")} isRequired>
-                                                        <TextInput
-                                                            id={`endpoint-${service.id}`}
-                                                            value={serviceEndpoint}
-                                                            onChange={(_event, value) =>
-                                                                updateServiceEndpoint(service.id, value)
-                                                            }
-                                                            isDisabled={!service.endpoint.allowUserOverride}
-                                                            validated={endpointValidated}
-                                                        />
-                                                        {showEndpointError && <ErrorHelperText error={endpointError} />}
-                                                        {!service.endpoint.allowUserOverride && (
-                                                            <DefaultHelperText
-                                                                text={_("Endpoint is configured by the administrator")}
-                                                            />
-                                                        )}
-                                                    </FormGroup>
-                                                </StackItem>
+                                                            <StackItem>
+                                                                <Divider />
+                                                            </StackItem>
 
-                                                {/* Credentials Form (dynamic based on schema) */}
-                                                <StackItem>
-                                                    <FormGroup label={_("Credentials")}>
-                                                        <JsonSchemaForm
-                                                            schema={service.credentialsSchema}
-                                                            formData={serviceCredentials}
-                                                            onChange={(data) =>
-                                                                updateServiceCredentials(service.id, data)
-                                                            }
-                                                        />
-                                                    </FormGroup>
-                                                </StackItem>
-                                            </>
-                                        )}
+                                                            <StackItem>
+                                                                <FormGroup
+                                                                    label={_("Flight Control server")}
+                                                                    isRequired
+                                                                >
+                                                                    <ValidatedTextInput
+                                                                        id="endpoint-flightctl"
+                                                                        value={serviceEndpoint}
+                                                                        onChange={(_event, value) =>
+                                                                            handleEndpointChange(value)
+                                                                        }
+                                                                        {...(isEndpointFromExistingConfig && {
+                                                                            helperText: _(
+                                                                                "Auto-detected from the selected credential."
+                                                                            ),
+                                                                        })}
+                                                                        error={
+                                                                            endpointTouched ? endpointError : undefined
+                                                                        }
+                                                                    />
+                                                                </FormGroup>
+                                                            </StackItem>
+                                                        </Stack>
+                                                    )
+                                                }
+                                            />
+                                        </StackItem>
                                     </Stack>
-                                </CardBody>
-                            )}
-                        </Card>
-                    </StackItem>
-                );
-            })}
+                                </StackItem>
+                            </Stack>
+                        </CardBody>
+                    </Card>
+                </StackItem>
+            )}
         </Stack>
     );
 };
