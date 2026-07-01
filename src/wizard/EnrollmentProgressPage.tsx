@@ -11,6 +11,7 @@ import { CheckCircleIcon, ExclamationCircleIcon, InProgressIcon, OutlinedClockIc
 import { useModelContext } from "../model-context";
 import { systemConfigurationService } from "../system-config";
 import { loadConfig } from "../config-loader";
+import { getHostnameInfo } from "../services/hostname";
 import { getSetupInterface, applyNetworkConfiguration, rollbackNetworkConfiguration } from "../services/network";
 import { evaluateSkipConditions, SkipResult } from "../services/skip-conditions";
 import { writeAttemptedMarker } from "../attempted-marker";
@@ -330,6 +331,10 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         resultsBuffer.push({ type: "header", content: _("Applying configuration changes") });
         setResults([...resultsBuffer]);
 
+        const originalHostname = await getHostnameInfo()
+            .then((info) => info.staticHostname || info.hostname)
+            .catch(() => "");
+
         try {
             onOutput("Applying hostname and NTP configuration...");
             const configResult = await systemConfigurationService.applySystemConfiguration(networkManager, model, {
@@ -381,6 +386,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
             effectiveIfaceName,
             enrollmentScripts: enrollmentScriptEntries,
             hostname: model.hostname.value,
+            originalHostname,
             connectivityTestHost: model.connectivityTestHost || "www.google.com",
         };
         const masterParamsFile = await createSecureTempFile(JSON.stringify(masterParams), ".onboarding-apply-");
