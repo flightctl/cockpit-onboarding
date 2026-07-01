@@ -2,6 +2,13 @@ import cockpit from "cockpit";
 import type { EnrollmentService } from "../types";
 import type { SkipResult } from "./skip-conditions";
 
+const IPV4_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
+const IPV6_RE = /^[0-9a-fA-F:]+$/;
+
+function isIPAddress(host: string): boolean {
+    return IPV4_RE.test(host) || IPV6_RE.test(host);
+}
+
 export interface CancellationSignal {
     cancelled: boolean;
     process?: cockpit.Spawn<string> | undefined;
@@ -19,35 +26,39 @@ export async function testNetworkConnectivity(
     onOutput?: (output: string) => void
 ): Promise<ConnectivityResult> {
     try {
-        // DNS resolution
-        try {
-            const dnsLabel = iface ? `${testHost} via ${iface}` : testHost;
-            onOutput?.(`• Resolving ${dnsLabel} via DNS...`);
-            const dnsArgs = iface
-                ? ["resolvectl", "query", `--interface=${iface}`, testHost]
-                : ["getent", "hosts", testHost];
-            const dnsProc = cockpit.spawn(dnsArgs, { err: "ignore" });
-            if (signal) {
-                signal.process = dnsProc;
-            }
-            await dnsProc;
-            if (signal) {
-                signal.process = undefined;
-            }
-            onOutput?.(" Success.");
-        } catch (dnsError) {
-            if (signal) {
-                signal.process = undefined;
-            }
+        // DNS resolution — skip when the host is already an IP address
+        if (isIPAddress(testHost)) {
+            onOutput?.("• Host is an IP address, skipping DNS resolution.");
+        } else {
+            try {
+                const dnsLabel = iface ? `${testHost} via ${iface}` : testHost;
+                onOutput?.(`• Resolving ${dnsLabel} via DNS...`);
+                const dnsArgs = iface
+                    ? ["resolvectl", "query", `--interface=${iface}`, testHost]
+                    : ["getent", "hosts", testHost];
+                const dnsProc = cockpit.spawn(dnsArgs, { err: "ignore" });
+                if (signal) {
+                    signal.process = dnsProc;
+                }
+                await dnsProc;
+                if (signal) {
+                    signal.process = undefined;
+                }
+                onOutput?.(" Success.");
+            } catch (dnsError) {
+                if (signal) {
+                    signal.process = undefined;
+                }
 
-            let errorDetail = "";
-            if (dnsError instanceof cockpit.ProcessError && dnsError.exit_status !== null) {
-                errorDetail = ` (exit status ${dnsError.exit_status})`;
-            }
+                let errorDetail = "";
+                if (dnsError instanceof cockpit.ProcessError && dnsError.exit_status !== null) {
+                    errorDetail = ` (exit status ${dnsError.exit_status})`;
+                }
 
-            const errorMsg = ` Failed${errorDetail}.\n  Please check network configuration.`;
-            onOutput?.(errorMsg);
-            return { success: false, output: errorMsg };
+                const errorMsg = ` Failed${errorDetail}.\n  Please check network configuration.`;
+                onOutput?.(errorMsg);
+                return { success: false, output: errorMsg };
+            }
         }
 
         // Ping bound to the configured interface
@@ -116,25 +127,29 @@ export async function verifyServiceConnectivity(
         return { success: false, output: msg };
     }
 
-    // DNS resolution
-    try {
-        onOutput?.(`• Resolving ${hostname}...`);
-        const dnsProc = cockpit.spawn(["getent", "hosts", hostname], { err: "ignore" });
-        if (signal) {
-            signal.process = dnsProc;
+    // DNS resolution — skip when the hostname is already an IP address
+    if (isIPAddress(hostname)) {
+        onOutput?.("• Host is an IP address, skipping DNS resolution.");
+    } else {
+        try {
+            onOutput?.(`• Resolving ${hostname}...`);
+            const dnsProc = cockpit.spawn(["getent", "hosts", hostname], { err: "ignore" });
+            if (signal) {
+                signal.process = dnsProc;
+            }
+            await dnsProc;
+            if (signal) {
+                signal.process = undefined;
+            }
+            onOutput?.(" Success.");
+        } catch {
+            if (signal) {
+                signal.process = undefined;
+            }
+            const msg = ` Failed.\n  Cannot resolve ${hostname}. Check DNS configuration.`;
+            onOutput?.(msg);
+            return { success: false, output: msg };
         }
-        await dnsProc;
-        if (signal) {
-            signal.process = undefined;
-        }
-        onOutput?.(" Success.");
-    } catch {
-        if (signal) {
-            signal.process = undefined;
-        }
-        const msg = ` Failed.\n  Cannot resolve ${hostname}. Check DNS configuration.`;
-        onOutput?.(msg);
-        return { success: false, output: msg };
     }
 
     // HTTPS connection test
