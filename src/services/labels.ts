@@ -1,26 +1,43 @@
+import cockpit from "cockpit";
+
 import { SCRIPT_LABELS } from "../paths";
-import type { LabelsState } from "../types";
+import type { GenericLabel, LabelsState } from "../types";
+import type { AliasState } from "../model-context";
+import { resolveAliasValue, ALIAS_LABEL_KEY } from "./alias";
 import { spawnWithParamsFile } from "./spawn-helpers";
 
-export async function applyLabelsConfiguration(labels: LabelsState): Promise<string[]> {
+const _ = cockpit.gettext;
+
+const buildLabelMap = (labels: GenericLabel[]): Record<string, string> => {
+    const genericLabels: Record<string, string> = {};
+    for (const { key, value } of labels) {
+        if (key && value) {
+            genericLabels[key] = value;
+        }
+    }
+    return genericLabels;
+};
+
+export async function applyLabelsConfiguration(
+    labels: LabelsState,
+    alias: AliasState,
+    hostname: string
+): Promise<string[]> {
     const results: string[] = [];
 
-    const defaultLabels: Record<string, string> = {};
-    for (const { key, value } of labels.deviceLabels) {
-        if (key && value) {
-            defaultLabels[key] = value;
-        }
+    const defaultLabels = buildLabelMap(labels.deviceLabels);
+    const deviceAlias = resolveAliasValue(alias, hostname);
+    if (deviceAlias) {
+        defaultLabels[ALIAS_LABEL_KEY] = deviceAlias;
     }
 
-    const systemInfoLabels: Record<string, string> = {};
-    for (const { labelKey, systemInfoField } of labels.systemInfoMappings) {
-        if (labelKey && systemInfoField) {
-            systemInfoLabels[labelKey] = systemInfoField;
-        }
-    }
+    const systemInfoLabels = buildLabelMap(labels.systemInfoMappings);
 
-    if (Object.keys(defaultLabels).length === 0 && Object.keys(systemInfoLabels).length === 0) {
-        results.push("Labels: No changes required");
+    const defaultCount = Object.keys(defaultLabels).length;
+    const systemInfoCount = Object.keys(systemInfoLabels).length;
+
+    if (defaultCount === 0 && systemInfoCount === 0) {
+        results.push(_("Labels: No changes required"));
         return results;
     }
 
@@ -32,17 +49,28 @@ export async function applyLabelsConfiguration(labels: LabelsState): Promise<str
     try {
         await spawnWithParamsFile(SCRIPT_LABELS, params, ".labels-params-");
 
-        const defaultCount = Object.keys(defaultLabels).length;
-        const systemInfoCount = Object.keys(systemInfoLabels).length;
-
         if (defaultCount > 0) {
-            results.push(`Applied ${defaultCount} default label${defaultCount !== 1 ? "s" : ""}`);
+            results.push(
+                cockpit.format(
+                    cockpit.ngettext("Applied $0 default label", "Applied $0 default labels", defaultCount),
+                    defaultCount
+                )
+            );
         }
         if (systemInfoCount > 0) {
-            results.push(`Applied ${systemInfoCount} system-info mapping${systemInfoCount !== 1 ? "s" : ""}`);
+            results.push(
+                cockpit.format(
+                    cockpit.ngettext(
+                        "Applied $0 system-info mapping",
+                        "Applied $0 system-info mappings",
+                        systemInfoCount
+                    ),
+                    systemInfoCount
+                )
+            );
         }
     } catch (error) {
-        throw new Error(`Labels configuration failed: ${String(error)}`);
+        throw new Error(cockpit.format(_("Labels configuration failed: $0"), String(error)));
     }
 
     return results;

@@ -22,7 +22,6 @@ import testlib
 from wizard_navigation import (
     advance_past_optional_steps_to_review,
     complete_hostname_step,
-    complete_network_step,
 )
 
 
@@ -40,9 +39,9 @@ class TestReview(testlib.MachineCase):
         advance_past_optional_steps_to_review(b, "test-review-host")
 
         b.wait_in_text(".pf-v5-c-description-list", "test-review-host")
-        b.wait_in_text(".pf-v5-c-description-list", "Interface")
-        b.wait_in_text(".pf-v5-c-description-list", "IPv4 Configuration")
-        b.wait_in_text(".pf-v5-c-description-list", "NTP Servers")
+        b.wait_in_text(".pf-v5-c-description-list", "Network interface")
+        b.wait_in_text(".pf-v5-c-description-list", "IPv4 Connection")
+        b.wait_in_text(".pf-v5-c-description-list", "NTP Server Hostname")
 
     def testBackNavigationFromReview(self):
         """Test that users can navigate back from review page to edit settings"""
@@ -56,8 +55,7 @@ class TestReview(testlib.MachineCase):
         b.wait_in_text(".pf-v5-c-description-list", initial_hostname)
 
         b.click("button:contains('Back')")
-        b.click("button:contains('Back')")
-        b.wait_visible("#hostnameStep")
+        b.wait_visible("#labelsStep")
 
     def testEditButtonNavigation(self):
         """Test that Edit buttons navigate to correct wizard steps"""
@@ -69,13 +67,9 @@ class TestReview(testlib.MachineCase):
         advance_past_optional_steps_to_review(b, "edit-test-host")
         b.wait_in_text(".pf-v5-c-description-list", "edit-test-host")
 
-        hostname_edit_selector = "button[aria-label='Edit hostname']"
-        if b.is_present(hostname_edit_selector):
-            b.click(hostname_edit_selector)
-        else:
-            b.click(".pf-v5-c-description-list__group:contains('Hostname') button:contains('Edit')")
+        b.click("button[aria-label='Edit device labels']")
 
-        b.wait_visible("#hostnameStep")
+        b.wait_visible("#labelsStep")
         b.wait_visible("#hostname-input")
 
     def testSummaryReflectsChanges(self):
@@ -92,10 +86,8 @@ class TestReview(testlib.MachineCase):
         b.wait_in_text(".pf-v5-c-description-list", initial_hostname)
 
         b.click("button:contains('Back')")
-        b.click("button:contains('Back')")
-        b.wait_visible("#hostnameStep")
+        b.wait_visible("#labelsStep")
         b.set_input_text("#hostname-input", modified_hostname)
-        b.click("button:contains('Next')")
         b.click("button:contains('Next')")
         b.wait_visible("#reviewStep")
 
@@ -111,7 +103,7 @@ class TestReview(testlib.MachineCase):
 
         advance_past_optional_steps_to_review(b, "ipv4-test-host")
 
-        b.wait_in_text(".pf-v5-c-description-list", "IPv4 Configuration")
+        b.wait_in_text(".pf-v5-c-description-list", "IPv4 Connection")
         b.wait_in_text(".pf-v5-c-description-list", "Automatic")
 
     def testReviewDisplaysProxyConfiguration(self):
@@ -136,10 +128,9 @@ class TestReview(testlib.MachineCase):
 
         advance_past_enrollment_and_connectivity(b)
         complete_hostname_step(b, "proxy-test-host")
-        b.click("button:contains('Next')")
         b.wait_visible("#reviewStep")
 
-        b.wait_in_text(".pf-v5-c-description-list", "Proxy")
+        b.wait_in_text(".pf-v5-c-description-list", "HTTP proxy")
 
 
 if __name__ == "__main__":

@@ -1,29 +1,19 @@
 import React from "react";
 
 import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/components/HelperText";
-import { FormHelperText } from "@patternfly/react-core/dist/esm/components/Form";
+import { FormHelperText as PFFormHelperText } from "@patternfly/react-core/dist/esm/components/Form";
 
-export const ErrorHelperText = ({ error }: { error: string | null | undefined }) => {
-    if (!error) {
+const FormHelperText = ({ content, variant }: { content: string; variant?: "default" | "error" | "warning" }) => {
+    if (!content) {
         return null;
     }
     return (
-        <FormHelperText>
+        <PFFormHelperText>
             <HelperText>
-                <HelperTextItem variant="error">{error}</HelperTextItem>
+                <HelperTextItem variant={variant || "default"}>{content}</HelperTextItem>
             </HelperText>
-        </FormHelperText>
+        </PFFormHelperText>
     );
 };
 
-const DefaultHelperText = ({ text }: { text: string }) => {
-    return (
-        <FormHelperText>
-            <HelperText>
-                <HelperTextItem variant="default">{text}</HelperTextItem>
-            </HelperText>
-        </FormHelperText>
-    );
-};
-
-export default DefaultHelperText;
+export default FormHelperText;

@@ -1,5 +1,7 @@
 import cockpit from "cockpit";
 import { Model } from "./model-context";
+import { serializeEnrollmentForMarker } from "./enrollment-state";
+import type { PersistedEnrollmentState } from "./enrollment-state";
 import { MARKER_ATTEMPTED } from "./paths";
 import { ProxyProtocol, WifiSecurity } from "./types";
 
@@ -28,11 +30,8 @@ export interface AttemptedMarkerData {
             noProxy: string;
         };
     };
-    enrollment: {
-        selectedServices: string[];
-        endpoints: Record<string, string>;
-        useExisting: Record<string, boolean>;
-    };
+    enrollment: PersistedEnrollmentState;
+    alias: Model["alias"];
     labels: Model["labels"];
     connectivityTestHost: string;
 }
@@ -63,11 +62,8 @@ function serializeModel(model: Model): AttemptedMarkerData {
                 noProxy: model.networkServices.proxy.noProxy || "localhost,127.0.0.1,::1",
             },
         },
-        enrollment: {
-            selectedServices: [...model.enrollment.selectedServices],
-            endpoints: { ...model.enrollment.endpoints },
-            useExisting: { ...model.enrollment.useExisting },
-        },
+        enrollment: serializeEnrollmentForMarker(model.enrollment),
+        alias: { ...model.alias },
         labels: {
             deviceLabels: [...model.labels.deviceLabels],
             systemInfoMappings: [...model.labels.systemInfoMappings],

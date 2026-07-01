@@ -173,7 +173,7 @@ class TestWifi(testlib.MachineCase):
         b.wait_not_present("#wifi-password")
 
         # Set security to 'wpa'
-        b.select_from_dropdown("#wifi-security", "WPA/WPA2")
+        b.select_from_dropdown("#wifi-security", "WPA/WPA2/WPA3")
         b.wait_visible("#wifi-password")
 
         # Test password input

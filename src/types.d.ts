@@ -3,6 +3,8 @@
  * Derived from data-model.md
  */
 
+import { AliasMode } from "./model-context";
+
 /* eslint-disable no-use-before-define, @typescript-eslint/no-explicit-any */
 
 // ========== Configuration Types (SystemOnboardingConfig) ==========
@@ -14,7 +16,7 @@ export interface SystemOnboardingConfig {
     hideModules?: boolean;
     autoReboot?: boolean;
     network?: NetworkConfig;
-    enrollmentServices?: EnrollmentService[];
+    flightctl?: FlightctlConfig;
     led?: LedConfig;
     defaults?: ConfigDefaults;
     connectivityTest?: ConnectivityTestConfig;
@@ -24,9 +26,12 @@ export interface ConnectivityTestConfig {
     host?: string;
 }
 
+export interface FlightctlConfig {
+    defaultEndpoint?: string;
+}
+
 export interface ConfigDefaults {
     hostname?: string;
-    selectedEnrollmentServices?: string[];
     proxy?: {
         enabled?: boolean;
         protocol?: ProxyProtocol;
@@ -38,8 +43,12 @@ export interface ConfigDefaults {
         noProxy?: string;
     };
     labels?: {
-        deviceLabels?: { key: string; value: string }[];
-        systemInfoMappings?: { labelKey: string; systemInfoField: string }[];
+        deviceLabels?: GenericLabel[];
+        systemInfoMappings?: GenericLabel[];
+    };
+    alias?: {
+        mode?: AliasMode;
+        customValue?: string;
     };
 }
 
@@ -61,28 +70,6 @@ export interface EthernetConfig {
     staticIp?: string;
 }
 
-export interface SkipWhenCondition {
-    allPathsExist?: string[];
-    anyPathExists?: string[];
-    action: "skip" | "connectivityOnly";
-    reason: string;
-}
-
-export interface EnrollmentService {
-    id: string;
-    name: string;
-    description?: string;
-    endpoint: EndpointConfig;
-    credentialsSchema: any; // JSON Schema Draft 7
-    scriptPath: string;
-    skipWhen?: SkipWhenCondition[];
-}
-
-export interface EndpointConfig {
-    url: string;
-    allowUserOverride?: boolean;
-}
-
 export interface LedConfig {
     enabled?: boolean;
     tool?: string;
@@ -98,7 +85,7 @@ export interface OnboardingSession {
     networkInterface: NetworkInterfaceState;
     networkAddress: NetworkAddressState;
     networkServices: NetworkServicesState;
-    enrollment: EnrollmentState;
+    enrollment: ServiceEnrollmentConfig;
     wizardStep: number;
 }
 
@@ -166,16 +153,33 @@ export interface ProxyConfig {
     noProxy: string;
 }
 
-export interface EnrollmentState {
-    selectedServices: string[];
-    credentials: Record<string, any>;
-    endpoints: Record<string, string>;
-    useExisting: Record<string, boolean>;
+export type FlightctlAuthMethod = "token" | "password";
+
+export interface FlightctlTokenCredentials {
+    authMethod: "token";
+    token: string;
 }
 
+export interface FlightctlPasswordCredentials {
+    authMethod: "password";
+    username: string;
+    password: string;
+}
+
+export type FlightctlCredentials = FlightctlTokenCredentials | FlightctlPasswordCredentials;
+
+export interface ServiceEnrollmentConfig {
+    selected: boolean;
+    endpoint?: string;
+    credentials?: FlightctlCredentials;
+    useExisting?: boolean;
+}
+
+export type GenericLabel = { key: string; value: string };
+
 export interface LabelsState {
-    deviceLabels: { key: string; value: string }[];
-    systemInfoMappings: { labelKey: string; systemInfoField: string }[];
+    deviceLabels: GenericLabel[];
+    systemInfoMappings: GenericLabel[];
 }
 
 // ========== System Integration Types ==========

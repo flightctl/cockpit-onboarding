@@ -483,30 +483,28 @@ export const validatePort = (port: number | null, required = true): string | nul
     return null;
 };
 
+// Kubernetes label format rules aligned with the flightctl API, which delegates to
+// k8s.io/apimachinery/pkg/util/validation (IsQualifiedName / IsValidLabelValue).
+const K8S_DNS_SUBDOMAIN_PREFIX = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/;
+const K8S_LABEL_NAME_OR_VALUE = /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/;
+const K8S_LABEL_KEY_PREFIX_MAX_LENGTH = 253;
+const K8S_LABEL_NAME_OR_VALUE_MAX_LENGTH = 63;
+
 /**
- * Validate URL
- *
- * @param url - The URL to validate
- * @param required - Whether the field is required
- * @returns Error message or null if valid
- */
-/**
- * Validate a Kubernetes label key
+ * Validate a Kubernetes label key.
  *
  * Format: [prefix/]name
- * - prefix: optional DNS subdomain, max 253 chars
+ * - prefix: optional DNS subdomain (lowercase), max 253 chars
  * - name: max 63 chars, alphanumeric start/end, [-_.a-zA-Z0-9] in between
  */
 export const validateLabelKey = (key: string, required = true): string | null => {
-    const trimmed = key.trim();
-
-    if (!trimmed) {
+    if (!key) {
         return required ? "Label key is required" : null;
     }
 
-    let name = trimmed;
-    if (trimmed.includes("/")) {
-        const parts = trimmed.split("/");
+    let name = key;
+    if (key.includes("/")) {
+        const parts = key.split("/");
         if (parts.length !== 2) {
             return 'Label key can contain at most one "/"';
         }
@@ -516,10 +514,10 @@ export const validateLabelKey = (key: string, required = true): string | null =>
         if (!prefix) {
             return "Label key prefix cannot be empty";
         }
-        if (prefix.length > 253) {
+        if (prefix.length > K8S_LABEL_KEY_PREFIX_MAX_LENGTH) {
             return "Label key prefix must be 253 characters or less";
         }
-        if (!/^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$/.test(prefix)) {
+        if (!K8S_DNS_SUBDOMAIN_PREFIX.test(prefix)) {
             return "Label key prefix must be a valid DNS subdomain";
         }
     }
@@ -527,10 +525,10 @@ export const validateLabelKey = (key: string, required = true): string | null =>
     if (!name) {
         return "Label key name cannot be empty";
     }
-    if (name.length > 63) {
+    if (name.length > K8S_LABEL_NAME_OR_VALUE_MAX_LENGTH) {
         return "Label key name must be 63 characters or less";
     }
-    if (!/^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/.test(name)) {
+    if (!K8S_LABEL_NAME_OR_VALUE.test(name)) {
         return "Label key name must start and end with alphanumeric characters, and contain only alphanumerics, hyphens, underscores, or dots";
     }
 
@@ -538,27 +536,68 @@ export const validateLabelKey = (key: string, required = true): string | null =>
 };
 
 /**
- * Validate a Kubernetes label value
+ * Validate a Kubernetes label value.
  *
  * Max 63 chars, alphanumeric start/end if non-empty, [-_.a-zA-Z0-9] in between.
  * Empty string is valid.
  */
 export const validateLabelValue = (value: string): string | null => {
-    const trimmed = value.trim();
-
-    if (!trimmed) {
+    if (!value) {
         return null;
     }
-    if (trimmed.length > 63) {
+    if (value.length > K8S_LABEL_NAME_OR_VALUE_MAX_LENGTH) {
         return "Label value must be 63 characters or less";
     }
-    if (!/^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/.test(trimmed)) {
+    if (!K8S_LABEL_NAME_OR_VALUE.test(value)) {
         return "Label value must start and end with alphanumeric characters, and contain only alphanumerics, hyphens, underscores, or dots";
     }
 
     return null;
 };
 
+/** Returns true when all non-empty label keys are unique. */
+export const hasUniqueLabelKeys = (labels: { key: string }[]): boolean => {
+    const keys = labels.map((label) => label.key).filter((key) => key.length > 0);
+    return new Set(keys).size === keys.length;
+};
+
+/** Returns label keys that appear more than once (ignoring empty keys). */
+export const getDuplicateLabelKeys = (labels: { key: string }[]): string[] => {
+    const counts = new Map<string, number>();
+    for (const { key } of labels) {
+        if (!key) {
+            continue;
+        }
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+        .filter(([, count]) => count > 1)
+        .map(([key]) => key)
+        .sort();
+};
+
+/** Returns non-empty label keys that appear in both collections. */
+export const getOverlappingLabelKeys = (
+    first: { key: string }[],
+    second: { key: string }[]
+): string[] => {
+    const firstKeys = new Set(first.map(({ key }) => key).filter((key) => key.length > 0));
+    const overlaps = new Set<string>();
+    for (const { key } of second) {
+        if (key && firstKeys.has(key)) {
+            overlaps.add(key);
+        }
+    }
+    return [...overlaps].sort();
+};
+
+/**
+ * Validate URL
+ *
+ * @param url - The URL to validate
+ * @param required - Whether the field is required
+ * @returns Error message or null if valid
+ */
 export const validateURL = (url: string, required = true): string | null => {
     const trimmedUrl = url.trim();
 

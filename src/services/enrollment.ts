@@ -1,7 +1,7 @@
 import cockpit from "cockpit";
 import { SCRIPT_FINALIZE } from "../paths";
-import type { EnrollmentService } from "../types";
 import type { Model } from "../model-context";
+import { buildFlightctlCredentialsJson, defaultFlightctlServiceDescriptor } from "../flightctl-enrollment";
 import type { CancellationSignal } from "./connectivity";
 import { disarmWatchdog } from "./watchdog";
 import { deleteAttemptedMarker } from "../attempted-marker";
@@ -30,28 +30,26 @@ export interface EnrollmentResult {
     deviceUrl?: string;
 }
 
-export function buildEnrollmentParams(model: Model, service: EnrollmentService): Record<string, unknown> {
-    const isUsingExisting = model.enrollment.useExisting?.[service.id] ?? false;
-    const endpoint = model.enrollment.endpoints[service.id] || service.endpoint.url;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { _variantIndex, ...credentials } = model.enrollment.credentials[service.id] || {};
+export function buildEnrollmentParams(model: Model): Record<string, unknown> {
+    const enrollment = model.enrollment;
+    const networkProxy = model.networkServices.proxy;
 
     return {
-        ENROLLMENT_SERVICE_ID: service.id,
-        ENROLLMENT_SERVICE_NAME: service.name,
-        ENROLLMENT_ENDPOINT: endpoint,
-        ENROLLMENT_CREDENTIALS_JSON: JSON.stringify(credentials),
-        ENROLLMENT_USE_EXISTING: isUsingExisting,
+        ENROLLMENT_SERVICE_ID: defaultFlightctlServiceDescriptor.id,
+        ENROLLMENT_SERVICE_NAME: defaultFlightctlServiceDescriptor.name,
+        ENROLLMENT_ENDPOINT: enrollment.endpoint || "",
+        ENROLLMENT_CREDENTIALS_JSON: buildFlightctlCredentialsJson(enrollment.credentials),
+        ENROLLMENT_USE_EXISTING: Boolean(enrollment.useExisting),
         ENROLLMENT_HOSTNAME: model.hostname.value,
         ENROLLMENT_INTERFACE: model.networkInterface.selectedInterface || "",
         // TODO: Review backend wiring for proxy.applyForHttps (flightctl-enroll.sh).
-        ENROLLMENT_PROXY_ENABLED: model.networkServices.proxy.enabled,
-        ENROLLMENT_PROXY_PROTOCOL: model.networkServices.proxy.protocol || "http",
-        ENROLLMENT_PROXY_HOSTNAME: model.networkServices.proxy.hostname || "",
-        ENROLLMENT_PROXY_PORT: model.networkServices.proxy.port ?? "",
-        ENROLLMENT_PROXY_USERNAME: model.networkServices.proxy.username || "",
-        ENROLLMENT_PROXY_PASSWORD: model.networkServices.proxy.password || "",
-        ENROLLMENT_PROXY_NO_PROXY: model.networkServices.proxy.noProxy || "",
+        ENROLLMENT_PROXY_ENABLED: networkProxy.enabled,
+        ENROLLMENT_PROXY_PROTOCOL: networkProxy.protocol || "http",
+        ENROLLMENT_PROXY_HOSTNAME: networkProxy.hostname || "",
+        ENROLLMENT_PROXY_PORT: networkProxy.port ?? "",
+        ENROLLMENT_PROXY_USERNAME: networkProxy.username || "",
+        ENROLLMENT_PROXY_PASSWORD: networkProxy.password || "",
+        ENROLLMENT_PROXY_NO_PROXY: networkProxy.noProxy || "",
     };
 }
 

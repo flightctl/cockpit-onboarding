@@ -10,10 +10,8 @@ import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js
 import { CheckCircleIcon, ExclamationCircleIcon, InProgressIcon, OutlinedClockIcon } from "@patternfly/react-icons";
 import { useModelContext } from "../model-context";
 import { systemConfigurationService } from "../system-config";
-import { loadConfig } from "../config-loader";
 import { getHostnameInfo } from "../services/hostname";
 import { getSetupInterface, applyNetworkConfiguration, rollbackNetworkConfiguration } from "../services/network";
-import { evaluateSkipConditions, SkipResult } from "../services/skip-conditions";
 import { writeAttemptedMarker } from "../attempted-marker";
 import { SCRIPT_RUN_APPLY_ENROLL } from "../paths";
 import { armWatchdog, disarmWatchdog } from "../services/watchdog";
@@ -21,7 +19,7 @@ import { testNetworkConnectivity, verifyServiceConnectivity, CancellationSignal 
 import { buildEnrollmentParams, executeEnrollmentScript, finalizeEnrollment } from "../services/enrollment";
 import { createSecureTempFile } from "../services/spawn-helpers";
 import { Interface } from "../../pkg/networkmanager/interfaces.js";
-import { EnrollmentService } from "../types";
+import { FLIGHTCTL_SCRIPT_PATH, FLIGHTCTL_SERVICE_ID, FLIGHTCTL_SERVICE_NAME } from "../flightctl-enrollment";
 
 type StepStatus = "pending" | "running" | "success" | "failed" | "warning" | "delegated";
 
@@ -51,8 +49,7 @@ const escapeHtml = (text: string): string => {
 export const EnrollmentProgressPage: React.FunctionComponent = () => {
     const { model, updateModel, networkManager, cancelEnrollmentRef } = useModelContext();
     const [hasStarted, setHasStarted] = useState(false);
-    const [enrollmentServices, setEnrollmentServices] = useState<EnrollmentService[]>([]);
-    const [skipResults, setSkipResults] = useState<Record<string, SkipResult>>({});
+    const [isEnrollmentSelected, setIsEnrollmentSelected] = useState(false);
     const [steps, setSteps] = useState<Step[]>([]);
     const [results, setResults] = useState<ResultItem[]>([]);
     const [singleNic, setSingleNic] = useState(false);
@@ -97,24 +94,10 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
     // Initialize steps based on enrollment configuration
     const initializeSteps = async () => {
         try {
-            // Load configuration to get enrollment services and reboot settings
-            const config = await loadConfig();
-            const configuredServices = config.enrollmentServices || [];
+            const enrollment = model.enrollment;
+            const shouldEnroll = enrollment.selected;
+            setIsEnrollmentSelected(shouldEnroll);
 
-            // Filter to only include services that the user selected
-            const selectedServiceIds = model.enrollment.selectedServices || [];
-            const servicesToEnroll = configuredServices.filter((service) => selectedServiceIds.includes(service.id));
-
-            setEnrollmentServices(servicesToEnroll);
-
-            // Evaluate skipWhen conditions for each service
-            const skipMap: Record<string, SkipResult> = {};
-            for (const service of servicesToEnroll) {
-                skipMap[service.id] = await evaluateSkipConditions(service.skipWhen);
-            }
-            setSkipResults(skipMap);
-
-            // Create initial steps
             const initialSteps: Step[] = [
                 {
                     id: "apply-config",
@@ -130,39 +113,24 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                 },
             ];
 
-            // Add enrollment service steps (respecting skipWhen results)
-            servicesToEnroll.forEach((service) => {
-                const skip = skipMap[service.id];
-
-                if (skip?.action === "skip") {
-                    return;
-                }
-
-                if (skip?.action === "connectivityOnly") {
-                    initialSteps.push({
-                        id: `enroll-${service.id}`,
-                        name: _("Verifying connectivity to {{serviceName}}").replace("{{serviceName}}", service.name),
-                        status: "pending",
-                        isBuiltIn: false,
-                    });
-                    return;
-                }
-
-                const isUsingExisting = model.enrollment.useExisting?.[service.id] ?? false;
+            if (shouldEnroll) {
+                const isUsingExisting = enrollment.useExisting ?? false;
                 initialSteps.push({
-                    id: `enroll-${service.id}`,
+                    id: `enroll-${FLIGHTCTL_SERVICE_ID}`,
                     name: isUsingExisting
-                        ? _("Restarting {{serviceName}} agent").replace("{{serviceName}}", service.name)
-                        : _("Enrolling into {{serviceName}}").replace("{{serviceName}}", service.name),
+                        ? _("Verifying connectivity to {{serviceName}}").replace(
+                              "{{serviceName}}",
+                              FLIGHTCTL_SERVICE_NAME
+                          )
+                        : _("Enrolling into {{serviceName}}").replace("{{serviceName}}", FLIGHTCTL_SERVICE_NAME),
                     status: "pending",
                     isBuiltIn: false,
                 });
-            });
+            }
 
-            // Add finalize step
             initialSteps.push({
                 id: "finalize",
-                name: servicesToEnroll.length > 0 ? _("Finalizing enrollment") : _("Finalizing configuration"),
+                name: shouldEnroll ? _("Finalizing enrollment") : _("Finalizing configuration"),
                 status: "pending",
                 isBuiltIn: true,
             });
@@ -216,31 +184,21 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                 case "finalize":
                     return await finalizeEnrollment(model.hostname.value);
                 default:
-                    // Handle enrollment service execution
-                    if (stepId.startsWith("enroll-")) {
-                        const serviceId = stepId.replace("enroll-", "");
-                        const service = enrollmentServices.find((s) => s.id === serviceId);
-                        if (service) {
-                            const skip = skipResults[serviceId];
-                            if (skip?.action === "connectivityOnly") {
-                                const endpoint = model.enrollment.endpoints[serviceId] || service.endpoint.url;
-                                return await verifyServiceConnectivity(
-                                    service,
-                                    endpoint,
-                                    skip,
-                                    signalRef.current,
-                                    onOutput
-                                );
-                            }
+                    if (stepId === `enroll-${FLIGHTCTL_SERVICE_ID}`) {
+                        const enrollment = model.enrollment;
+                        const endpoint = enrollment.endpoint ?? "";
 
-                            const params = buildEnrollmentParams(model, service);
-                            return await executeEnrollmentScript(
-                                service.scriptPath,
-                                params,
-                                signalRef.current,
-                                onOutput
-                            );
+                        if (enrollment.useExisting) {
+                            return await verifyServiceConnectivity(endpoint, true, signalRef.current, onOutput);
                         }
+
+                        const params = buildEnrollmentParams(model);
+                        return await executeEnrollmentScript(
+                            FLIGHTCTL_SCRIPT_PATH,
+                            params,
+                            signalRef.current,
+                            onOutput
+                        );
                     }
                     return { success: false, output: "Unknown step" };
             }
@@ -366,15 +324,14 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         // -- Write enrollment params files for each service (skip services that evaluated to "skip") --
         const enrollmentScriptEntries: { scriptPath: string; paramsFile: string }[] = [];
         const tempFilesToCleanup: string[] = [];
-        for (const service of enrollmentServices) {
-            const skip = skipResults[service.id];
-            if (skip?.action === "skip" || skip?.action === "connectivityOnly") {
-                continue;
+        if (isEnrollmentSelected) {
+            const enrollment = model.enrollment;
+            if (!enrollment.useExisting) {
+                const params = buildEnrollmentParams(model);
+                const pf = await createSecureTempFile(JSON.stringify(params), `.enrollment-${FLIGHTCTL_SERVICE_ID}-`);
+                tempFilesToCleanup.push(pf);
+                enrollmentScriptEntries.push({ scriptPath: FLIGHTCTL_SCRIPT_PATH, paramsFile: pf });
             }
-            const params = buildEnrollmentParams(model, service);
-            const pf = await createSecureTempFile(JSON.stringify(params), `.enrollment-${service.id}-`);
-            tempFilesToCleanup.push(pf);
-            enrollmentScriptEntries.push({ scriptPath: service.scriptPath, paramsFile: pf });
         }
 
         // -- Write master params JSON for apply-and-enroll.sh --
@@ -564,15 +521,13 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         steps.length > 0 ? Math.round((steps.filter((s) => s.status === "success").length / steps.length) * 100) : 0;
     const executionState = model.enrollmentProgress.executionState;
 
-    const hasEnrollmentServices = enrollmentServices.length > 0;
-
     return (
         <Stack hasGutter>
             <StackItem>
                 <p>
-                    {hasEnrollmentServices
-                        ? _("Applying your configuration changes and enrolling the system.")
-                        : _("Applying your configuration changes to the system.")}
+                    {isEnrollmentSelected
+                        ? _("Applying your configuration changes and enrolling this device.")
+                        : _("Applying your configuration changes to this device.")}
                 </p>
             </StackItem>
 
@@ -593,8 +548,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                         </Title>
                         <List isPlain>
                             {steps.map((step) => {
-                                const serviceId = step.id.startsWith("enroll-") ? step.id.replace("enroll-", "") : null;
-                                const service = serviceId ? enrollmentServices.find((s) => s.id === serviceId) : null;
+                                const isFlightctlStep = step.id === `enroll-${FLIGHTCTL_SERVICE_ID}`;
 
                                 return (
                                     <ListItem key={step.id}>
@@ -607,7 +561,7 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
                                                 }}
                                             >
                                                 {step.name}
-                                                {step.deviceUrl && service && (
+                                                {step.deviceUrl && isFlightctlStep && (
                                                     <>
                                                         {" ("}
                                                         <a

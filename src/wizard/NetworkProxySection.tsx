@@ -11,7 +11,7 @@ import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/ind
 
 import FeatureSwitch from "../components/FeatureSwitch";
 import ValidatedTextInput from "../components/ValidatedTextInput";
-import DefaultHelperText from "../components/HelperTexts";
+import FormHelperText from "../components/HelperTexts";
 import { useModelContext } from "../model-context";
 import { validateHostnameOrIP, validatePort } from "../validation";
 import type { ProxyProtocol } from "../types";
@@ -110,7 +110,7 @@ const NetworkProxySection = () => {
             <Stack hasGutter>
                 <StackItem>
                     <FormGroup label={_("Protocol")}>
-                        <Flex alignItems={{ default: "alignItemsFlexStart" }} spaceItems={{ default: "spaceItemsMd" }}>
+                        <Flex alignItems={{ default: "alignItemsCenter" }} spaceItems={{ default: "spaceItemsMd" }}>
                             <FlexItem>
                                 <Select
                                     id="proxy-protocol-select-menu"
@@ -200,8 +200,8 @@ const NetworkProxySection = () => {
                             onChange={(_, value) => handleProxyNoProxyChange(value)}
                             placeholder={_("e.g. localhost,127.0.0.1,::1,*.internal.corp,10.0.0.0/8")}
                         />
-                        <DefaultHelperText
-                            text={_("Comma-separated list of hosts, domains, or CIDRs that should bypass the proxy")}
+                        <FormHelperText
+                            content={_("Comma-separated list of hosts, domains, or CIDRs that should bypass the proxy")}
                         />
                     </FormGroup>
                 </StackItem>

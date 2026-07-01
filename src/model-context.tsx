@@ -6,13 +6,25 @@ import {
     NetworkInterfaceState,
     NetworkAddressState,
     NetworkServicesState,
-    EnrollmentState,
     LabelsState,
+    ServiceEnrollmentConfig,
     SystemOnboardingConfig,
 } from "./types";
 import { detectFlightctlConfig } from "./services/flightctl-config";
+import { DEFAULT_ENROLLMENT_CONFIG, patchEnrollment, restoreEnrollmentFromMarker } from "./enrollment-state";
 import { parseIpv6Address, ConnectionIpSettings } from "./services/network";
 import { AttemptedMarkerData } from "./attempted-marker";
+
+export enum AliasMode {
+    HOSTNAME = "hostname",
+    CUSTOM = "custom",
+    NONE = "none",
+}
+
+export interface AliasState {
+    mode: AliasMode;
+    customValue: string;
+}
 
 // NetworkAddressConfig - internal type for compatibility with existing code
 // Uses string instead of string | null for backward compatibility
@@ -38,6 +50,7 @@ interface NetworkAddressConfig {
 
 export interface Model {
     hostname: HostnameState;
+    alias: AliasState;
     networkInterface: NetworkInterfaceState;
     networkAddress: NetworkAddressState;
     // Store original interface configurations for quick switching (internal format)
@@ -45,7 +58,7 @@ export interface Model {
     // Store user-modified configurations per interface (internal format)
     userNetworkConfigs: { [interfaceName: string]: NetworkAddressConfig };
     networkServices: NetworkServicesState;
-    enrollment: EnrollmentState;
+    enrollment: ServiceEnrollmentConfig;
     labels: LabelsState;
     connectivityTestHost: string;
     enrollmentProgress: {
@@ -130,11 +143,10 @@ const initialModel: Model = {
             noProxy: "localhost,127.0.0.1,::1",
         },
     },
-    enrollment: {
-        selectedServices: [],
-        credentials: {},
-        endpoints: {},
-        useExisting: {},
+    enrollment: { ...DEFAULT_ENROLLMENT_CONFIG },
+    alias: {
+        mode: AliasMode.HOSTNAME,
+        customValue: "",
     },
     labels: {
         deviceLabels: [],
@@ -491,13 +503,7 @@ export const ModelProvider: React.FunctionComponent<{
                 !defaultHostname || defaultHostname === "localhost" || defaultHostname === "localhost.localdomain";
             const resolvedHostname = hostnameIsDefault && defaults?.hostname ? defaults.hostname : defaultHostname;
 
-            const flightctlService = config?.enrollmentServices?.find((s) => s.id === "flightctl");
-            let flightctlEndpoint = "";
-            if (flightctlService?.endpoint?.url) {
-                flightctlEndpoint = flightctlService.endpoint.url;
-            } else if (flightctlConfig.serverUrl) {
-                flightctlEndpoint = flightctlConfig.serverUrl;
-            }
+            const flightctlEndpoint = config?.flightctl?.defaultEndpoint || flightctlConfig.serverUrl || "";
 
             let connectivityHost = config?.connectivityTest?.host || "www.google.com";
             if (flightctlEndpoint) {
@@ -543,21 +549,17 @@ export const ModelProvider: React.FunctionComponent<{
                         }),
                     },
                 },
-                enrollment: {
-                    ...prev.enrollment,
-                    selectedServices: defaults?.selectedEnrollmentServices ?? prev.enrollment.selectedServices,
-                    useExisting: {
-                        ...prev.enrollment.useExisting,
-                        ...(flightctlConfig.exists && flightctlConfig.hasCredentials && { flightctl: true }),
-                    },
-                    endpoints: {
-                        ...prev.enrollment.endpoints,
-                        ...(flightctlEndpoint && { flightctl: flightctlEndpoint }),
-                    },
-                },
+                enrollment: patchEnrollment(prev.enrollment, {
+                    ...(flightctlConfig.exists && flightctlConfig.hasCredentials && { useExisting: true }),
+                    ...(flightctlEndpoint && { endpoint: flightctlEndpoint }),
+                }),
                 labels: {
                     deviceLabels: defaults?.labels?.deviceLabels ?? prev.labels.deviceLabels,
                     systemInfoMappings: defaults?.labels?.systemInfoMappings ?? prev.labels.systemInfoMappings,
+                },
+                alias: {
+                    mode: (defaults?.alias?.mode as AliasMode | undefined) ?? prev.alias.mode,
+                    customValue: defaults?.alias?.customValue ?? prev.alias.customValue,
                 },
                 connectivityTestHost: connectivityHost,
             }));
@@ -621,12 +623,8 @@ export const ModelProvider: React.FunctionComponent<{
                     }),
                 },
             },
-            enrollment: {
-                ...prev.enrollment,
-                selectedServices: previousAttempt.enrollment?.selectedServices ?? prev.enrollment.selectedServices,
-                endpoints: previousAttempt.enrollment?.endpoints ?? prev.enrollment.endpoints,
-                useExisting: previousAttempt.enrollment?.useExisting ?? prev.enrollment.useExisting,
-            },
+            enrollment: restoreEnrollmentFromMarker(previousAttempt.enrollment, prev.enrollment),
+            alias: previousAttempt.alias ?? prev.alias,
             labels: previousAttempt.labels ?? prev.labels,
             connectivityTestHost: previousAttempt.connectivityTestHost ?? prev.connectivityTestHost,
         }));

@@ -2,6 +2,7 @@ import React from "react";
 import cockpit from "cockpit";
 
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
 import {
     DescriptionList,
     DescriptionListGroup,
@@ -10,40 +11,221 @@ import {
 } from "@patternfly/react-core/dist/esm/components/DescriptionList/index.js";
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
+import { Card, CardBody } from "@patternfly/react-core/dist/esm/components/Card/index.js";
+import { Label } from "@patternfly/react-core/dist/esm/components/Label/Label";
+import { LabelGroup } from "@patternfly/react-core/dist/esm/components/Label/LabelGroup";
+import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 import { useWizardContext } from "@patternfly/react-core/dist/esm/components/Wizard/index.js";
-import { PencilAltIcon } from "@patternfly/react-icons";
-import { useModelContext } from "../model-context";
+import { ExclamationTriangleIcon } from "@patternfly/react-icons";
+import { Icon } from "@patternfly/react-core/dist/esm/components/Icon";
+
+import { AliasMode, useModelContext } from "../model-context";
 import { useConfig } from "../app";
 import { getSetupInterface } from "../services/network";
-import { WIZARD_STEP_IDS } from "./WizardSteps";
+import { resolveAliasValue } from "../services/alias";
+import { WIZARD_STEP_IDS, type WizardStepId } from "./WizardSteps";
+import { GenericLabel, ServiceEnrollmentConfig } from "../types";
+import WithTooltip from "../components/WithTooltip";
 
 const _ = cockpit.gettext;
 
 interface ReviewPageProps {
-    hasEnrollmentScripts: boolean;
+    hasSelectedEnrollments: boolean;
 }
 
-export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnrollmentScripts }) => {
+interface ReviewSectionCardProps {
+    title: string;
+    editStepId: WizardStepId;
+    editAriaLabel: string;
+    children: React.ReactNode;
+}
+
+const CUSTOM_INFO_PREFIX = "customInfo.";
+
+const REVIEW_DESCRIPTION_LIST_ORIENTATION = {
+    lg: "horizontal",
+    xl: "horizontal",
+    "2xl": "horizontal",
+} as const;
+
+const REVIEW_DESCRIPTION_LIST_TERM_WIDTH_STYLE = {
+    "--pf-v6-c-description-list--m-horizontal__term--width-on-lg": "25ch",
+    "--pf-v6-c-description-list--m-horizontal__term--width-on-xl": "25ch",
+    "--pf-v6-c-description-list--m-horizontal__term--width-on-2xl": "25ch",
+} as React.CSSProperties;
+
+const toDisplayValue = (value: string): string => {
+    if (value.startsWith(CUSTOM_INFO_PREFIX)) {
+        return value.slice(CUSTOM_INFO_PREFIX.length);
+    }
+    return value;
+};
+
+const formatReviewLabelText = (label: GenericLabel): string => {
+    const { key, value } = label;
+    if (!value) {
+        return key;
+    }
+    const displayValue = toDisplayValue(value);
+    return `${key}=${displayValue}`;
+};
+
+interface ReviewLabelGroupProps {
+    labels: GenericLabel[];
+    compareKeys: string[];
+    emptyLabel: string;
+}
+
+const ReviewLabelGroup = ({ labels, compareKeys, emptyLabel }: ReviewLabelGroupProps) => {
+    // The empty labels from the form are only removed when applying the validation, so we need to filter them out here.
+    const displayLabels = labels.filter((label) => label.key);
+    if (displayLabels.length === 0) {
+        return emptyLabel;
+    }
+    return (
+        <LabelGroup numLabels={displayLabels.length}>
+            {displayLabels.map((label, i) => {
+                const isDuplicate = compareKeys.includes(label.key);
+                return (
+                    <WithTooltip
+                        key={`${label.key}-${i}`}
+                        showTooltip={isDuplicate}
+                        content={cockpit.format(
+                            _(
+                                "A custom label is also defined with key '$0', which takes precedence over the system information mapping"
+                            ),
+                            label.key
+                        )}
+                    >
+                        <Label>
+                            {isDuplicate && (
+                                <Icon status="warning" className="pf-v6-u-mr-sm">
+                                    <ExclamationTriangleIcon />
+                                </Icon>
+                            )}
+                            {formatReviewLabelText(label)}
+                        </Label>
+                    </WithTooltip>
+                );
+            })}
+        </LabelGroup>
+    );
+};
+
+const EnrollmentCardBody = ({
+    enrollment,
+    defaultEndpoint,
+}: {
+    enrollment: ServiceEnrollmentConfig;
+    defaultEndpoint: string | undefined;
+}) => {
+    const { selected, useExisting, credentials } = enrollment;
+    if (!selected) {
+        return <span>{_("Enrollment skipped")}</span>;
+    }
+
+    const enrollmentEndpoint = enrollment.endpoint ?? defaultEndpoint;
+    const hasNewCredentials = selected && !useExisting;
+    return (
+        <>
+            <DescriptionListGroup>
+                <DescriptionListTerm>{_("Credentials")}</DescriptionListTerm>
+                <DescriptionListDescription>
+                    {hasNewCredentials ? _("New credentials were configured") : _("Using existing credentials")}
+                </DescriptionListDescription>
+            </DescriptionListGroup>
+            {hasNewCredentials && (
+                <DescriptionListGroup>
+                    <DescriptionListTerm>{_("Authentication method")}</DescriptionListTerm>
+                    <DescriptionListDescription>
+                        {credentials?.authMethod === "token" ? _("Token") : _("Username and password")}
+                        {credentials?.authMethod === "password" && (
+                            <strong>{` (${_("username")}: ${credentials.username || _("(empty)")})`}</strong>
+                        )}
+                    </DescriptionListDescription>
+                </DescriptionListGroup>
+            )}
+            <DescriptionListGroup>
+                <DescriptionListTerm>{_("Flight Control server")}</DescriptionListTerm>
+                <DescriptionListDescription>{enrollmentEndpoint}</DescriptionListDescription>
+            </DescriptionListGroup>
+        </>
+    );
+};
+
+const ReviewSectionCard = ({
+    title,
+    editStepId,
+    editAriaLabel,
+    children,
+}: React.PropsWithChildren<ReviewSectionCardProps>) => {
+    const { goToStepById } = useWizardContext();
+
+    return (
+        <Card isCompact>
+            <CardBody>
+                <Stack hasGutter>
+                    <StackItem>
+                        <Flex
+                            justifyContent={{ default: "justifyContentSpaceBetween" }}
+                            alignItems={{ default: "alignItemsCenter" }}
+                        >
+                            <FlexItem>
+                                <Title headingLevel="h3" size="md">
+                                    {title}
+                                </Title>
+                            </FlexItem>
+                            <FlexItem>
+                                <Button
+                                    variant="link"
+                                    isInline
+                                    onClick={() => goToStepById(editStepId)}
+                                    aria-label={editAriaLabel}
+                                >
+                                    {_("Edit")}
+                                </Button>
+                            </FlexItem>
+                        </Flex>
+                    </StackItem>
+                    <StackItem>
+                        <DescriptionList
+                            orientation={REVIEW_DESCRIPTION_LIST_ORIENTATION}
+                            style={REVIEW_DESCRIPTION_LIST_TERM_WIDTH_STYLE}
+                        >
+                            {children}
+                        </DescriptionList>
+                    </StackItem>
+                </Stack>
+            </CardBody>
+        </Card>
+    );
+};
+
+export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelectedEnrollments }) => {
     const { model, networkManager } = useModelContext();
     const { config } = useConfig();
-    const { goToStepById } = useWizardContext();
 
     const interfaces = networkManager?.list_interfaces() || [];
     const setupIface = getSetupInterface(interfaces);
     const isSingleNic = setupIface !== null && setupIface === model.networkInterface.selectedInterface;
 
+    const aliasSummary =
+        model.alias.mode === AliasMode.NONE
+            ? _("Not set")
+            : resolveAliasValue(model.alias, model.hostname.value) || _("(empty)");
+
     return (
         <Stack hasGutter>
             <StackItem>
-                <p>
-                    {hasEnrollmentScripts
+                <Alert variant="info" isInline title={_("Review your configuration")}>
+                    {hasSelectedEnrollments
                         ? _(
                               'Please review your configuration below. Click "Enroll" to apply these settings and complete the system onboarding.'
                           )
                         : _(
                               'Please review your configuration below. Click "Apply" to apply these settings to the system.'
                           )}
-                </p>
+                </Alert>
             </StackItem>
 
             {isSingleNic && (
@@ -57,368 +239,248 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasEnroll
             )}
 
             <StackItem>
-                <DescriptionList isHorizontal>
-                    {/* Hostname Section */}
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>{_("Hostname")}</DescriptionListTerm>
-                        <DescriptionListDescription>
-                            {model.hostname.value || _("(empty)")}
-                            <Button
-                                variant="link"
-                                icon={<PencilAltIcon />}
-                                onClick={() => goToStepById(WIZARD_STEP_IDS.hostname)}
-                                aria-label={_("Edit hostname")}
-                            />
-                        </DescriptionListDescription>
-                    </DescriptionListGroup>
-
-                    {/* Network Interface Section */}
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>{_("Interface")}</DescriptionListTerm>
-                        <DescriptionListDescription>
-                            {model.networkInterface.selectedInterface || _("(not selected)")}
-                            <Button
-                                variant="link"
-                                icon={<PencilAltIcon />}
-                                onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
-                                aria-label={_("Edit network interface")}
-                            />
-                        </DescriptionListDescription>
-                    </DescriptionListGroup>
-                    {model.networkInterface.interfaceType === "wifi" && (
-                        <>
+                <Stack hasGutter>
+                    <StackItem>
+                        <ReviewSectionCard
+                            title={_("Network")}
+                            editStepId={WIZARD_STEP_IDS.network}
+                            editAriaLabel={_("Edit network configuration")}
+                        >
                             <DescriptionListGroup>
-                                <DescriptionListTerm>{_("WiFi SSID")}</DescriptionListTerm>
+                                <DescriptionListTerm>{_("Network interface")}</DescriptionListTerm>
                                 <DescriptionListDescription>
-                                    {model.networkInterface.wifiSsid || _("(empty)")}
-                                    <Button
-                                        variant="link"
-                                        icon={<PencilAltIcon />}
-                                        onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
-                                        aria-label={_("Edit network interface")}
+                                    {model.networkInterface.selectedInterface || _("(not selected)")}
+                                </DescriptionListDescription>
+                            </DescriptionListGroup>
+                            {model.networkInterface.interfaceType === "wifi" && (
+                                <>
+                                    <DescriptionListGroup>
+                                        <DescriptionListTerm>{_("WiFi SSID")}</DescriptionListTerm>
+                                        <DescriptionListDescription>
+                                            {model.networkInterface.wifiSsid || _("(empty)")}
+                                        </DescriptionListDescription>
+                                    </DescriptionListGroup>
+                                    <DescriptionListGroup>
+                                        <DescriptionListTerm>{_("WiFi Security")}</DescriptionListTerm>
+                                        <DescriptionListDescription>
+                                            {model.networkInterface.wifiSecurity === "none" && _("None")}
+                                            {model.networkInterface.wifiSecurity === "wep" && _("WEP")}
+                                            {model.networkInterface.wifiSecurity === "wpa" && _("WPA/WPA2/WPA3")}
+                                            {!model.networkInterface.wifiSecurity && _("(not set)")}
+                                        </DescriptionListDescription>
+                                    </DescriptionListGroup>
+                                </>
+                            )}
+                            <DescriptionListGroup>
+                                <DescriptionListTerm>{_("VLAN ID")}</DescriptionListTerm>
+                                <DescriptionListDescription>
+                                    {model.networkInterface.vlanId !== null
+                                        ? model.networkInterface.vlanId
+                                        : _("No VLAN")}
+                                </DescriptionListDescription>
+                            </DescriptionListGroup>
+                            <DescriptionListGroup>
+                                <DescriptionListTerm>{_("IPv4 Connection")}</DescriptionListTerm>
+                                <DescriptionListDescription>
+                                    {model.networkAddress.ipv4.method === "auto" && _("Automatic (DHCP)")}
+                                    {model.networkAddress.ipv4.method === "static" && _("Static")}
+                                    {model.networkAddress.ipv4.method === "disabled" && _("Disabled")}
+                                </DescriptionListDescription>
+                            </DescriptionListGroup>
+                            {model.networkAddress.ipv4.method === "static" && (
+                                <>
+                                    <DescriptionListGroup>
+                                        <DescriptionListTerm>{_("IPv4 Address")}</DescriptionListTerm>
+                                        <DescriptionListDescription>
+                                            {model.networkAddress.ipv4.address || _("(empty)")}
+                                        </DescriptionListDescription>
+                                    </DescriptionListGroup>
+                                    <DescriptionListGroup>
+                                        <DescriptionListTerm>{_("IPv4 Subnet Mask")}</DescriptionListTerm>
+                                        <DescriptionListDescription>
+                                            {model.networkAddress.ipv4.subnetMask || _("(empty)")}
+                                        </DescriptionListDescription>
+                                    </DescriptionListGroup>
+                                    <DescriptionListGroup>
+                                        <DescriptionListTerm>{_("Gateway")}</DescriptionListTerm>
+                                        <DescriptionListDescription>
+                                            {model.networkAddress.ipv4.gateway || _("(empty)")}
+                                        </DescriptionListDescription>
+                                    </DescriptionListGroup>
+                                </>
+                            )}
+                            <DescriptionListGroup>
+                                <DescriptionListTerm>{_("IPv4 DNS Configuration")}</DescriptionListTerm>
+                                <DescriptionListDescription>
+                                    {model.networkAddress.ipv4.autoDns ? (
+                                        _("Automatic")
+                                    ) : (
+                                        <>
+                                            {model.networkAddress.ipv4.primaryDns && (
+                                                <div>{model.networkAddress.ipv4.primaryDns}</div>
+                                            )}
+                                            {model.networkAddress.ipv4.secondaryDns && (
+                                                <div>{model.networkAddress.ipv4.secondaryDns}</div>
+                                            )}
+                                            {!model.networkAddress.ipv4.primaryDns &&
+                                                !model.networkAddress.ipv4.secondaryDns && <div>{_("(empty)")}</div>}
+                                        </>
+                                    )}
+                                </DescriptionListDescription>
+                            </DescriptionListGroup>
+                            <DescriptionListGroup>
+                                <DescriptionListTerm>{_("IPv6 Connection")}</DescriptionListTerm>
+                                <DescriptionListDescription>
+                                    {model.networkAddress.ipv6.method === "auto" && _("Automatic (DHCP)")}
+                                    {model.networkAddress.ipv6.method === "static" && _("Static")}
+                                    {model.networkAddress.ipv6.method === "disabled" && _("Disabled")}
+                                </DescriptionListDescription>
+                            </DescriptionListGroup>
+                            {model.networkAddress.ipv6.method === "static" && (
+                                <>
+                                    <DescriptionListGroup>
+                                        <DescriptionListTerm>{_("IPv6 Address")}</DescriptionListTerm>
+                                        <DescriptionListDescription>
+                                            {model.networkAddress.ipv6.address || _("(empty)")}
+                                        </DescriptionListDescription>
+                                    </DescriptionListGroup>
+                                    <DescriptionListGroup>
+                                        <DescriptionListTerm>{_("Gateway")}</DescriptionListTerm>
+                                        <DescriptionListDescription>
+                                            {model.networkAddress.ipv6.gateway || _("(empty)")}
+                                        </DescriptionListDescription>
+                                    </DescriptionListGroup>
+                                </>
+                            )}
+                            {model.networkAddress.ipv6.method !== "disabled" && (
+                                <DescriptionListGroup>
+                                    <DescriptionListTerm>{_("IPv6 DNS Configuration")}</DescriptionListTerm>
+                                    <DescriptionListDescription>
+                                        {model.networkAddress.ipv6.autoDns ? (
+                                            _("Automatic")
+                                        ) : (
+                                            <>
+                                                {model.networkAddress.ipv6.primaryDns && (
+                                                    <div>{model.networkAddress.ipv6.primaryDns}</div>
+                                                )}
+                                                {model.networkAddress.ipv6.secondaryDns && (
+                                                    <div>{model.networkAddress.ipv6.secondaryDns}</div>
+                                                )}
+                                                {!model.networkAddress.ipv6.primaryDns &&
+                                                    !model.networkAddress.ipv6.secondaryDns && (
+                                                        <div>{_("(empty)")}</div>
+                                                    )}
+                                            </>
+                                        )}
+                                    </DescriptionListDescription>
+                                </DescriptionListGroup>
+                            )}
+                        </ReviewSectionCard>
+                    </StackItem>
+
+                    <StackItem>
+                        <ReviewSectionCard
+                            title={_("Network services")}
+                            editStepId={WIZARD_STEP_IDS.networkServices}
+                            editAriaLabel={_("Edit network services")}
+                        >
+                            <DescriptionListGroup>
+                                <DescriptionListTerm>{_("NTP Server Hostname")}</DescriptionListTerm>
+                                <DescriptionListDescription>
+                                    {model.networkServices.ntp.autoConfig ? (
+                                        _("No custom NTP servers configured")
+                                    ) : model.networkServices.ntp.servers.length > 0 ? (
+                                        model.networkServices.ntp.servers.map((server, index) => (
+                                            <div key={index}>{server}</div>
+                                        ))
+                                    ) : (
+                                        <span>{_("(empty)")}</span>
+                                    )}
+                                </DescriptionListDescription>
+                            </DescriptionListGroup>
+                            <DescriptionListGroup>
+                                <DescriptionListTerm>{_("HTTP proxy")}</DescriptionListTerm>
+                                <DescriptionListDescription>
+                                    {model.networkServices.proxy.enabled ? (
+                                        <>
+                                            {model.networkServices.proxy.hostname && model.networkServices.proxy.port
+                                                ? `${model.networkServices.proxy.protocol}://${model.networkServices.proxy.hostname}:${model.networkServices.proxy.port}`
+                                                : _("(incomplete configuration)")}
+                                            {model.networkServices.proxy.username && (
+                                                <div>
+                                                    {_("Username: ")} {model.networkServices.proxy.username}
+                                                </div>
+                                            )}
+                                            {model.networkServices.proxy.noProxy && (
+                                                <div>
+                                                    {_("No proxy: ")} {model.networkServices.proxy.noProxy}
+                                                </div>
+                                            )}
+                                            {model.networkServices.proxy.protocol === "http" &&
+                                                model.networkServices.proxy.applyForHttps && (
+                                                    <div>{_("Also applies to HTTPS traffic")}</div>
+                                                )}
+                                        </>
+                                    ) : (
+                                        _("No proxy configured")
+                                    )}
+                                </DescriptionListDescription>
+                            </DescriptionListGroup>
+                        </ReviewSectionCard>
+                    </StackItem>
+
+                    <StackItem>
+                        <ReviewSectionCard
+                            title={_("Enrollment")}
+                            editStepId={WIZARD_STEP_IDS.enrollment}
+                            editAriaLabel={_("Edit enrollment")}
+                        >
+                            <EnrollmentCardBody
+                                enrollment={model.enrollment}
+                                defaultEndpoint={config?.flightctl?.defaultEndpoint}
+                            />
+                        </ReviewSectionCard>
+                    </StackItem>
+
+                    <StackItem>
+                        <ReviewSectionCard
+                            title={_("Device labels")}
+                            editStepId={WIZARD_STEP_IDS.labels}
+                            editAriaLabel={_("Edit device labels")}
+                        >
+                            <DescriptionListGroup>
+                                <DescriptionListTerm>{_("Hostname")}</DescriptionListTerm>
+                                <DescriptionListDescription>
+                                    {model.hostname.value || _("(empty)")}
+                                </DescriptionListDescription>
+                            </DescriptionListGroup>
+                            <DescriptionListGroup>
+                                <DescriptionListTerm>{_("Alias")}</DescriptionListTerm>
+                                <DescriptionListDescription>{aliasSummary}</DescriptionListDescription>
+                            </DescriptionListGroup>
+                            <DescriptionListGroup>
+                                <DescriptionListTerm>{_("Custom labels")}</DescriptionListTerm>
+                                <DescriptionListDescription>
+                                    <ReviewLabelGroup
+                                        labels={model.labels.deviceLabels}
+                                        compareKeys={[]}
+                                        emptyLabel={_("No custom labels configured")}
                                     />
                                 </DescriptionListDescription>
                             </DescriptionListGroup>
                             <DescriptionListGroup>
-                                <DescriptionListTerm>{_("WiFi Security")}</DescriptionListTerm>
+                                <DescriptionListTerm>{_("System information mappings")}</DescriptionListTerm>
                                 <DescriptionListDescription>
-                                    {model.networkInterface.wifiSecurity === "none" && _("None")}
-                                    {model.networkInterface.wifiSecurity === "wep" && _("WEP")}
-                                    {model.networkInterface.wifiSecurity === "wpa" && _("WPA/WPA2")}
-                                    {!model.networkInterface.wifiSecurity && _("(not set)")}
+                                    <ReviewLabelGroup
+                                        labels={model.labels.systemInfoMappings}
+                                        compareKeys={model.labels.deviceLabels.map((label) => label.key)}
+                                        emptyLabel={_("No system information mappings configured")}
+                                    />
                                 </DescriptionListDescription>
                             </DescriptionListGroup>
-                        </>
-                    )}
-                    {model.networkInterface.vlanId !== null && (
-                        <DescriptionListGroup>
-                            <DescriptionListTerm>{_("VLAN ID")}</DescriptionListTerm>
-                            <DescriptionListDescription>
-                                {model.networkInterface.vlanId}
-                                <Button
-                                    variant="link"
-                                    icon={<PencilAltIcon />}
-                                    onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
-                                    aria-label={_("Edit network interface")}
-                                />
-                            </DescriptionListDescription>
-                        </DescriptionListGroup>
-                    )}
-
-                    {/* Network Address Section */}
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>{_("IPv4 Configuration")}</DescriptionListTerm>
-                        <DescriptionListDescription>
-                            {model.networkAddress.ipv4.method === "auto" && _("Automatic (DHCP)")}
-                            {model.networkAddress.ipv4.method === "static" && _("Static")}
-                            {model.networkAddress.ipv4.method === "disabled" && _("Disabled")}
-                            <Button
-                                variant="link"
-                                icon={<PencilAltIcon />}
-                                onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
-                                aria-label={_("Edit network address")}
-                            />
-                        </DescriptionListDescription>
-                    </DescriptionListGroup>
-                    {model.networkAddress.ipv4.method === "static" && (
-                        <>
-                            <DescriptionListGroup>
-                                <DescriptionListTerm>IPv4 Address</DescriptionListTerm>
-                                <DescriptionListDescription>
-                                    {model.networkAddress.ipv4.address || "(empty)"}
-                                </DescriptionListDescription>
-                            </DescriptionListGroup>
-                            <DescriptionListGroup>
-                                <DescriptionListTerm>IPv4 Subnet Mask</DescriptionListTerm>
-                                <DescriptionListDescription>
-                                    {model.networkAddress.ipv4.subnetMask || "(empty)"}
-                                </DescriptionListDescription>
-                            </DescriptionListGroup>
-                            <DescriptionListGroup>
-                                <DescriptionListTerm>Gateway</DescriptionListTerm>
-                                <DescriptionListDescription>
-                                    {model.networkAddress.ipv4.gateway || "(empty)"}
-                                </DescriptionListDescription>
-                            </DescriptionListGroup>
-                        </>
-                    )}
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>DNS servers</DescriptionListTerm>
-                        <DescriptionListDescription>
-                            {model.networkAddress.ipv4.autoDns ? (
-                                _("Automatic")
-                            ) : (
-                                <>
-                                    {model.networkAddress.ipv4.primaryDns && (
-                                        <div>{model.networkAddress.ipv4.primaryDns}</div>
-                                    )}
-                                    {model.networkAddress.ipv4.secondaryDns && (
-                                        <div>{model.networkAddress.ipv4.secondaryDns}</div>
-                                    )}
-                                    {!model.networkAddress.ipv4.primaryDns &&
-                                        !model.networkAddress.ipv4.secondaryDns && <div>(empty)</div>}
-                                </>
-                            )}
-                        </DescriptionListDescription>
-                    </DescriptionListGroup>
-
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>{_("IPv6 Configuration")}</DescriptionListTerm>
-                        <DescriptionListDescription>
-                            {model.networkAddress.ipv6.method === "auto" && _("Automatic (DHCP)")}
-                            {model.networkAddress.ipv6.method === "static" && _("Static")}
-                            {model.networkAddress.ipv6.method === "disabled" && _("Disabled")}
-                            <Button
-                                variant="link"
-                                icon={<PencilAltIcon />}
-                                onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
-                                aria-label={_("Edit network address")}
-                            />
-                        </DescriptionListDescription>
-                    </DescriptionListGroup>
-                    {model.networkAddress.ipv6.method === "static" && (
-                        <>
-                            <DescriptionListGroup>
-                                <DescriptionListTerm>IPv6 Address</DescriptionListTerm>
-                                <DescriptionListDescription>
-                                    {model.networkAddress.ipv6.address || "(empty)"}
-                                </DescriptionListDescription>
-                            </DescriptionListGroup>
-                            <DescriptionListGroup>
-                                <DescriptionListTerm>Gateway</DescriptionListTerm>
-                                <DescriptionListDescription>
-                                    {model.networkAddress.ipv6.gateway || "(empty)"}
-                                </DescriptionListDescription>
-                            </DescriptionListGroup>
-                        </>
-                    )}
-                    {model.networkAddress.ipv6.method !== "disabled" && (
-                        <DescriptionListGroup>
-                            <DescriptionListTerm>DNS servers</DescriptionListTerm>
-                            <DescriptionListDescription>
-                                {model.networkAddress.ipv6.autoDns ? (
-                                    _("Automatic")
-                                ) : (
-                                    <>
-                                        {model.networkAddress.ipv6.primaryDns && (
-                                            <div>{model.networkAddress.ipv6.primaryDns}</div>
-                                        )}
-                                        {model.networkAddress.ipv6.secondaryDns && (
-                                            <div>{model.networkAddress.ipv6.secondaryDns}</div>
-                                        )}
-                                        {!model.networkAddress.ipv6.primaryDns &&
-                                            !model.networkAddress.ipv6.secondaryDns && <div>(empty)</div>}
-                                    </>
-                                )}
-                            </DescriptionListDescription>
-                        </DescriptionListGroup>
-                    )}
-
-                    {/* Network Services Section */}
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>{_("NTP Servers")}</DescriptionListTerm>
-                        <DescriptionListDescription>
-                            {model.networkServices.ntp.autoConfig ? (
-                                _("Automatic")
-                            ) : model.networkServices.ntp.servers.length > 0 ? (
-                                model.networkServices.ntp.servers.map((server, index) => (
-                                    <div key={index}>{server}</div>
-                                ))
-                            ) : (
-                                <span>{_("(empty)")}</span>
-                            )}
-                            <Button
-                                variant="link"
-                                icon={<PencilAltIcon />}
-                                onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
-                                aria-label={_("Edit network services")}
-                            />
-                        </DescriptionListDescription>
-                    </DescriptionListGroup>
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>{_("Proxy")}</DescriptionListTerm>
-                        <DescriptionListDescription>
-                            {model.networkServices.proxy.enabled ? (
-                                <>
-                                    {model.networkServices.proxy.hostname && model.networkServices.proxy.port
-                                        ? `${model.networkServices.proxy.protocol}://${model.networkServices.proxy.hostname}:${model.networkServices.proxy.port}`
-                                        : _("(incomplete configuration)")}
-                                    {model.networkServices.proxy.username && (
-                                        <div>
-                                            {_("Username: ")} {model.networkServices.proxy.username}
-                                        </div>
-                                    )}
-                                    {model.networkServices.proxy.noProxy && (
-                                        <div>
-                                            {_("No proxy: ")} {model.networkServices.proxy.noProxy}
-                                        </div>
-                                    )}
-                                    {model.networkServices.proxy.protocol === "http" &&
-                                        model.networkServices.proxy.applyForHttps && (
-                                            <div>{_("Also applies to HTTPS traffic")}</div>
-                                        )}
-                                </>
-                            ) : (
-                                _("Not configured")
-                            )}
-                            <Button
-                                variant="link"
-                                icon={<PencilAltIcon />}
-                                onClick={() => goToStepById(WIZARD_STEP_IDS.network)}
-                                aria-label={_("Edit network services")}
-                            />
-                        </DescriptionListDescription>
-                    </DescriptionListGroup>
-
-                    {/* Connectivity Test Section */}
-                    <DescriptionListGroup>
-                        <DescriptionListTerm>{_("Connectivity test host")}</DescriptionListTerm>
-                        <DescriptionListDescription>
-                            {model.connectivityTestHost || _("(not set)")}
-                            <Button
-                                variant="link"
-                                icon={<PencilAltIcon />}
-                                onClick={() => goToStepById(WIZARD_STEP_IDS.connectivityTest)}
-                                aria-label={_("Edit connectivity test host")}
-                            />
-                        </DescriptionListDescription>
-                    </DescriptionListGroup>
-
-                    {hasEnrollmentScripts && (
-                        <>
-                            {/* Enrollment Section */}
-                            {config?.enrollmentServices?.map((service) => {
-                                const isSelected = model.enrollment.selectedServices.includes(service.id);
-
-                                if (!isSelected) {
-                                    // Service not selected - show "Skip enrollment"
-                                    return (
-                                        <DescriptionListGroup key={service.id}>
-                                            <DescriptionListTerm>{service.name}</DescriptionListTerm>
-                                            <DescriptionListDescription>
-                                                {_("Skip enrollment")}
-                                                <Button
-                                                    variant="link"
-                                                    icon={<PencilAltIcon />}
-                                                    onClick={() => goToStepById(WIZARD_STEP_IDS.enrollment)}
-                                                    aria-label={_("Edit enrollment services")}
-                                                />
-                                            </DescriptionListDescription>
-                                        </DescriptionListGroup>
-                                    );
-                                }
-
-                                const isUsingExisting = model.enrollment.useExisting?.[service.id] ?? false;
-
-                                if (isUsingExisting) {
-                                    return (
-                                        <DescriptionListGroup key={service.id}>
-                                            <DescriptionListTerm>{service.name}</DescriptionListTerm>
-                                            <DescriptionListDescription>
-                                                {_("Using existing credentials")}
-                                                <Button
-                                                    variant="link"
-                                                    icon={<PencilAltIcon />}
-                                                    onClick={() => goToStepById(WIZARD_STEP_IDS.enrollment)}
-                                                    aria-label={_("Edit enrollment services")}
-                                                />
-                                            </DescriptionListDescription>
-                                        </DescriptionListGroup>
-                                    );
-                                }
-
-                                // Service selected with new credentials - show endpoint and credentials
-                                const endpoint = model.enrollment.endpoints[service.id] || service.endpoint.url;
-                                const credentials = model.enrollment.credentials[service.id] || {};
-
-                                return (
-                                    <DescriptionListGroup key={service.id}>
-                                        <DescriptionListTerm>{service.name}</DescriptionListTerm>
-                                        <DescriptionListDescription>
-                                            <div>
-                                                {_("Enroll in ")} {endpoint}
-                                            </div>
-                                            {Object.keys(credentials).length > 0 && (
-                                                <div>
-                                                    {Object.entries(credentials)
-                                                        .filter(([key]) => !key.startsWith("_"))
-                                                        .map(([key, value]) => {
-                                                            // Hide password/token fields
-                                                            const isSecret =
-                                                                key.toLowerCase().includes("password") ||
-                                                                key.toLowerCase().includes("token") ||
-                                                                key.toLowerCase().includes("key");
-                                                            const displayValue =
-                                                                isSecret && value
-                                                                    ? "•".repeat(8)
-                                                                    : String(value || _("(empty)"));
-
-                                                            return (
-                                                                <div key={key}>
-                                                                    {key}: {displayValue}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                </div>
-                                            )}
-                                            <Button
-                                                variant="link"
-                                                icon={<PencilAltIcon />}
-                                                onClick={() => goToStepById(WIZARD_STEP_IDS.enrollment)}
-                                                aria-label={_("Edit enrollment services")}
-                                            />
-                                        </DescriptionListDescription>
-                                    </DescriptionListGroup>
-                                );
-                            })}
-                        </>
-                    )}
-
-                    {/* Labels Section */}
-                    {(model.labels.deviceLabels.length > 0 || model.labels.systemInfoMappings.length > 0) && (
-                        <DescriptionListGroup>
-                            <DescriptionListTerm>{_("Device labels")}</DescriptionListTerm>
-                            <DescriptionListDescription>
-                                {model.labels.deviceLabels.map((entry, i) => (
-                                    <div key={i}>
-                                        {entry.key} = {entry.value}
-                                    </div>
-                                ))}
-                                {model.labels.systemInfoMappings.map((entry, i) => (
-                                    <div key={i}>
-                                        {entry.labelKey} &larr; {entry.systemInfoField}
-                                    </div>
-                                ))}
-                                <Button
-                                    variant="link"
-                                    icon={<PencilAltIcon />}
-                                    onClick={() => goToStepById(WIZARD_STEP_IDS.labels)}
-                                    aria-label={_("Edit device labels")}
-                                />
-                            </DescriptionListDescription>
-                        </DescriptionListGroup>
-                    )}
-                </DescriptionList>
+                        </ReviewSectionCard>
+                    </StackItem>
+                </Stack>
             </StackItem>
         </Stack>
     );

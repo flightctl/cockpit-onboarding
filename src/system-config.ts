@@ -114,7 +114,7 @@ export class SystemConfigurationService {
 
         // 5. Apply labels configuration
         try {
-            const labelResults = await applyLabelsConfiguration(model.labels);
+            const labelResults = await applyLabelsConfiguration(model.labels, model.alias, model.hostname.value);
             labelResults.forEach((result) => allResults.push(`✓ ${result}`));
         } catch (error) {
             allResults.push(`✗ ${String(error)}`);

@@ -1,5 +1,6 @@
+import { ALIAS_LABEL_KEY, validateAliasConfig } from "../services/alias";
 import { Model } from "../model-context";
-import { EnrollmentService } from "../types";
+import { validateFlightctlCredentials } from "../flightctl-enrollment";
 import {
     validateHostname,
     validateIpv4StaticConfig,
@@ -9,15 +10,15 @@ import {
     validateHostnameOrIP,
     validateManualNtpServers,
     validatePort,
+    hasUniqueLabelKeys,
     validateLabelKey,
     validateLabelValue,
 } from "../validation";
 
 export const WIZARD_STEP_IDS = {
     network: "networkStep",
+    networkServices: "networkServicesStep",
     enrollment: "enrollmentStep",
-    connectivityTest: "connectivityTestStep",
-    hostname: "hostnameStep",
     labels: "labelsStep",
     review: "reviewStep",
     progress: "progressStep",
@@ -25,9 +26,8 @@ export const WIZARD_STEP_IDS = {
 
 export const stepIds = [
     WIZARD_STEP_IDS.network,
+    WIZARD_STEP_IDS.networkServices,
     WIZARD_STEP_IDS.enrollment,
-    WIZARD_STEP_IDS.connectivityTest,
-    WIZARD_STEP_IDS.hostname,
     WIZARD_STEP_IDS.labels,
     WIZARD_STEP_IDS.review,
     WIZARD_STEP_IDS.progress,
@@ -116,7 +116,7 @@ export const validateNetworkAddressStep = (model: Model): boolean => {
  * NTP: If custom NTP servers are configured, at least one must be provided
  * Proxy: If proxy is enabled, hostname and port are required
  */
-export const validateNetworkServicesStep = (model: Model): boolean => {
+export const validateNetworkServicesConfig = (model: Model): boolean => {
     const { ntp, proxy } = model.networkServices;
 
     // NTP validation
@@ -143,116 +143,89 @@ export const validateNetworkServicesStep = (model: Model): boolean => {
 };
 
 /**
- * Validate the enrollment step
- * If enrollment services are selected, credentials and endpoint must be valid
- *
- * Note: This function needs access to the config to validate properly.
- * For now, we do basic validation. Full validation is done in the UI component.
+ * Validate the enrollment step for Flight Control.
+ * Enrollment is optional; when selected, credentials and endpoint must be valid.
  */
-export const validateEnrollmentStep = (model: Model, enrollmentServices?: EnrollmentService[]): boolean => {
-    const { selectedServices, credentials, endpoints } = model.enrollment;
+export const validateEnrollmentStep = (model: Model): boolean => {
+    const enrollment = model.enrollment;
 
-    // If no services are selected, step is valid (enrollment is optional)
-    if (selectedServices.length === 0) {
+    if (!enrollment.selected) {
         return true;
     }
 
-    // If we don't have the enrollment services config, we can't fully validate
-    // Just check that credentials exist for selected services
-    if (!enrollmentServices || enrollmentServices.length === 0) {
-        for (const serviceId of selectedServices) {
-            if (!credentials[serviceId]) {
-                return false;
-            }
-        }
+    if (enrollment.useExisting) {
         return true;
     }
 
-    // Full validation with config
-    for (const serviceId of selectedServices) {
-        const service = enrollmentServices.find((s) => s.id === serviceId);
-        if (!service) {
-            continue;
-        }
-
-        // When using existing credentials, skip endpoint and credential validation
-        if (model.enrollment.useExisting?.[serviceId]) {
-            continue;
-        }
-
-        // Validate endpoint exists
-        const endpoint = endpoints?.[serviceId] || service.endpoint.url;
-        if (!endpoint || !endpoint.trim()) {
-            return false;
-        }
-
-        // Validate credentials object exists
-        const serviceCreds = credentials[serviceId];
-        if (!serviceCreds) {
-            return false;
-        }
-
-        // Check all required fields are filled.
-        // For oneOf schemas, resolve the active variant's required fields.
-        const credSchema = service.credentialsSchema;
-        let required: string[] = [];
-        if (credSchema?.oneOf && credSchema.oneOf.length > 0) {
-            const variantIndex = typeof serviceCreds._variantIndex === "number" ? serviceCreds._variantIndex : 0;
-            const variant = credSchema.oneOf[variantIndex] || credSchema.oneOf[0];
-            required = variant.required || [];
-        } else {
-            required = credSchema?.required || [];
-        }
-        for (const fieldName of required) {
-            const value = serviceCreds[fieldName];
-            if (value === undefined || value === null || value === "") {
-                return false;
-            }
-        }
+    const endpoint = enrollment.endpoint;
+    if (!endpoint || !endpoint.trim()) {
+        return false;
     }
 
-    return true;
+    return validateFlightctlCredentials(enrollment.credentials);
 };
 
 /**
  * Validate the labels step
+ * Required: A valid hostname must be entered.
  * Labels are optional; validates key/value consistency when either is present.
  */
 export const validateLabelsStep = (model: Model): boolean => {
-    for (const { key, value } of model.labels.deviceLabels) {
-        const hasKey = key.trim().length > 0;
-        const hasValue = value.trim().length > 0;
+    if (!validateHostnameStep(model)) {
+        return false;
+    }
 
-        if (hasKey || hasValue) {
-            if (!hasKey) {
-                return false;
-            }
-            if (validateLabelKey(key) !== null) {
-                return false;
-            }
-            if (validateLabelValue(value) !== null) {
-                return false;
-            }
+    if (!validateAliasConfig(model.alias, model.hostname.value)) {
+        return false;
+    }
+
+    const activeDeviceLabels = model.labels.deviceLabels.filter(
+        ({ key, value }) => key.length > 0 || value.length > 0
+    );
+    if (!hasUniqueLabelKeys(activeDeviceLabels)) {
+        return false;
+    }
+
+    for (const { key, value } of activeDeviceLabels) {
+        // Reserved for the separate Alias field on the labels step.
+        if (key === ALIAS_LABEL_KEY) {
+            return false;
+        }
+
+        if (!key) {
+            return false;
+        }
+        if (validateLabelKey(key) !== null) {
+            return false;
+        }
+        if (validateLabelValue(value) !== null) {
+            return false;
         }
     }
 
-    for (const { labelKey, systemInfoField } of model.labels.systemInfoMappings) {
-        const hasKey = labelKey.trim().length > 0;
-        const isCustomInfo = systemInfoField.startsWith("customInfo.");
-        const hasField = isCustomInfo
-            ? systemInfoField.slice("customInfo.".length).trim().length > 0
-            : systemInfoField.trim().length > 0;
+    const activeSystemInfoMappings = model.labels.systemInfoMappings.filter(({ key, value }) => {
+        const isCustomInfo = value.startsWith("customInfo.");
+        const hasField = isCustomInfo ? value.slice("customInfo.".length).length > 0 : value.length > 0;
+        return key.length > 0 || hasField;
+    });
+    if (!hasUniqueLabelKeys(activeSystemInfoMappings)) {
+        return false;
+    }
 
-        if (hasKey || hasField) {
-            if (!hasKey) {
-                return false;
-            }
-            if (!hasField) {
-                return false;
-            }
-            if (validateLabelKey(labelKey) !== null) {
-                return false;
-            }
+    for (const { key, value } of activeSystemInfoMappings) {
+        const isCustomInfo = value.startsWith("customInfo.");
+        const hasField = isCustomInfo ? value.slice("customInfo.".length).length > 0 : value.length > 0;
+
+        // Reserved for the separate Alias field on the labels step.
+        if (key === ALIAS_LABEL_KEY) {
+            return false;
+        }
+
+        if (!key || !hasField) {
+            return false;
+        }
+        if (validateLabelKey(key) !== null) {
+            return false;
         }
     }
 
@@ -260,28 +233,24 @@ export const validateLabelsStep = (model: Model): boolean => {
 };
 
 /**
- * Validate the combined network step (interface, address, and services)
+ * Validate the combined network step (interface and address)
  */
 export const validateNetworkStep = (model: Model): boolean => {
-    return (
-        validateNetworkInterfaceStep(model) && validateNetworkAddressStep(model) && validateNetworkServicesStep(model)
-    );
+    return validateNetworkInterfaceStep(model) && validateNetworkAddressStep(model);
 };
 
 /**
- * Validate the connectivity test step
- * Required: A non-empty host must be provided
+ * Validate the network services step
  */
-export const validateConnectivityTestStep = (model: Model): boolean => {
-    return model.connectivityTestHost.trim().length > 0;
+export const validateNetworkServicesStep = (model: Model): boolean => {
+    return validateNetworkServicesConfig(model);
 };
 
 /**
  * Validate the review step
  * No validation needed - this is a summary/review page
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const validateReviewStep = (_model: Model): boolean => {
+export const validateReviewStep = (): boolean => {
     // Review step has no validation requirements
     // It's just a summary of all previous steps
     return true;

@@ -9,7 +9,6 @@ import { Interface } from "../../pkg/networkmanager/interfaces.js";
 import SelectedNetworkInterfaceAlert from "./SelectedNetworkInterfaceAlert";
 import NetworkInterfaceSection from "./NetworkInterfaceSection";
 import NetworkAddressSection from "./NetworkAddressSection";
-import NetworkServicesSection from "./NetworkServicesSection";
 
 const _ = cockpit.gettext;
 
@@ -40,14 +39,6 @@ export const NetworkPage = ({ interfaces }: NetworkPageProps) => {
 
             <StackItem>
                 <NetworkAddressSection />
-            </StackItem>
-
-            <StackItem>
-                <Divider />
-            </StackItem>
-
-            <StackItem>
-                <NetworkServicesSection />
             </StackItem>
         </Stack>
     );
