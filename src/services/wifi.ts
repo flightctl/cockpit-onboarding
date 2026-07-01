@@ -4,20 +4,17 @@ import { WifiSecurity } from "../types";
 
 export interface WifiConnection {
     ssid: string;
-    bssid: string;
     password: string;
     security: WifiSecurity;
 }
+
+export type WifiBandLabel = "2.4 GHz" | "5 GHz";
 
 export interface WifiNetwork {
     ssid: string;
     strength: number;
     security: string;
-    frequency: number;
-    channel: number;
-    band: "2.4 GHz" | "5 GHz" | "unknown";
-    rate: number;
-    bssid: string;
+    bands: WifiBandLabel[];
 }
 
 interface DbusVariant<T = unknown> {
@@ -59,7 +56,6 @@ const WIFI_CONNECTION_SECRETS_KEY = "802-11-wireless-security";
 interface WifiConnectionSettings {
     [WIFI_CONNECTION_SETTINGS_KEY]?: {
         ssid?: DbusVariant<string | number[]>;
-        bssid?: DbusVariant<string>;
     };
     [WIFI_CONNECTION_SECRETS_KEY]?: {
         "key-mgmt"?: DbusVariant<string>;
@@ -158,10 +154,6 @@ export async function getCurrentWifiConnection(interfaceName: string): Promise<W
             }
         }
 
-        // Extract BSSID
-        const bssidRaw = settings[WIFI_CONNECTION_SETTINGS_KEY]?.bssid?.v;
-        const bssid = bssidRaw || "";
-
         // Extract password from secrets
         let password = "";
         const securitySettings = secrets[WIFI_CONNECTION_SECRETS_KEY];
@@ -186,7 +178,7 @@ export async function getCurrentWifiConnection(interfaceName: string): Promise<W
 
         nmClient.close();
 
-        return { ssid, bssid, password, security };
+        return { ssid, password, security };
     } catch (error) {
         console.error("Failed to get current WiFi connection:", error);
         return null;
@@ -242,14 +234,14 @@ function frequencyToChannel(frequency: number): number {
     return 0;
 }
 
-function channelToBand(channel: number): "2.4 GHz" | "5 GHz" | "unknown" {
+function channelToBand(channel: number): WifiBandLabel | null {
     if (channel >= 1 && channel <= 14) {
         return "2.4 GHz";
     }
     if (channel >= 32 && channel <= 177) {
         return "5 GHz";
     }
-    return "unknown";
+    return null;
 }
 
 function decodeSsid(ssidData: unknown): string {
@@ -286,7 +278,15 @@ export async function scanWifiNetworks(interfaceName: string): Promise<WifiNetwo
         await new Promise((resolve) => setTimeout(resolve, 3000));
 
         const apPaths = deviceProxy.data.AccessPoints || [];
-        const aps: WifiNetwork[] = [];
+
+        interface RawAccessPoint {
+            ssid: string;
+            strength: number;
+            security: string;
+            band: WifiBandLabel | null;
+        }
+
+        const aps: RawAccessPoint[] = [];
 
         for (const apPath of apPaths) {
             try {
@@ -303,13 +303,11 @@ export async function scanWifiNetworks(interfaceName: string): Promise<WifiNetwo
 
                 const strength = apData.Strength || 0;
                 const frequency = apData.Frequency || 0;
-                const bssid = apData.HwAddress || "";
-                const rate = Math.floor((apData.MaxBitrate || 0) / 1000);
                 const channel = frequencyToChannel(frequency);
                 const band = channelToBand(channel);
                 const security = parseWifiSecurity(apData.Flags || 0, apData.WpaFlags || 0, apData.RsnFlags || 0);
 
-                aps.push({ ssid, strength, security, frequency, channel, band, rate, bssid });
+                aps.push({ ssid, strength, security, band });
             } catch (error) {
                 console.warn(`Failed to read access point ${apPath}:`, error);
                 continue;
@@ -318,10 +316,30 @@ export async function scanWifiNetworks(interfaceName: string): Promise<WifiNetwo
 
         nmClient.close();
 
-        // Sort by signal strength (strongest first)
-        aps.sort((a, b) => b.strength - a.strength);
+        // Deduplicate by SSID, keeping the strongest signal and collecting all bands
+        const bestBySSid = new Map<string, RawAccessPoint>();
+        const bandsBySSid = new Map<string, Set<WifiBandLabel>>();
+        for (const ap of aps) {
+            const existing = bestBySSid.get(ap.ssid);
+            if (!existing || ap.strength > existing.strength) {
+                bestBySSid.set(ap.ssid, ap);
+            }
+            if (ap.band) {
+                if (!bandsBySSid.has(ap.ssid)) {
+                    bandsBySSid.set(ap.ssid, new Set());
+                }
+                bandsBySSid.get(ap.ssid)!.add(ap.band);
+            }
+        }
 
-        return aps;
+        const networks: WifiNetwork[] = Array.from(bestBySSid.values()).map(({ ssid, strength, security }) => {
+            const bands = Array.from(bandsBySSid.get(ssid) || []).sort();
+            return { ssid, strength, security, bands };
+        });
+
+        networks.sort((a, b) => b.strength - a.strength);
+
+        return networks;
     } catch (error) {
         console.error("WiFi scan failed:", error);
         throw new Error(`WiFi network scan failed: ${String(error)}`);

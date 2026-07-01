@@ -3,7 +3,7 @@ import { Model } from "./model-context";
 import { serializeEnrollmentForMarker } from "./enrollment-state";
 import type { PersistedEnrollmentState } from "./enrollment-state";
 import { MARKER_ATTEMPTED } from "./paths";
-import { ProxyProtocol, WifiSecurity } from "./types";
+import { ProxyProtocol, WifiBand, WifiSecurity } from "./types";
 
 export interface AttemptedMarkerData {
     attemptedAt: string;
@@ -16,6 +16,7 @@ export interface AttemptedMarkerData {
         interfaceType: "ethernet" | "wifi" | null;
         wifiSsid: string | null;
         wifiSecurity: WifiSecurity | null;
+        wifiBand: WifiBand | null;
         vlanId: number | null;
     };
     networkAddress: Model["networkAddress"];
@@ -48,6 +49,7 @@ function serializeModel(model: Model): AttemptedMarkerData {
             interfaceType: model.networkInterface.interfaceType,
             wifiSsid: model.networkInterface.wifiSsid,
             wifiSecurity: model.networkInterface.wifiSecurity,
+            wifiBand: model.networkInterface.wifiBand,
             vlanId: model.networkInterface.vlanId,
         },
         networkAddress: { ...model.networkAddress },

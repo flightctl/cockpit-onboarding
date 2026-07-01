@@ -269,6 +269,16 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
                                             {!model.networkInterface.wifiSecurity && _("(not set)")}
                                         </DescriptionListDescription>
                                     </DescriptionListGroup>
+                                    <DescriptionListGroup>
+                                        <DescriptionListTerm>{_("WiFi Band")}</DescriptionListTerm>
+                                        <DescriptionListDescription>
+                                            {model.networkInterface.wifiBand === "bg" && _("2.4 GHz")}
+                                            {model.networkInterface.wifiBand === "a" && _("5 GHz")}
+                                            {(!model.networkInterface.wifiBand ||
+                                                model.networkInterface.wifiBand === "auto") &&
+                                                _("Auto")}
+                                        </DescriptionListDescription>
+                                    </DescriptionListGroup>
                                 </>
                             )}
                             <DescriptionListGroup>
