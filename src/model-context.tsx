@@ -13,6 +13,7 @@ import {
 import { detectFlightctlConfig } from "./services/flightctl-config";
 import { DEFAULT_ENROLLMENT_CONFIG, patchEnrollment, restoreEnrollmentFromMarker } from "./enrollment-state";
 import { parseIpv6Address, ConnectionIpSettings } from "./services/network";
+import { resolveDefaultAliasMode } from "./services/alias.js";
 import { AttemptedMarkerData } from "./attempted-marker";
 
 export enum AliasMode {
@@ -559,7 +560,7 @@ export const ModelProvider: React.FunctionComponent<{
                     systemInfoMappings: defaults?.labels?.systemInfoMappings ?? prev.labels.systemInfoMappings,
                 },
                 alias: {
-                    mode: (defaults?.alias?.mode as AliasMode | undefined) ?? prev.alias.mode,
+                    mode: resolveDefaultAliasMode(defaults?.alias?.mode ?? prev.alias.mode, resolvedHostname),
                     customValue: defaults?.alias?.customValue ?? prev.alias.customValue,
                 },
                 connectivityTestHost: connectivityHost,
