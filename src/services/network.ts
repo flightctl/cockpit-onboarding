@@ -310,6 +310,10 @@ function buildConnectionSettings(
             mode: { t: "s", v: "infrastructure" },
         };
 
+        if (model.networkInterface.wifiBand && model.networkInterface.wifiBand !== "auto") {
+            settings["802-11-wireless"].band = { t: "s", v: model.networkInterface.wifiBand };
+        }
+
         if (
             model.networkInterface.wifiSecurity !== "none" &&
             (model.networkInterface.wifiSecurity || model.networkInterface.wifiPassword)

@@ -20,7 +20,7 @@ import NetworkInterfaceModel from "./NetworkInterfaceModel.tsx";
 
 import { useModelContext } from "../model-context.js";
 import { mapWifiSecurity } from "../services/network.js";
-import { getCurrentWifiConnection, scanWifiNetworks, WifiConnection } from "../services/wifi.js";
+import { getCurrentWifiConnection, scanWifiNetworks, WifiConnection, WifiNetwork } from "../services/wifi.js";
 import { Device, device_state_text, is_managed, type Interface } from "../../pkg/networkmanager/interfaces.js";
 import { Flex } from "@patternfly/react-core/dist/esm/layouts/Flex/Flex";
 import { FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/FlexItem";
@@ -158,10 +158,10 @@ export const NetworkInterfaceSelector = ({ interfaces }: { interfaces: Interface
         updateModel("networkInterface", {
             selectedInterface: name,
             interfaceType: isWifi ? "wifi" : "ethernet",
-            // Clear WiFi-specific fields when switching to non-WiFi interface
             wifiSsid: isWifi ? model.networkInterface.wifiSsid : null,
             wifiPassword: isWifi ? model.networkInterface.wifiPassword : null,
             wifiSecurity: isWifi ? model.networkInterface.wifiSecurity : null,
+            wifiBand: isWifi ? model.networkInterface.wifiBand : null,
             vlanId: isWifi ? null : model.networkInterface.vlanId,
         });
         // Switch to the configuration of the newly selected interface
@@ -217,23 +217,12 @@ interface NetworkWifiSelectorProps {
     interfaceName: string;
 }
 
-interface WifiNetwork {
-    ssid: string;
-    strength: number;
-    security: string; // e.g., "None", "WEP", "WPA", "WPA2", "WPA3", "WPA2/WPA3"
-    frequency: number;
-    channel: number;
-    band: "2.4 GHz" | "5 GHz" | "unknown";
-    rate: number;
-    bssid: string;
-}
-
 export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps) => {
     const { model, updateModel } = useModelContext();
     const [isScanning, setIsScanning] = React.useState(false);
     const [networks, setNetworks] = React.useState<WifiNetwork[]>([]);
     const [scanError, setScanError] = React.useState<string | null>(null);
-    const [selectedBssid, setSelectedBssid] = React.useState<string | null>(null);
+    const [selectedSsid, setSelectedSsid] = React.useState<string | null>(null);
     const hasPreSelected = React.useRef(false);
     // Store current connection details in a ref so it can be accessed in handleNetworkSelection
     const currentConnectionRef = React.useRef<WifiConnection | null>(null);
@@ -257,25 +246,16 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
                 const scannedNetworks = await scanWifiNetworks(interfaceName);
                 setNetworks(scannedNetworks);
 
-                // If we have a current connection and it's in the scanned list, pre-select it
                 if (current && !hasPreSelected.current) {
-                    // Try to find by BSSID first (most specific), then by SSID
-                    let matchingNetwork = scannedNetworks.find((n) => current.bssid && n.bssid === current.bssid);
-
-                    if (!matchingNetwork) {
-                        // If no BSSID match, try to find by SSID (might match a different AP of the same network)
-                        matchingNetwork = scannedNetworks.find((n) => n.ssid === current.ssid);
-                    }
+                    const matchingNetwork = scannedNetworks.find((n) => n.ssid === current.ssid);
 
                     if (matchingNetwork) {
-                        // Pre-select the current network
-                        setSelectedBssid(matchingNetwork.bssid);
+                        setSelectedSsid(matchingNetwork.ssid);
 
-                        // Update model with current network info
                         updateModel("networkInterface", {
                             wifiSsid: matchingNetwork.ssid,
                             wifiSecurity: mapWifiSecurity(matchingNetwork.security),
-                            wifiPassword: current.password, // Pre-fill password
+                            wifiPassword: current.password,
                             interfaceType: "wifi",
                         });
 
@@ -294,23 +274,18 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [interfaceName]);
 
-    const handleNetworkSelection = (bssid: string) => {
-        setSelectedBssid(bssid);
+    const handleNetworkSelection = (ssid: string) => {
+        setSelectedSsid(ssid);
 
-        // Find the selected network by BSSID
-        const selectedNetwork = networks.find((n) => n.bssid === bssid);
-        if (selectedNetwork) {
-            // Check if this is the currently connected network
-            const isCurrentNetwork =
-                currentConnectionRef.current &&
-                (currentConnectionRef.current.bssid === bssid ||
-                    currentConnectionRef.current.ssid === selectedNetwork.ssid);
+        const network = networks.find((n) => n.ssid === ssid);
+        if (network) {
+            const isCurrentNetwork = currentConnectionRef.current && currentConnectionRef.current.ssid === ssid;
 
             updateModel("networkInterface", {
-                wifiSsid: selectedNetwork.ssid,
-                wifiSecurity: mapWifiSecurity(selectedNetwork.security),
-                // Pre-fill password if this is the currently connected network
+                wifiSsid: network.ssid,
+                wifiSecurity: mapWifiSecurity(network.security),
                 wifiPassword: isCurrentNetwork ? currentConnectionRef.current!.password : null,
+                wifiBand: network.bands.length > 1 ? model.networkInterface.wifiBand : null,
                 interfaceType: "wifi",
             });
         }
@@ -354,10 +329,11 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
         ssid: _("SSID"),
         signal: _("Signal"),
         security: _("Security"),
-        channel: _("Channel"),
         band: _("Band"),
-        rate: _("Rate"),
     };
+
+    const selectedNetwork = selectedSsid ? networks.find((n) => n.ssid === selectedSsid) : null;
+    const selectedHasDualBand = selectedNetwork ? selectedNetwork.bands.length > 1 : false;
 
     const scanUnavailable = !isScanning && scanError !== null && networks.length === 0;
 
@@ -376,9 +352,13 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
         });
     };
 
+    const handleBandChange = (band: "auto" | "bg" | "a") => {
+        updateModel("networkInterface", { wifiBand: band });
+    };
+
     // Show password field when a secured network is selected (via scan or manual entry)
     // Show password when security is not 'none' (null defaults to WPA, matching the radio state)
-    const showPassword = model.networkInterface.wifiSecurity !== "none" && (scanUnavailable || selectedBssid !== null);
+    const showPassword = model.networkInterface.wifiSecurity !== "none" && (scanUnavailable || selectedSsid !== null);
 
     return (
         <Stack hasGutter>
@@ -404,20 +384,18 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
                                     <Th>{columnNames.ssid}</Th>
                                     <Th>{columnNames.signal}</Th>
                                     <Th>{columnNames.security}</Th>
-                                    <Th>{columnNames.channel}</Th>
                                     <Th>{columnNames.band}</Th>
-                                    <Th>{columnNames.rate}</Th>
                                 </Tr>
                             </Thead>
                             <Tbody>
-                                {networks.map((network) => (
-                                    <Tr key={network.bssid}>
+                                {networks.map((network, index) => (
+                                    <Tr key={network.ssid}>
                                         <Td>
                                             <Radio
-                                                id={`wifi-radio-${network.bssid}`}
+                                                id={`wifi-radio-${index}`}
                                                 name="wifi-network-select"
-                                                isChecked={selectedBssid === network.bssid}
-                                                onChange={() => handleNetworkSelection(network.bssid)}
+                                                isChecked={selectedSsid === network.ssid}
+                                                onChange={() => handleNetworkSelection(network.ssid)}
                                                 aria-label={`Select ${network.ssid}`}
                                             />
                                         </Td>
@@ -435,9 +413,9 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
                                             {network.strength}%
                                         </Td>
                                         <Td dataLabel={columnNames.security}>{network.security}</Td>
-                                        <Td dataLabel={columnNames.channel}>{network.channel}</Td>
-                                        <Td dataLabel={columnNames.band}>{network.band}</Td>
-                                        <Td dataLabel={columnNames.rate}>{network.rate} Mbps</Td>
+                                        <Td dataLabel={columnNames.band}>
+                                            {network.bands.join(" / ") || _("Unknown")}
+                                        </Td>
                                     </Tr>
                                 ))}
                             </Tbody>
@@ -490,6 +468,44 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
                             </Flex>
                         </FormGroup>
                     </StackItem>
+                    {selectedHasDualBand && (
+                        <StackItem>
+                            <FormGroup label={_("Band preference")} fieldId="wifi-band">
+                                <Flex>
+                                    <FlexItem>
+                                        <Radio
+                                            id="wifi-band-auto"
+                                            name="wifi-band"
+                                            label={_("Auto")}
+                                            isChecked={
+                                                !model.networkInterface.wifiBand ||
+                                                model.networkInterface.wifiBand === "auto"
+                                            }
+                                            onChange={() => handleBandChange("auto")}
+                                        />
+                                    </FlexItem>
+                                    <FlexItem>
+                                        <Radio
+                                            id="wifi-band-24"
+                                            name="wifi-band"
+                                            label={_("2.4 GHz")}
+                                            isChecked={model.networkInterface.wifiBand === "bg"}
+                                            onChange={() => handleBandChange("bg")}
+                                        />
+                                    </FlexItem>
+                                    <FlexItem>
+                                        <Radio
+                                            id="wifi-band-5"
+                                            name="wifi-band"
+                                            label={_("5 GHz")}
+                                            isChecked={model.networkInterface.wifiBand === "a"}
+                                            onChange={() => handleBandChange("a")}
+                                        />
+                                    </FlexItem>
+                                </Flex>
+                            </FormGroup>
+                        </StackItem>
+                    )}
                     {showPassword && (
                         <StackItem>
                             <FormGroup label={_("WiFi Password")} isRequired fieldId="wifi-password">

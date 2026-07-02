@@ -95,6 +95,7 @@ export interface HostnameState {
 }
 
 export type WifiSecurity = "none" | "wep" | "wpa";
+export type WifiBand = "auto" | "bg" | "a";
 
 export interface NetworkInterfaceState {
     selectedInterface: string | null;
@@ -102,6 +103,7 @@ export interface NetworkInterfaceState {
     wifiSsid: string | null;
     wifiPassword: string | null;
     wifiSecurity: WifiSecurity | null;
+    wifiBand: WifiBand | null;
     vlanId: number | null;
 }
 
