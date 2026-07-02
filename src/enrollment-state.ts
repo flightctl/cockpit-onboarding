@@ -1,7 +1,7 @@
 import type { ServiceEnrollmentConfig } from "./types";
 
 export const DEFAULT_ENROLLMENT_CONFIG: ServiceEnrollmentConfig = {
-    selected: false,
+    selected: true,
     useExisting: false,
 };
 

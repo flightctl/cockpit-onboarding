@@ -8,9 +8,7 @@ import React, { useState, useEffect } from "react";
 import cockpit from "cockpit";
 import ExternalLinkAltIcon from "@patternfly/react-icons/dist/esm/icons/external-link-alt-icon";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
-import { Content } from "@patternfly/react-core/dist/esm/components/Content";
 import { Divider } from "@patternfly/react-core/dist/esm/components/Divider/index.js";
-import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
@@ -158,14 +156,12 @@ export const EnrollmentPage = () => {
                                             onChange={() => updateEnrollment({ useExisting: true })}
                                             body={
                                                 isUsingExisting && (
-                                                    <Flex>
-                                                        <FlexItem>
-                                                            <LabelHeading text={_("Credentials for server:")} />
-                                                        </FlexItem>
-                                                        <FlexItem>
-                                                            <Content>{existingServerUrl || serviceEndpoint}</Content>
-                                                        </FlexItem>
-                                                    </Flex>
+                                                    <FormGroup label={_("Server address:")}>
+                                                        <TextInput
+                                                            value={existingServerUrl || serviceEndpoint}
+                                                            isDisabled
+                                                        />
+                                                    </FormGroup>
                                                 )
                                             }
                                         />
@@ -193,7 +189,10 @@ export const EnrollmentPage = () => {
                                                                         onChange={() => handleAuthMethodChange("token")}
                                                                         body={
                                                                             authMethod === "token" && (
-                                                                                <FormGroup label={_("Token")} isRequired>
+                                                                                <FormGroup
+                                                                                    label={_("Token")}
+                                                                                    isRequired
+                                                                                >
                                                                                     <TextInput
                                                                                         id="credential-token"
                                                                                         type="password"
@@ -232,7 +231,10 @@ export const EnrollmentPage = () => {
                                                                         body={
                                                                             authMethod === "password" && (
                                                                                 <>
-                                                                                    <FormGroup label={_("Username")} isRequired>
+                                                                                    <FormGroup
+                                                                                        label={_("Username")}
+                                                                                        isRequired
+                                                                                    >
                                                                                         <TextInput
                                                                                             id="credential-username"
                                                                                             value={newUsername}
@@ -250,7 +252,10 @@ export const EnrollmentPage = () => {
                                                                                             isRequired
                                                                                         />
                                                                                     </FormGroup>
-                                                                                    <FormGroup label={_("Password")} isRequired>
+                                                                                    <FormGroup
+                                                                                        label={_("Password")}
+                                                                                        isRequired
+                                                                                    >
                                                                                         <TextInput
                                                                                             id="credential-password"
                                                                                             type="password"

@@ -455,7 +455,7 @@ export const LabelsPage = () => {
                             </StackItem>
                         )}
                         <StackItem>
-                            <Button variant="link" isInline icon={<PlusCircleIcon />} onClick={addDeviceLabelRow}>
+                            <Button variant="secondary" size="sm" icon={<PlusCircleIcon />} onClick={addDeviceLabelRow}>
                                 {_("Add another label")}
                             </Button>
                         </StackItem>
