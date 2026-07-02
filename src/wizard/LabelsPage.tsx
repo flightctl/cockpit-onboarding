@@ -15,6 +15,7 @@ import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 
 import { SubtleHeading } from "../components/Headings";
+import FeatureSwitch from "../components/FeatureSwitch";
 import FormHelperText from "../components/HelperTexts";
 import ValidatedTextInput from "../components/ValidatedTextInput";
 import { AliasMode, useModelContext } from "../model-context";
@@ -257,6 +258,10 @@ export const LabelsPage = () => {
         updateModel("hostname", { value });
     };
 
+    const setAliasEnabled = (enabled: boolean) => {
+        setAliasMode(enabled ? AliasMode.HOSTNAME : AliasMode.NONE);
+    };
+
     const setAliasMode = (mode: AliasMode) => {
         updateModel("alias", { mode });
         if (mode !== AliasMode.CUSTOM) {
@@ -367,7 +372,12 @@ export const LabelsPage = () => {
                             </FormGroup>
                         </StackItem>
                         <StackItem>
-                            <FormGroup label={_("Alias")} fieldId="alias-mode">
+                            <FeatureSwitch
+                                fieldId="alias-enabled"
+                                label={_("Alias")}
+                                isChecked={aliasMode !== AliasMode.NONE}
+                                onToggle={setAliasEnabled}
+                            >
                                 <Stack hasGutter>
                                     <StackItem>
                                         <Radio
@@ -400,17 +410,8 @@ export const LabelsPage = () => {
                                             }
                                         />
                                     </StackItem>
-                                    <StackItem>
-                                        <Radio
-                                            id="alias-mode-none"
-                                            name="alias-mode"
-                                            label={_("Do not set an alias")}
-                                            isChecked={aliasMode === AliasMode.NONE}
-                                            onChange={() => setAliasMode(AliasMode.NONE)}
-                                        />
-                                    </StackItem>
                                 </Stack>
-                            </FormGroup>
+                            </FeatureSwitch>
                         </StackItem>
                     </Stack>
                 </FormSection>

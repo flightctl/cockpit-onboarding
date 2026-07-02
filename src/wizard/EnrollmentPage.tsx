@@ -8,8 +8,6 @@ import React, { useState, useEffect } from "react";
 import cockpit from "cockpit";
 import ExternalLinkAltIcon from "@patternfly/react-icons/dist/esm/icons/external-link-alt-icon";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
-import { Card, CardBody, CardTitle } from "@patternfly/react-core/dist/esm/components/Card/index.js";
-import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { Content } from "@patternfly/react-core/dist/esm/components/Content";
 import { Divider } from "@patternfly/react-core/dist/esm/components/Divider/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex";
@@ -23,6 +21,7 @@ import { useModelContext } from "../model-context";
 import { useConfig } from "../app";
 import { validateURL } from "../validation";
 import ValidatedTextInput from "../components/ValidatedTextInput";
+import FeatureSwitch from "../components/FeatureSwitch";
 import { LabelHeading } from "../components/Headings";
 import WithTooltip from "../components/WithTooltip";
 import type {
@@ -95,12 +94,12 @@ export const EnrollmentPage = () => {
         setEndpointError(validateURL(serviceEndpoint, true) || undefined);
     }, [enrollment.selected, isUsingExisting, serviceEndpoint]);
 
-    const handleSelectionChange = () => {
-        if (enrollment.selected) {
+    const handleEnrollmentToggle = (checked: boolean) => {
+        if (!checked) {
             setEndpointTouched(false);
             setEndpointError(undefined);
         }
-        updateEnrollment({ selected: !enrollment.selected });
+        updateEnrollment({ selected: checked });
     };
 
     const handleEndpointChange = (value: string) => {
@@ -133,227 +132,183 @@ export const EnrollmentPage = () => {
             </StackItem>
 
             <StackItem>
-                <Checkbox
-                    id="flightctl-enrollment"
+                <FeatureSwitch
+                    fieldId="flightctl-enrollment"
                     label={_("Enroll this device into Flight Control")}
                     isChecked={enrollment.selected}
-                    onChange={handleSelectionChange}
-                />
-            </StackItem>
-
-            {enrollment.selected && (
-                <StackItem>
-                    <Card isCompact>
-                        <CardTitle>
+                    onToggle={handleEnrollmentToggle}
+                >
+                    <Stack hasGutter>
+                        <StackItem>
                             <LabelHeading text={_("Credentials")} />
-                        </CardTitle>
-                        <CardBody>
+                        </StackItem>
+                        <StackItem>
                             <Stack hasGutter>
                                 <StackItem>
-                                    <Stack hasGutter>
-                                        <StackItem>
-                                            <WithTooltip
-                                                showTooltip={!hasExistingCredentials}
-                                                content={_("No existing credentials found")}
-                                            >
-                                                <Radio
-                                                    id="use-existing-flightctl"
-                                                    name="credential-mode-flightctl"
-                                                    label={_("Use existing")}
-                                                    isChecked={isUsingExisting}
-                                                    isDisabled={!hasExistingCredentials}
-                                                    onChange={() => updateEnrollment({ useExisting: true })}
-                                                    body={
-                                                        isUsingExisting && (
-                                                            <Flex>
-                                                                <FlexItem>
-                                                                    <LabelHeading text={_("Credentials for server:")} />
-                                                                </FlexItem>
-                                                                <FlexItem>
-                                                                    <Content>
-                                                                        {existingServerUrl || serviceEndpoint}
-                                                                    </Content>
-                                                                </FlexItem>
-                                                            </Flex>
-                                                        )
-                                                    }
-                                                />
-                                            </WithTooltip>
-                                        </StackItem>
-                                        <StackItem>
-                                            <Radio
-                                                id="configure-new-flightctl"
-                                                name="credential-mode-flightctl"
-                                                label={_("Add a new credential")}
-                                                isChecked={!isUsingExisting}
-                                                onChange={() => updateEnrollment({ useExisting: false })}
-                                                body={
-                                                    !isUsingExisting && (
-                                                        <Stack hasGutter>
-                                                            <StackItem>
-                                                                <FormGroup label={_("Authentication method")}>
-                                                                    <Stack hasGutter>
-                                                                        <StackItem>
-                                                                            <Radio
-                                                                                id="auth-token"
-                                                                                name="auth-method"
-                                                                                label={_("Token")}
-                                                                                isChecked={authMethod === "token"}
-                                                                                onChange={() =>
-                                                                                    handleAuthMethodChange("token")
-                                                                                }
-                                                                                body={
-                                                                                    authMethod === "token" && (
-                                                                                        <FormGroup
-                                                                                            label={_("Token")}
-                                                                                            isRequired
-                                                                                        >
-                                                                                            <TextInput
-                                                                                                id="credential-token"
-                                                                                                type="password"
-                                                                                                value={newToken}
-                                                                                                onChange={(
-                                                                                                    _event,
-                                                                                                    value
-                                                                                                ) =>
-                                                                                                    updateServiceCredentials(
-                                                                                                        {
-                                                                                                            authMethod:
-                                                                                                                "token",
-                                                                                                            token: value,
-                                                                                                        }
-                                                                                                    )
-                                                                                                }
-                                                                                                isRequired
-                                                                                            />
-                                                                                            <Button
-                                                                                                variant="link"
-                                                                                                isInline
-                                                                                                className="pf-v6-u-mt-sm"
-                                                                                                iconPosition="end"
-                                                                                                icon={
-                                                                                                    <ExternalLinkAltIcon />
-                                                                                                }
-                                                                                            >
-                                                                                                {_(
-                                                                                                    "Where can I get my token?"
-                                                                                                )}
-                                                                                            </Button>
-                                                                                        </FormGroup>
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                        </StackItem>
-                                                                        <StackItem>
-                                                                            <Radio
-                                                                                id="auth-password"
-                                                                                name="auth-method"
-                                                                                label={_("Username and password")}
-                                                                                isChecked={authMethod === "password"}
-                                                                                onChange={() =>
-                                                                                    handleAuthMethodChange("password")
-                                                                                }
-                                                                                body={
-                                                                                    authMethod === "password" && (
-                                                                                        <>
-                                                                                            <FormGroup
-                                                                                                label={_("Username")}
-                                                                                                isRequired
-                                                                                            >
-                                                                                                <TextInput
-                                                                                                    id="credential-username"
-                                                                                                    value={newUsername}
-                                                                                                    onChange={(
-                                                                                                        _event,
-                                                                                                        value
-                                                                                                    ) =>
-                                                                                                        updateServiceCredentials(
-                                                                                                            {
-                                                                                                                authMethod:
-                                                                                                                    "password",
-                                                                                                                username:
-                                                                                                                    value,
-                                                                                                                password:
-                                                                                                                    newPassword,
-                                                                                                            }
-                                                                                                        )
-                                                                                                    }
-                                                                                                    isRequired
-                                                                                                />
-                                                                                            </FormGroup>
-                                                                                            <FormGroup
-                                                                                                label={_("Password")}
-                                                                                                isRequired
-                                                                                            >
-                                                                                                <TextInput
-                                                                                                    id="credential-password"
-                                                                                                    type="password"
-                                                                                                    value={newPassword}
-                                                                                                    onChange={(
-                                                                                                        _event,
-                                                                                                        value
-                                                                                                    ) =>
-                                                                                                        updateServiceCredentials(
-                                                                                                            {
-                                                                                                                authMethod:
-                                                                                                                    "password",
-                                                                                                                username:
-                                                                                                                    newUsername,
-                                                                                                                password:
-                                                                                                                    value,
-                                                                                                            }
-                                                                                                        )
-                                                                                                    }
-                                                                                                    isRequired
-                                                                                                />
-                                                                                            </FormGroup>
-                                                                                        </>
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                        </StackItem>
-                                                                    </Stack>
-                                                                </FormGroup>
-                                                            </StackItem>
-
-                                                            <StackItem>
-                                                                <Divider />
-                                                            </StackItem>
-
-                                                            <StackItem>
-                                                                <FormGroup
-                                                                    label={_("Flight Control server")}
-                                                                    isRequired
-                                                                >
-                                                                    <ValidatedTextInput
-                                                                        id="endpoint-flightctl"
-                                                                        value={serviceEndpoint}
-                                                                        onChange={(_event, value) =>
-                                                                            handleEndpointChange(value)
-                                                                        }
-                                                                        {...(isEndpointFromExistingConfig && {
-                                                                            helperText: _(
-                                                                                "Auto-detected from the selected credential."
-                                                                            ),
-                                                                        })}
-                                                                        error={
-                                                                            endpointTouched ? endpointError : undefined
+                                    <WithTooltip
+                                        showTooltip={!hasExistingCredentials}
+                                        content={_("No existing credentials found")}
+                                    >
+                                        <Radio
+                                            id="use-existing-flightctl"
+                                            name="credential-mode-flightctl"
+                                            label={_("Use existing")}
+                                            isChecked={isUsingExisting}
+                                            isDisabled={!hasExistingCredentials}
+                                            onChange={() => updateEnrollment({ useExisting: true })}
+                                            body={
+                                                isUsingExisting && (
+                                                    <Flex>
+                                                        <FlexItem>
+                                                            <LabelHeading text={_("Credentials for server:")} />
+                                                        </FlexItem>
+                                                        <FlexItem>
+                                                            <Content>{existingServerUrl || serviceEndpoint}</Content>
+                                                        </FlexItem>
+                                                    </Flex>
+                                                )
+                                            }
+                                        />
+                                    </WithTooltip>
+                                </StackItem>
+                                <StackItem>
+                                    <Radio
+                                        id="configure-new-flightctl"
+                                        name="credential-mode-flightctl"
+                                        label={_("Add a new credential")}
+                                        isChecked={!isUsingExisting}
+                                        onChange={() => updateEnrollment({ useExisting: false })}
+                                        body={
+                                            !isUsingExisting && (
+                                                <Stack hasGutter>
+                                                    <StackItem>
+                                                        <FormGroup label={_("Authentication method")}>
+                                                            <Stack hasGutter>
+                                                                <StackItem>
+                                                                    <Radio
+                                                                        id="auth-token"
+                                                                        name="auth-method"
+                                                                        label={_("Token")}
+                                                                        isChecked={authMethod === "token"}
+                                                                        onChange={() => handleAuthMethodChange("token")}
+                                                                        body={
+                                                                            authMethod === "token" && (
+                                                                                <FormGroup label={_("Token")} isRequired>
+                                                                                    <TextInput
+                                                                                        id="credential-token"
+                                                                                        type="password"
+                                                                                        value={newToken}
+                                                                                        onChange={(_event, value) =>
+                                                                                            updateServiceCredentials({
+                                                                                                authMethod: "token",
+                                                                                                token: value,
+                                                                                            })
+                                                                                        }
+                                                                                        isRequired
+                                                                                    />
+                                                                                    <Button
+                                                                                        variant="link"
+                                                                                        isInline
+                                                                                        className="pf-v6-u-mt-sm"
+                                                                                        iconPosition="end"
+                                                                                        icon={<ExternalLinkAltIcon />}
+                                                                                    >
+                                                                                        {_("Where can I get my token?")}
+                                                                                    </Button>
+                                                                                </FormGroup>
+                                                                            )
                                                                         }
                                                                     />
-                                                                </FormGroup>
-                                                            </StackItem>
-                                                        </Stack>
-                                                    )
-                                                }
-                                            />
-                                        </StackItem>
-                                    </Stack>
+                                                                </StackItem>
+                                                                <StackItem>
+                                                                    <Radio
+                                                                        id="auth-password"
+                                                                        name="auth-method"
+                                                                        label={_("Username and password")}
+                                                                        isChecked={authMethod === "password"}
+                                                                        onChange={() =>
+                                                                            handleAuthMethodChange("password")
+                                                                        }
+                                                                        body={
+                                                                            authMethod === "password" && (
+                                                                                <>
+                                                                                    <FormGroup label={_("Username")} isRequired>
+                                                                                        <TextInput
+                                                                                            id="credential-username"
+                                                                                            value={newUsername}
+                                                                                            onChange={(_event, value) =>
+                                                                                                updateServiceCredentials(
+                                                                                                    {
+                                                                                                        authMethod:
+                                                                                                            "password",
+                                                                                                        username: value,
+                                                                                                        password:
+                                                                                                            newPassword,
+                                                                                                    }
+                                                                                                )
+                                                                                            }
+                                                                                            isRequired
+                                                                                        />
+                                                                                    </FormGroup>
+                                                                                    <FormGroup label={_("Password")} isRequired>
+                                                                                        <TextInput
+                                                                                            id="credential-password"
+                                                                                            type="password"
+                                                                                            value={newPassword}
+                                                                                            onChange={(_event, value) =>
+                                                                                                updateServiceCredentials(
+                                                                                                    {
+                                                                                                        authMethod:
+                                                                                                            "password",
+                                                                                                        username:
+                                                                                                            newUsername,
+                                                                                                        password: value,
+                                                                                                    }
+                                                                                                )
+                                                                                            }
+                                                                                            isRequired
+                                                                                        />
+                                                                                    </FormGroup>
+                                                                                </>
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </StackItem>
+                                                            </Stack>
+                                                        </FormGroup>
+                                                    </StackItem>
+
+                                                    <StackItem>
+                                                        <Divider />
+                                                    </StackItem>
+
+                                                    <StackItem>
+                                                        <FormGroup label={_("Flight Control server")} isRequired>
+                                                            <ValidatedTextInput
+                                                                id="endpoint-flightctl"
+                                                                value={serviceEndpoint}
+                                                                onChange={(_event, value) =>
+                                                                    handleEndpointChange(value)
+                                                                }
+                                                                {...(isEndpointFromExistingConfig && {
+                                                                    helperText: _(
+                                                                        "Auto-detected from the selected credential."
+                                                                    ),
+                                                                })}
+                                                                error={endpointTouched ? endpointError : undefined}
+                                                            />
+                                                        </FormGroup>
+                                                    </StackItem>
+                                                </Stack>
+                                            )
+                                        }
+                                    />
                                 </StackItem>
                             </Stack>
-                        </CardBody>
-                    </Card>
-                </StackItem>
-            )}
+                        </StackItem>
+                    </Stack>
+                </FeatureSwitch>
+            </StackItem>
         </Stack>
     );
 };
