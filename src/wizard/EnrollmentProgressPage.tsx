@@ -257,7 +257,10 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         const parentIface = model.networkInterface.selectedInterface || "";
         const vlanId = model.networkInterface.vlanId;
         const iface =
-            vlanId !== null && parentIface && model.networkInterface.interfaceType !== "wifi"
+            model.networkInterface.vlanEnabled &&
+            vlanId !== null &&
+            parentIface &&
+            model.networkInterface.interfaceType !== "wifi"
                 ? `${parentIface}.${vlanId}`
                 : parentIface;
         return testNetworkConnectivity(testHost, iface, signalRef.current, onOutput);
@@ -337,7 +340,10 @@ export const EnrollmentProgressPage: React.FunctionComponent = () => {
         // -- Write master params JSON for apply-and-enroll.sh --
         const ifaceName = model.networkInterface.selectedInterface || "";
         const vlanId = model.networkInterface.vlanId;
-        const isVlan = vlanId !== null && model.networkInterface.interfaceType !== "wifi";
+        const isVlan =
+            model.networkInterface.vlanEnabled &&
+            vlanId !== null &&
+            model.networkInterface.interfaceType !== "wifi";
         const effectiveIfaceName = isVlan ? `${ifaceName}.${vlanId}` : ifaceName;
         const masterParams = {
             connectionId: `flightctl-onboarding-${effectiveIfaceName}`,

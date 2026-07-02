@@ -104,6 +104,7 @@ export interface NetworkInterfaceState {
     wifiPassword: string | null;
     wifiSecurity: WifiSecurity | null;
     wifiBand: WifiBand | null;
+    vlanEnabled: boolean;
     vlanId: number | null;
 }
 

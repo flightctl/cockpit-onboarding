@@ -106,6 +106,7 @@ const initialModel: Model = {
         wifiPassword: null,
         wifiSecurity: null,
         wifiBand: null,
+        vlanEnabled: false,
         vlanId: null,
     },
     networkAddress: {
@@ -609,6 +610,11 @@ export const ModelProvider: React.FunctionComponent<{
                 wifiSsid: previousAttempt.networkInterface?.wifiSsid ?? prev.networkInterface.wifiSsid,
                 wifiSecurity: previousAttempt.networkInterface?.wifiSecurity ?? prev.networkInterface.wifiSecurity,
                 wifiBand: previousAttempt.networkInterface?.wifiBand ?? prev.networkInterface.wifiBand,
+                vlanEnabled:
+                    previousAttempt.networkInterface?.vlanEnabled ??
+                    (previousAttempt.networkInterface?.vlanId != null
+                        ? true
+                        : prev.networkInterface.vlanEnabled),
                 vlanId: previousAttempt.networkInterface?.vlanId ?? prev.networkInterface.vlanId,
             },
             networkAddress: previousAttempt.networkAddress ?? prev.networkAddress,

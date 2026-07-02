@@ -645,3 +645,22 @@ export const validateURL = (url: string, required = true): string | null => {
         return "Invalid URL format";
     }
 };
+
+/**
+ * Validate VLAN configuration when VLAN tagging is enabled.
+ */
+export const validateVlanConfig = (vlanEnabled: boolean, vlanId: number | null): string | null => {
+    if (!vlanEnabled) {
+        return null;
+    }
+
+    if (vlanId === null) {
+        return "VLAN ID is required";
+    }
+
+    if (vlanId < 1 || vlanId > 4094) {
+        return "VLAN ID must be between 1 and 4094";
+    }
+
+    return null;
+};

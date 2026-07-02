@@ -26,6 +26,7 @@ import NetworkInterfaceModel from "./NetworkInterfaceModel.tsx";
 
 import { useModelContext } from "../model-context.js";
 import { mapWifiSecurity } from "../services/network.js";
+import { validateVlanConfig } from "../validation.js";
 import { getCurrentWifiConnection, scanWifiNetworks, WifiConnection, WifiNetwork } from "../services/wifi.js";
 import { Device, device_state_text, is_managed, type Interface } from "../../pkg/networkmanager/interfaces.js";
 import type { WifiBand } from "../types.js";
@@ -167,6 +168,7 @@ export const NetworkInterfaceSelector = ({ interfaces }: { interfaces: Interface
             wifiPassword: isWifi ? model.networkInterface.wifiPassword : null,
             wifiSecurity: isWifi ? model.networkInterface.wifiSecurity : null,
             wifiBand: isWifi ? model.networkInterface.wifiBand : null,
+            vlanEnabled: isWifi ? false : model.networkInterface.vlanEnabled,
             vlanId: isWifi ? null : model.networkInterface.vlanId,
         });
         // Switch to the configuration of the newly selected interface
@@ -575,26 +577,35 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
 
 export const NetworkVlanSelector = () => {
     const { model, updateModel } = useModelContext();
-    const [useVlan, setUseVlan] = React.useState(false);
-    const [vlanError, setVlanError] = React.useState<string | null>(null);
+    const [vlanInputError, setVlanInputError] = React.useState<string | null>(null);
+    const useVlan = model.networkInterface.vlanEnabled;
+    const vlanError =
+        vlanInputError ?? validateVlanConfig(model.networkInterface.vlanEnabled, model.networkInterface.vlanId);
 
-    const setVlanId = (vlanId: number | null) => {
-        updateModel("networkInterface", { vlanId });
-    };
-
-    const onToggleUseVlan = (useVlan: boolean) => {
-        setVlanError(null);
-        setUseVlan(useVlan);
+    const onToggleUseVlan = (enabled: boolean) => {
+        setVlanInputError(null);
+        updateModel("networkInterface", {
+            vlanEnabled: enabled,
+            vlanId: enabled ? model.networkInterface.vlanId : null,
+        });
     };
 
     const onVlanIdChange = (_event: React.FormEvent<HTMLInputElement>, valStr: string) => {
-        const value = parseInt(valStr, 10);
-        if (isNaN(value) || value < 1 || value > 4094) {
-            setVlanError(_("VLAN ID must be a number between 1 and 4094"));
+        if (!valStr.trim()) {
+            setVlanInputError(null);
+            updateModel("networkInterface", { vlanId: null });
             return;
         }
-        setVlanError(null);
-        setVlanId(value);
+
+        const value = parseInt(valStr, 10);
+        if (isNaN(value) || value < 1 || value > 4094) {
+            setVlanInputError(_("VLAN ID must be a number between 1 and 4094"));
+            updateModel("networkInterface", { vlanId: null });
+            return;
+        }
+
+        setVlanInputError(null);
+        updateModel("networkInterface", { vlanId: value });
     };
 
     return (

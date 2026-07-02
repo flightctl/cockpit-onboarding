@@ -212,8 +212,13 @@ interface VlanInfo {
     effectiveIfaceName: string;
 }
 
-function resolveVlanInfo(ifaceName: string, interfaceType: string, vlanId: number | null): VlanInfo {
-    const isVlan = vlanId !== null && interfaceType !== "wifi";
+function resolveVlanInfo(
+    ifaceName: string,
+    interfaceType: string,
+    vlanEnabled: boolean,
+    vlanId: number | null
+): VlanInfo {
+    const isVlan = vlanEnabled && vlanId !== null && interfaceType !== "wifi";
     const effectiveIfaceName = isVlan ? `${ifaceName}.${vlanId}` : ifaceName;
     return { isVlan, effectiveIfaceName };
 }
@@ -277,7 +282,12 @@ function buildConnectionSettings(
     interfaceType: string
 ): Record<string, Record<string, unknown>> {
     const vlanId = model.networkInterface.vlanId;
-    const { isVlan, effectiveIfaceName } = resolveVlanInfo(ifaceName, interfaceType, vlanId);
+    const { isVlan, effectiveIfaceName } = resolveVlanInfo(
+        ifaceName,
+        interfaceType,
+        model.networkInterface.vlanEnabled,
+        vlanId
+    );
     const connectionId = `${ONBOARDING_PROFILE_PREFIX}${effectiveIfaceName}`;
 
     const nmType = isVlan ? "vlan" : interfaceType === "wifi" ? "802-11-wireless" : "802-3-ethernet";
@@ -475,7 +485,12 @@ export async function applyNetworkConfiguration(
         }
 
         const interfaceType = model.networkInterface.interfaceType || "ethernet";
-        const { isVlan, effectiveIfaceName } = resolveVlanInfo(ifaceName, interfaceType, model.networkInterface.vlanId);
+        const { isVlan, effectiveIfaceName } = resolveVlanInfo(
+            ifaceName,
+            interfaceType,
+            model.networkInterface.vlanEnabled,
+            model.networkInterface.vlanId
+        );
         const connectionId = `${ONBOARDING_PROFILE_PREFIX}${effectiveIfaceName}`;
 
         // Delete any previously created onboarding profile for this interface

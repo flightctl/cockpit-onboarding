@@ -10,6 +10,7 @@ import {
     validateHostnameOrIP,
     validateManualNtpServers,
     validatePort,
+    validateVlanConfig,
     hasUniqueLabelKeys,
     validateLabelKey,
     validateLabelValue,
@@ -73,6 +74,13 @@ export const validateNetworkInterfaceStep = (model: Model): boolean => {
                 return false;
             }
         }
+    }
+
+    if (
+        model.networkInterface.interfaceType !== "wifi" &&
+        validateVlanConfig(model.networkInterface.vlanEnabled, model.networkInterface.vlanId) !== null
+    ) {
+        return false;
     }
 
     return true;
