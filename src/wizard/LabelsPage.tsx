@@ -23,7 +23,7 @@ import { ALIAS_LABEL_KEY } from "../services/alias";
 import {
     getDuplicateLabelKeys,
     getOverlappingLabelKeys,
-    validateHostname,
+    validateSystemHostname,
     validateLabelKey,
     validateLabelValue,
 } from "../validation";
@@ -230,7 +230,9 @@ export const LabelsPage = () => {
     );
     const hasSyncedModelLabels = React.useRef(deviceLabels.length > 0);
     const hasSyncedModelSystemInfoMappings = React.useRef(systemInfoMappings.length > 0);
-    const [hostnameValidationError, setHostnameValidationError] = React.useState<string | null>(null);
+    const [hostnameValidationError, setHostnameValidationError] = React.useState<string | null>(() =>
+        validateSystemHostname(model.hostname.value)
+    );
     const [aliasValidationError, setAliasValidationError] = React.useState<string | null>(null);
     const isHostnameAsAliasDisabled = validateLabelValue(model.hostname.value) !== null;
 
@@ -254,8 +256,12 @@ export const LabelsPage = () => {
         }
     }, [isInitialized, systemInfoMappings]);
 
+    React.useEffect(() => {
+        setHostnameValidationError(validateSystemHostname(model.hostname.value));
+    }, [model.hostname.value]);
+
     const setHostname = (value: string) => {
-        const error = validateHostname(value);
+        const error = validateSystemHostname(value);
         setHostnameValidationError(error);
         updateModel("hostname", { value });
         // If the alias is set to match the hostname, but after the changes it would be an invalid label value,

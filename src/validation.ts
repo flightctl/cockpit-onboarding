@@ -8,21 +8,17 @@ import * as ipaddr from "ipaddr.js";
 
 import { IPv4Config, IPv6Config } from "./types";
 
+/** Linux/systemd static hostname limit (see hostnamectl(1)). */
+export const LINUX_HOSTNAME_MAX_LENGTH = 64;
+
 /**
- * Validate hostname according to RFC 1123
+ * Validate hostname format according to RFC 1123.
  *
- * Rules:
- * - Total length: 1-253 characters
- * - Label length: 1-63 characters per dot-separated label
- * - Characters: alphanumeric and hyphens only
- * - Start/end: must be alphanumeric
- * - Labels cannot be all numeric in FQDN
- *
- * @param hostname - The hostname to validate
- * @param required - Whether the hostname is required (default: true)
- * @returns Error message or null if valid
+ * Internal helper for {@link validateSystemHostname}, {@link validateHostnameOrIP},
+ * and {@link validateURL}. Callers setting a Linux static hostname must use
+ * {@link validateSystemHostname} instead.
  */
-export const validateHostname = (hostname: string, required = true): string | null => {
+const validateHostname = (hostname: string, required = true): string | null => {
     const trimmedHostname = hostname.trim();
 
     if (!trimmedHostname) {
@@ -65,6 +61,28 @@ export const validateHostname = (hostname: string, required = true): string | nu
     const allLabelsNumeric = labels.every((label) => /^\d+$/.test(label));
     if (allLabelsNumeric && labels.length > 1) {
         return "Hostname labels cannot be all numeric in a FQDN";
+    }
+
+    return null;
+};
+
+/**
+ * Validate a system hostname that will be applied via hostnamectl.
+ *
+ * Applies RFC 1123 rules plus Linux's 64-character static hostname limit.
+ */
+export const validateSystemHostname = (hostname: string, required = true): string | null => {
+    const error = validateHostname(hostname, required);
+    if (error) {
+        return error;
+    }
+
+    if (!hostname) {
+        return null;
+    }
+
+    if (hostname.length > LINUX_HOSTNAME_MAX_LENGTH) {
+        return "Hostname must be 64 characters or less";
     }
 
     return null;
@@ -577,10 +595,7 @@ export const getDuplicateLabelKeys = (labels: { key: string }[]): string[] => {
 };
 
 /** Returns non-empty label keys that appear in both collections. */
-export const getOverlappingLabelKeys = (
-    first: { key: string }[],
-    second: { key: string }[]
-): string[] => {
+export const getOverlappingLabelKeys = (first: { key: string }[], second: { key: string }[]): string[] => {
     const firstKeys = new Set(first.map(({ key }) => key).filter((key) => key.length > 0));
     const overlaps = new Set<string>();
     for (const { key } of second) {
