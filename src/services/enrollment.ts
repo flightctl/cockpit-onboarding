@@ -6,6 +6,13 @@ import type { CancellationSignal } from "./connectivity";
 import { disarmWatchdog } from "./watchdog";
 import { deleteAttemptedMarker } from "../attempted-marker";
 import { createSecureTempFile } from "./spawn-helpers";
+import {
+    createActionEmitter,
+    ENROLLMENT_ACTION_IDS,
+    makeStepAction,
+    type OnStepAction,
+    type StepExecutionResult,
+} from "../wizard/enrollment-progress-types";
 
 const EXIT_CODE_MESSAGES: Record<number, string> = {
     2: "The provided credentials were rejected by the server",
@@ -22,12 +29,6 @@ function getExitCodeMessage(exitCode: number, endpoint?: string): string | null 
         return `${template} at ${endpoint}`;
     }
     return template;
-}
-
-export interface EnrollmentResult {
-    success: boolean;
-    output: string;
-    deviceUrl?: string;
 }
 
 export function buildEnrollmentParams(model: Model): Record<string, unknown> {
@@ -57,20 +58,25 @@ export async function executeEnrollmentScript(
     scriptPath: string,
     params: Record<string, unknown>,
     signal?: CancellationSignal,
-    onOutput?: (output: string) => void
-): Promise<EnrollmentResult> {
+    onAction?: OnStepAction
+): Promise<StepExecutionResult> {
     let capturedOutput = "";
     let paramsFile = "";
     const serviceId = String(params.ENROLLMENT_SERVICE_ID || "");
     const serviceName = String(params.ENROLLMENT_SERVICE_NAME || "");
     const endpoint = String(params.ENROLLMENT_ENDPOINT || "");
+    const { emit, getActions } = createActionEmitter(onAction);
 
     try {
         console.log(`Executing enrollment script: ${scriptPath}`);
         console.log("Service:", serviceName, `(${serviceId})`);
         console.log("Endpoint:", endpoint);
 
-        onOutput?.(`Executing enrollment script for ${serviceName}...\n`);
+        emit({
+            id: ENROLLMENT_ACTION_IDS.ENROLLMENT_SCRIPT,
+            actionTitle: `Executing enrollment script for ${serviceName}`,
+            result: "pending",
+        });
 
         paramsFile = await createSecureTempFile(JSON.stringify(params), `.enrollment-${serviceId}-`);
 
@@ -81,9 +87,13 @@ export async function executeEnrollmentScript(
             signal.process = proc;
         }
 
+        let streamLineIndex = 0;
         proc.stream((data) => {
             capturedOutput += data;
-            onOutput?.(data);
+            const line = data.trim();
+            if (line) {
+                emit({ id: `enrollment-stream-${streamLineIndex++}`, actionTitle: line, result: "pending" });
+            }
         });
 
         await proc;
@@ -92,6 +102,12 @@ export async function executeEnrollmentScript(
         }
         console.log(`Script ${scriptPath} completed successfully`);
 
+        emit({
+            id: ENROLLMENT_ACTION_IDS.ENROLLMENT_SCRIPT,
+            actionTitle: `Executing enrollment script for ${serviceName}`,
+            result: "success",
+        });
+
         const deviceUrlMatch = capturedOutput.match(/^DEVICE_URL:\s*(.+)$/m);
         if (deviceUrlMatch) {
             const url = deviceUrlMatch[1].trim();
@@ -99,16 +115,13 @@ export async function executeEnrollmentScript(
                 console.log(`Parsed device URL: ${url}`);
                 return {
                     success: true,
-                    output: capturedOutput || "Script completed successfully",
+                    actions: getActions(),
                     deviceUrl: url,
                 };
             }
         }
 
-        return {
-            success: true,
-            output: capturedOutput || "Script completed successfully",
-        };
+        return { success: true, actions: getActions() };
     } catch (error) {
         if (signal) {
             signal.process = undefined;
@@ -132,8 +145,8 @@ export async function executeEnrollmentScript(
 
         const fullMsg = friendlyMsg ? `${friendlyMsg}\n\n${errorMsg}` : errorMsg || "Script failed with unknown error";
 
-        onOutput?.(fullMsg);
-        return { success: false, output: fullMsg };
+        emit({ id: ENROLLMENT_ACTION_IDS.ENROLLMENT_SCRIPT, actionTitle: fullMsg, result: "error" });
+        return { success: false, actions: getActions() };
     } finally {
         if (paramsFile) {
             cockpit.spawn(["rm", "-f", paramsFile], { err: "message" }).catch(() => {});
@@ -141,20 +154,21 @@ export async function executeEnrollmentScript(
     }
 }
 
-export async function finalizeEnrollment(hostname: string): Promise<{ success: boolean; output: string }> {
-    const outputs: string[] = [];
+export async function finalizeEnrollment(hostname: string, onAction?: OnStepAction): Promise<StepExecutionResult> {
+    const markerTitle = "Onboarding completion marker created";
+    const { emit, getActions } = createActionEmitter(onAction);
+    emit({ id: ENROLLMENT_ACTION_IDS.FINALIZE_MARKER, actionTitle: markerTitle, result: "pending" });
 
     try {
         await cockpit.spawn(["sudo", SCRIPT_FINALIZE, hostname], { err: "message" });
-        outputs.push("✓ Onboarding completion marker created");
+        emit(makeStepAction(ENROLLMENT_ACTION_IDS.FINALIZE_MARKER, markerTitle, "success"));
+        await disarmWatchdog();
+        await deleteAttemptedMarker();
+        return { success: true, actions: getActions() };
     } catch (error) {
         console.error("Failed to finalize onboarding:", error);
-        outputs.push(`✗ Failed to create completion marker: ${String(error)}`);
-        return { success: false, output: outputs.join("\n") };
+        const errorTitle = `Failed to create completion marker: ${String(error)}`;
+        emit(makeStepAction(ENROLLMENT_ACTION_IDS.FINALIZE_MARKER, errorTitle, "error"));
+        return { success: false, actions: getActions() };
     }
-
-    await disarmWatchdog();
-    await deleteAttemptedMarker();
-
-    return { success: true, output: outputs.join("\n") };
 }

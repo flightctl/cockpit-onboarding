@@ -132,7 +132,7 @@ const NetworkServicesSection = () => {
                             );
                         })}
                         <StackItem>
-                            <Button variant="link" isInline icon={<PlusCircleIcon />} onClick={addNtpServerRow}>
+                            <Button variant="secondary" size="sm" icon={<PlusCircleIcon />} onClick={addNtpServerRow}>
                                 {_("Add another NTP server")}
                             </Button>
                         </StackItem>

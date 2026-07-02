@@ -18,6 +18,20 @@ export function resolveAliasValue(alias: AliasState, hostname: string): string |
     }
 }
 
+/**
+ * Alias is a label value, therefore we must not use AliasMode.HOSTNAME if the hostname is not a valid label value.
+ *
+ * @param aliasMode - The alias mode to resolve.
+ * @param hostname - The hostname to resolve the alias mode for.
+ * @returns The resolved alias mode.
+ */
+export function resolveDefaultAliasMode(aliasMode: AliasMode | undefined, hostname: string): AliasMode {
+    if (!hostname || validateLabelValue(hostname) !== null) {
+        return AliasMode.CUSTOM;
+    }
+    return aliasMode ?? AliasMode.HOSTNAME;
+}
+
 export function validateAliasConfig(alias: AliasState, hostname: string): boolean {
     if (alias.mode === AliasMode.NONE) {
         return true;

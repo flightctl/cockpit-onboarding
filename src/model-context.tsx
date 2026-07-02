@@ -13,6 +13,7 @@ import {
 import { detectFlightctlConfig } from "./services/flightctl-config";
 import { DEFAULT_ENROLLMENT_CONFIG, patchEnrollment, restoreEnrollmentFromMarker } from "./enrollment-state";
 import { parseIpv6Address, ConnectionIpSettings } from "./services/network";
+import { resolveDefaultAliasMode } from "./services/alias.js";
 import { AttemptedMarkerData } from "./attempted-marker";
 
 export enum AliasMode {
@@ -105,6 +106,7 @@ const initialModel: Model = {
         wifiPassword: null,
         wifiSecurity: null,
         wifiBand: null,
+        vlanEnabled: false,
         vlanId: null,
     },
     networkAddress: {
@@ -559,7 +561,7 @@ export const ModelProvider: React.FunctionComponent<{
                     systemInfoMappings: defaults?.labels?.systemInfoMappings ?? prev.labels.systemInfoMappings,
                 },
                 alias: {
-                    mode: (defaults?.alias?.mode as AliasMode | undefined) ?? prev.alias.mode,
+                    mode: resolveDefaultAliasMode(defaults?.alias?.mode ?? prev.alias.mode, resolvedHostname),
                     customValue: defaults?.alias?.customValue ?? prev.alias.customValue,
                 },
                 connectivityTestHost: connectivityHost,
@@ -608,6 +610,11 @@ export const ModelProvider: React.FunctionComponent<{
                 wifiSsid: previousAttempt.networkInterface?.wifiSsid ?? prev.networkInterface.wifiSsid,
                 wifiSecurity: previousAttempt.networkInterface?.wifiSecurity ?? prev.networkInterface.wifiSecurity,
                 wifiBand: previousAttempt.networkInterface?.wifiBand ?? prev.networkInterface.wifiBand,
+                vlanEnabled:
+                    previousAttempt.networkInterface?.vlanEnabled ??
+                    (previousAttempt.networkInterface?.vlanId != null
+                        ? true
+                        : prev.networkInterface.vlanEnabled),
                 vlanId: previousAttempt.networkInterface?.vlanId ?? prev.networkInterface.vlanId,
             },
             networkAddress: previousAttempt.networkAddress ?? prev.networkAddress,

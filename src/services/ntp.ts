@@ -3,6 +3,12 @@ import { SCRIPT_NTP } from "../paths";
 import { waitForProxy } from "./dbus-helpers";
 import { ServerTime } from "../../pkg/lib/serverTime.js";
 import { validateHostnameOrIP } from "../validation";
+import {
+    CONFIG_ACTION_IDS,
+    indexedActionId,
+    makeStepAction,
+    type StepAction,
+} from "../wizard/enrollment-progress-types";
 
 interface CustomNtpConfig {
     backend: "timesyncd" | "chronyd" | null;
@@ -46,10 +52,9 @@ export async function getNtpServers(): Promise<string[]> {
     return [];
 }
 
-export async function configureNtpServers(servers: string[], autoConfig: boolean): Promise<string[]> {
-    const results: string[] = [];
+export async function configureNtpServers(servers: string[], autoConfig: boolean): Promise<StepAction[]> {
+    const actions: StepAction[] = [];
 
-    // polkit rule authorizes the onboarding user
     const timedateClient = cockpit.dbus("org.freedesktop.timedate1");
     try {
         const timedateProxy = await waitForProxy(
@@ -57,7 +62,6 @@ export async function configureNtpServers(servers: string[], autoConfig: boolean
         );
 
         await timedateProxy.call("SetNTP", [true, true]);
-
         // Disable NTP before changing server config
         await timedateProxy.call("SetNTP", [false, true]);
 
@@ -66,7 +70,13 @@ export async function configureNtpServers(servers: string[], autoConfig: boolean
         // { superuser: "require" } which needs Cockpit's superuser bridge.
         if (autoConfig) {
             await cockpit.spawn(["sudo", SCRIPT_NTP, "auto"], { err: "message" });
-            results.push("NTP enabled with automatic server selection");
+            actions.push(
+                makeStepAction(
+                    indexedActionId(CONFIG_ACTION_IDS.NTP, 0),
+                    "NTP enabled with automatic server selection",
+                    "success"
+                )
+            );
         } else if (servers.length > 0) {
             const filteredServers = servers.filter((s) => !!s);
             for (const server of filteredServers) {
@@ -76,12 +86,23 @@ export async function configureNtpServers(servers: string[], autoConfig: boolean
                 }
             }
             await cockpit.spawn(["sudo", SCRIPT_NTP, "set", ...filteredServers], { err: "message" });
-            results.push(`NTP configured with custom servers: ${filteredServers.join(", ")}`);
+            actions.push(
+                makeStepAction(
+                    indexedActionId(CONFIG_ACTION_IDS.NTP, 0),
+                    `NTP configured with custom servers: ${filteredServers.join(", ")}`,
+                    "success"
+                )
+            );
         } else {
-            results.push("NTP enabled with default configuration");
+            actions.push(
+                makeStepAction(
+                    indexedActionId(CONFIG_ACTION_IDS.NTP, 0),
+                    "NTP enabled with default configuration",
+                    "success"
+                )
+            );
         }
 
-        // Re-enable NTP
         await timedateProxy.call("SetNTP", [true, true]);
     } catch (error) {
         throw new Error(`NTP configuration failed: ${String(error)}`);
@@ -89,5 +110,5 @@ export async function configureNtpServers(servers: string[], autoConfig: boolean
         timedateClient.close();
     }
 
-    return results;
+    return actions;
 }

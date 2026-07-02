@@ -284,7 +284,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
                             <DescriptionListGroup>
                                 <DescriptionListTerm>{_("VLAN ID")}</DescriptionListTerm>
                                 <DescriptionListDescription>
-                                    {model.networkInterface.vlanId !== null
+                                    {model.networkInterface.vlanEnabled && model.networkInterface.vlanId !== null
                                         ? model.networkInterface.vlanId
                                         : _("No VLAN")}
                                 </DescriptionListDescription>

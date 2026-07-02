@@ -15,6 +15,7 @@ import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 
 import { SubtleHeading } from "../components/Headings";
+import FeatureSwitch from "../components/FeatureSwitch";
 import FormHelperText from "../components/HelperTexts";
 import ValidatedTextInput from "../components/ValidatedTextInput";
 import { AliasMode, useModelContext } from "../model-context";
@@ -22,11 +23,12 @@ import { ALIAS_LABEL_KEY } from "../services/alias";
 import {
     getDuplicateLabelKeys,
     getOverlappingLabelKeys,
-    validateHostname,
+    validateSystemHostname,
     validateLabelKey,
     validateLabelValue,
 } from "../validation";
 import { CustomLabelRow, type DeviceLabelEntry } from "./CustomLabelRow";
+import WithTooltip from "../components/WithTooltip";
 
 const _ = cockpit.gettext;
 
@@ -228,8 +230,11 @@ export const LabelsPage = () => {
     );
     const hasSyncedModelLabels = React.useRef(deviceLabels.length > 0);
     const hasSyncedModelSystemInfoMappings = React.useRef(systemInfoMappings.length > 0);
-    const [hostnameValidationError, setHostnameValidationError] = React.useState<string | null>(null);
+    const [hostnameValidationError, setHostnameValidationError] = React.useState<string | null>(() =>
+        validateSystemHostname(model.hostname.value)
+    );
     const [aliasValidationError, setAliasValidationError] = React.useState<string | null>(null);
+    const isHostnameAsAliasDisabled = validateLabelValue(model.hostname.value) !== null;
 
     React.useEffect(() => {
         if (!isInitialized || hasSyncedModelLabels.current) {
@@ -251,10 +256,23 @@ export const LabelsPage = () => {
         }
     }, [isInitialized, systemInfoMappings]);
 
+    React.useEffect(() => {
+        setHostnameValidationError(validateSystemHostname(model.hostname.value));
+    }, [model.hostname.value]);
+
     const setHostname = (value: string) => {
-        const error = validateHostname(value);
+        const error = validateSystemHostname(value);
         setHostnameValidationError(error);
         updateModel("hostname", { value });
+        // If the alias is set to match the hostname, but after the changes it would be an invalid label value,
+        // the "hostname" AliasMode becomes disabled, so we change selection to CUSTOM.
+        if (aliasMode === AliasMode.HOSTNAME && validateLabelValue(value) !== null) {
+            setAliasMode(AliasMode.CUSTOM);
+        }
+    };
+
+    const setAliasEnabled = (enabled: boolean) => {
+        setAliasMode(enabled ? AliasMode.HOSTNAME : AliasMode.NONE);
     };
 
     const setAliasMode = (mode: AliasMode) => {
@@ -367,16 +385,27 @@ export const LabelsPage = () => {
                             </FormGroup>
                         </StackItem>
                         <StackItem>
-                            <FormGroup label={_("Alias")} fieldId="alias-mode">
+                            <FeatureSwitch
+                                fieldId="alias-enabled"
+                                label={_("Alias")}
+                                isChecked={aliasMode !== AliasMode.NONE}
+                                onToggle={setAliasEnabled}
+                            >
                                 <Stack hasGutter>
                                     <StackItem>
-                                        <Radio
-                                            id="alias-mode-hostname"
-                                            name="alias-mode"
-                                            label={_("Use hostname as alias")}
-                                            isChecked={aliasMode === AliasMode.HOSTNAME}
-                                            onChange={() => setAliasMode(AliasMode.HOSTNAME)}
-                                        />
+                                        <WithTooltip
+                                            showTooltip={isHostnameAsAliasDisabled}
+                                            content={_("Hostname is not a valid alias")}
+                                        >
+                                            <Radio
+                                                id="alias-mode-hostname"
+                                                name="alias-mode"
+                                                label={_("Use hostname as alias")}
+                                                isChecked={aliasMode === AliasMode.HOSTNAME}
+                                                isDisabled={isHostnameAsAliasDisabled}
+                                                onChange={() => setAliasMode(AliasMode.HOSTNAME)}
+                                            />
+                                        </WithTooltip>
                                     </StackItem>
                                     <StackItem>
                                         <Radio
@@ -400,17 +429,8 @@ export const LabelsPage = () => {
                                             }
                                         />
                                     </StackItem>
-                                    <StackItem>
-                                        <Radio
-                                            id="alias-mode-none"
-                                            name="alias-mode"
-                                            label={_("Do not set an alias")}
-                                            isChecked={aliasMode === AliasMode.NONE}
-                                            onChange={() => setAliasMode(AliasMode.NONE)}
-                                        />
-                                    </StackItem>
                                 </Stack>
-                            </FormGroup>
+                            </FeatureSwitch>
                         </StackItem>
                     </Stack>
                 </FormSection>
@@ -441,7 +461,7 @@ export const LabelsPage = () => {
                             </StackItem>
                         )}
                         <StackItem>
-                            <Button variant="link" isInline icon={<PlusCircleIcon />} onClick={addDeviceLabelRow}>
+                            <Button variant="secondary" size="sm" icon={<PlusCircleIcon />} onClick={addDeviceLabelRow}>
                                 {_("Add another label")}
                             </Button>
                         </StackItem>
@@ -538,7 +558,12 @@ export const LabelsPage = () => {
                             </StackItem>
                         )}
                         <StackItem>
-                            <Button variant="link" isInline icon={<PlusCircleIcon />} onClick={addSystemInfoMappingRow}>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                icon={<PlusCircleIcon />}
+                                onClick={addSystemInfoMappingRow}
+                            >
                                 {_("Add another mapping")}
                             </Button>
                         </StackItem>

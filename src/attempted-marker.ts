@@ -17,6 +17,7 @@ export interface AttemptedMarkerData {
         wifiSsid: string | null;
         wifiSecurity: WifiSecurity | null;
         wifiBand: WifiBand | null;
+        vlanEnabled?: boolean;
         vlanId: number | null;
     };
     networkAddress: Model["networkAddress"];
@@ -50,6 +51,7 @@ function serializeModel(model: Model): AttemptedMarkerData {
             wifiSsid: model.networkInterface.wifiSsid,
             wifiSecurity: model.networkInterface.wifiSecurity,
             wifiBand: model.networkInterface.wifiBand,
+            vlanEnabled: model.networkInterface.vlanEnabled,
             vlanId: model.networkInterface.vlanId,
         },
         networkAddress: { ...model.networkAddress },

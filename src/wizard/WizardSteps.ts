@@ -2,7 +2,7 @@ import { ALIAS_LABEL_KEY, validateAliasConfig } from "../services/alias";
 import { Model } from "../model-context";
 import { validateFlightctlCredentials } from "../flightctl-enrollment";
 import {
-    validateHostname,
+    validateSystemHostname,
     validateIpv4StaticConfig,
     validateIpv4DnsConfig,
     validateIpv6StaticConfig,
@@ -10,6 +10,7 @@ import {
     validateHostnameOrIP,
     validateManualNtpServers,
     validatePort,
+    validateVlanConfig,
     hasUniqueLabelKeys,
     validateLabelKey,
     validateLabelValue,
@@ -45,7 +46,7 @@ export const validateHostnameStep = (model: Model): boolean => {
         return false;
     }
 
-    const hostnameError = validateHostname(model.hostname.value);
+    const hostnameError = validateSystemHostname(model.hostname.value);
     return hostnameError === null;
 };
 
@@ -73,6 +74,13 @@ export const validateNetworkInterfaceStep = (model: Model): boolean => {
                 return false;
             }
         }
+    }
+
+    if (
+        model.networkInterface.interfaceType !== "wifi" &&
+        validateVlanConfig(model.networkInterface.vlanEnabled, model.networkInterface.vlanId) !== null
+    ) {
+        return false;
     }
 
     return true;

@@ -282,6 +282,8 @@ const SystemOnboardingWizardWrapper: React.FunctionComponent<{
     );
 };
 
+const lockedProgressStages = ["idle", "running", "success"];
+
 interface SystemOnboardingWizardProps {
     interfaces: Interface[];
     hasPreviousAttempt?: boolean;
@@ -296,8 +298,24 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     const { config } = useConfig();
     const { model, cancelEnrollmentRef } = useModelContext();
     const [maxReachedStep, setMaxReachedStep] = useState<WizardStepId>(WIZARD_STEP_IDS.network);
+    const [activeStepId, setActiveStepId] = useState<WizardStepId>(WIZARD_STEP_IDS.network);
     const [showRestoredConfigurationSection, setShowRestoredConfigurationSection] = useState(hasPreviousAttempt);
     const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
+
+    // It should not be possible to navigate to the "Apply" step via the navigation buttons.
+    // The process must be always started from the "Review" step, by clicking the "Apply" button.
+    const applyAuthorizedRef = useRef(false);
+    const [isApplyAuthorized, setIsApplyAuthorized] = useState(false);
+
+    const authorizeApply = () => {
+        applyAuthorizedRef.current = true;
+        setIsApplyAuthorized(true);
+    };
+
+    const resetApplyAuthorization = () => {
+        applyAuthorizedRef.current = false;
+        setIsApplyAuthorized(false);
+    };
 
     const isEnrollmentSelected = model.enrollment.selected;
     const reviewButtonText = isEnrollmentSelected ? _("Enroll") : _("Apply");
@@ -324,11 +342,28 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
         return index >= 0 ? stepValidations[index] : false;
     };
 
+    const enrollmentExecutionState = model.enrollmentProgress.executionState;
+
+    // It should not be possible to abandon the "Apply" step via the navigation buttons.
+    // Once the user has reached that step, they must complete the process or cancel it.
+    const isProgressStepNavigationLocked = () =>
+        activeStepId === WIZARD_STEP_IDS.progress && lockedProgressStages.includes(enrollmentExecutionState);
+
     // Handle step navigation - using PatternFly Wizard's correct signature
-    const handleStepChange = (_event: React.MouseEvent<HTMLButtonElement>, currentStep: WizardBasicStep) => {
-        const stepId = currentStep.id.toString() as WizardStepId;
+    const handleStepChange = (
+        _event: React.MouseEvent<HTMLButtonElement> | null,
+        newStep: WizardBasicStep,
+        prevStep?: WizardBasicStep
+    ) => {
+        const stepId = newStep.id.toString() as WizardStepId;
         const stepIndex = stepIds.indexOf(stepId);
         const maxReachIndex = stepIds.indexOf(maxReachedStep);
+
+        setActiveStepId(stepId);
+
+        if (prevStep?.id === WIZARD_STEP_IDS.progress && stepId !== WIZARD_STEP_IDS.progress) {
+            resetApplyAuthorization();
+        }
 
         // Update max reached step if user progresses forward with valid data
         if (stepIndex > maxReachIndex && getStepValidation(stepIds[maxReachIndex])) {
@@ -338,6 +373,14 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
 
     // Users can only navigate to steps they've reached or the next step if current is valid
     const isStepDisabled = (stepId: WizardStepId): boolean => {
+        if (isProgressStepNavigationLocked() && stepId !== WIZARD_STEP_IDS.progress) {
+            return true;
+        }
+
+        if (stepId === WIZARD_STEP_IDS.progress && !applyAuthorizedRef.current) {
+            return true;
+        }
+
         const stepIndex = stepIds.indexOf(stepId);
         const maxReachIndex = stepIds.indexOf(maxReachedStep);
 
@@ -358,9 +401,6 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
         // Cannot skip ahead past an invalid step
         return true;
     };
-
-    // Dynamic footer configuration for EnrollmentProgressPage
-    const enrollmentExecutionState = model.enrollmentProgress.executionState;
 
     useEffect(() => {
         if (enrollmentExecutionState !== "running") {
@@ -470,6 +510,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         name={_("Network services")}
                         id={WIZARD_STEP_IDS.networkServices}
                         footer={{ isNextDisabled: !isNetworkServicesConfigValid, isCancelHidden: true }}
+                        isDisabled={isStepDisabled(WIZARD_STEP_IDS.networkServices)}
                     >
                         <FormWrapper>
                             <NetworkServicesPage />
@@ -498,7 +539,12 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     <WizardStep
                         name={_("Review")}
                         id={WIZARD_STEP_IDS.review}
-                        footer={{ nextButtonText: reviewButtonText, isCancelHidden: true }}
+                        footer={{
+                            nextButtonText: reviewButtonText,
+                            isCancelHidden: true,
+                            // onMouseDown runs before Next navigation checks whether the progress step is enabled
+                            nextButtonProps: { onMouseDown: authorizeApply },
+                        }}
                         isDisabled={isStepDisabled(WIZARD_STEP_IDS.review)}
                     >
                         <FormWrapper>
@@ -512,7 +558,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         isDisabled={isStepDisabled(WIZARD_STEP_IDS.progress)}
                     >
                         <FormWrapper>
-                            <EnrollmentProgressPage />
+                            <EnrollmentProgressPage isApplyAuthorized={isApplyAuthorized} />
                         </FormWrapper>
                     </WizardStep>
                 </Wizard>

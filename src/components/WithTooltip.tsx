@@ -7,7 +7,27 @@ type WithTooltipProps = {
     children: React.ReactElement;
 };
 
-const WithTooltip = ({ showTooltip, content, children }: React.PropsWithChildren<WithTooltipProps>) =>
-    showTooltip ? <Tooltip content={content}>{children}</Tooltip> : children;
+const WithTooltip = ({ showTooltip, content, children }: React.PropsWithChildren<WithTooltipProps>) => {
+    const triggerRef = React.useRef<HTMLSpanElement>(null);
+
+    if (!showTooltip) {
+        return children;
+    }
+
+    // Wrap in a shrink-to-fit span so the tooltip anchors to the control text, not the
+    // full row width. The wrapper also receives pointer events when the child is disabled.
+    return (
+        <Tooltip
+            content={content}
+            triggerRef={triggerRef}
+            position="top"
+            flipBehavior={["top", "bottom", "top-start", "top-end", "bottom-start", "bottom-end"]}
+        >
+            <span ref={triggerRef} style={{ display: "inline-block", width: "fit-content" }}>
+                {children}
+            </span>
+        </Tooltip>
+    );
+};
 
 export default WithTooltip;

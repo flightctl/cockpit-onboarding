@@ -1,29 +1,38 @@
 import React from "react";
 import cockpit from "cockpit";
 
-import { WifiIcon } from "@patternfly/react-icons";
-import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
-import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
-import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
-import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
+import { Bullseye } from "@patternfly/react-core/dist/esm/layouts/Bullseye/Bullseye";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
-import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
-import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
-import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import {
+    EmptyState,
+    EmptyStateBody,
+    EmptyStateVariant,
+} from "@patternfly/react-core/dist/esm/components/EmptyState/index.js";
+import { Flex } from "@patternfly/react-core/dist/esm/layouts/Flex/Flex";
+import { FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/FlexItem";
+import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
+import { Icon } from "@patternfly/react-core/dist/esm/components/Icon/Icon";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/index.js";
+import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
+import { Spinner } from "@patternfly/react-core/dist/esm/components/Spinner/index.js";
+import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { Table, Thead, Tr, Th, Tbody, Td } from "@patternfly/react-table";
+import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
+import { WifiIcon } from "@patternfly/react-icons";
 
 import { SubtleHeading } from "../components/Headings.tsx";
 import FeatureSwitch from "../components/FeatureSwitch.tsx";
 import ValidatedTextInput from "../components/ValidatedTextInput.tsx";
+import WithTooltip from "../components/WithTooltip.tsx";
 import NetworkInterfaceModel from "./NetworkInterfaceModel.tsx";
 
 import { useModelContext } from "../model-context.js";
 import { mapWifiSecurity } from "../services/network.js";
+import { validateVlanConfig } from "../validation.js";
 import { getCurrentWifiConnection, scanWifiNetworks, WifiConnection, WifiNetwork } from "../services/wifi.js";
 import { Device, device_state_text, is_managed, type Interface } from "../../pkg/networkmanager/interfaces.js";
-import { Flex } from "@patternfly/react-core/dist/esm/layouts/Flex/Flex";
-import { FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/FlexItem";
+import type { WifiBand } from "../types.js";
 
 const _ = cockpit.gettext;
 
@@ -85,7 +94,7 @@ const NetworkInterfaceSection = ({ interfaces }: { interfaces: Interface[] }) =>
 
             {isWifiSelected && selectedIface && (
                 <StackItem>
-                    <NetworkWifiSelector interfaceName={selectedIface.Name} />
+                    <NetworkWifiSelector key={selectedIface.Name} interfaceName={selectedIface.Name} />
                 </StackItem>
             )}
         </Stack>
@@ -162,6 +171,7 @@ export const NetworkInterfaceSelector = ({ interfaces }: { interfaces: Interface
             wifiPassword: isWifi ? model.networkInterface.wifiPassword : null,
             wifiSecurity: isWifi ? model.networkInterface.wifiSecurity : null,
             wifiBand: isWifi ? model.networkInterface.wifiBand : null,
+            vlanEnabled: isWifi ? false : model.networkInterface.vlanEnabled,
             vlanId: isWifi ? null : model.networkInterface.vlanId,
         });
         // Switch to the configuration of the newly selected interface
@@ -217,41 +227,74 @@ interface NetworkWifiSelectorProps {
     interfaceName: string;
 }
 
+const WifiEmptyStateIcon = () => (
+    <Icon size="lg">
+        <WifiIcon />
+    </Icon>
+);
+
+const SIGNAL_BARS = ["▂", "▄", "▆", "█"] as const;
+
+const SignalStrengthIcon = ({ strength }: { strength: number }) => {
+    const barCount = Math.min(4, Math.max(0, Math.floor(strength / 20)));
+    const icon = SIGNAL_BARS.map((bar, i) => (i < barCount ? bar : "_")).join("");
+
+    return (
+        <Flex>
+            <FlexItem style={{ fontFamily: "monospace", lineHeight: 1 }}>{icon}</FlexItem>
+            <FlexItem>{strength}%</FlexItem>
+        </Flex>
+    );
+};
+
 export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps) => {
     const { model, updateModel } = useModelContext();
-    const [isScanning, setIsScanning] = React.useState(false);
+    const [isScanning, setIsScanning] = React.useState(true);
     const [networks, setNetworks] = React.useState<WifiNetwork[]>([]);
     const [scanError, setScanError] = React.useState<string | null>(null);
-    const [selectedSsid, setSelectedSsid] = React.useState<string | null>(null);
     const hasPreSelected = React.useRef(false);
     // Store current connection details in a ref so it can be accessed in handleNetworkSelection
     const currentConnectionRef = React.useRef<WifiConnection | null>(null);
 
     // Get current WiFi connection details and scan networks
     React.useEffect(() => {
+        let cancelled = false;
+
+        hasPreSelected.current = false;
+        currentConnectionRef.current = null;
+        setIsScanning(true);
+        setNetworks([]);
+        setScanError(null);
+
         const initializeWifi = async () => {
             // First, get current connection if any
             let current = null;
             try {
                 current = await getCurrentWifiConnection(interfaceName);
+                if (cancelled) {
+                    return;
+                }
                 currentConnectionRef.current = current;
             } catch (error) {
                 console.error("Failed to get current WiFi connection:", error);
             }
 
+            if (cancelled) {
+                return;
+            }
+
             // Then scan for networks
-            setIsScanning(true);
-            setScanError(null);
             try {
                 const scannedNetworks = await scanWifiNetworks(interfaceName);
+                if (cancelled) {
+                    return;
+                }
                 setNetworks(scannedNetworks);
 
                 if (current && !hasPreSelected.current) {
                     const matchingNetwork = scannedNetworks.find((n) => n.ssid === current.ssid);
 
                     if (matchingNetwork) {
-                        setSelectedSsid(matchingNetwork.ssid);
-
                         updateModel("networkInterface", {
                             wifiSsid: matchingNetwork.ssid,
                             wifiSecurity: mapWifiSecurity(matchingNetwork.security),
@@ -263,20 +306,27 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
                     }
                 }
             } catch (error) {
+                if (cancelled) {
+                    return;
+                }
                 console.error("WiFi scan failed:", error);
                 setScanError(String(error));
             } finally {
-                setIsScanning(false);
+                if (!cancelled) {
+                    setIsScanning(false);
+                }
             }
         };
 
         initializeWifi();
+
+        return () => {
+            cancelled = true;
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [interfaceName]);
 
     const handleNetworkSelection = (ssid: string) => {
-        setSelectedSsid(ssid);
-
         const network = networks.find((n) => n.ssid === ssid);
         if (network) {
             const isCurrentNetwork = currentConnectionRef.current && currentConnectionRef.current.ssid === ssid;
@@ -309,22 +359,6 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
         }
     };
 
-    const getSignalIcon = (strength: number) => {
-        if (strength >= 80) {
-            return "▂▄▆█";
-        }
-        if (strength >= 60) {
-            return "▂▄▆_";
-        }
-        if (strength >= 40) {
-            return "▂▄__";
-        }
-        if (strength >= 20) {
-            return "▂___";
-        }
-        return "____";
-    };
-
     const columnNames = {
         ssid: _("SSID"),
         signal: _("Signal"),
@@ -332,6 +366,7 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
         band: _("Band"),
     };
 
+    const selectedSsid = model.networkInterface.wifiSsid;
     const selectedNetwork = selectedSsid ? networks.find((n) => n.ssid === selectedSsid) : null;
     const selectedHasDualBand = selectedNetwork ? selectedNetwork.bands.length > 1 : false;
 
@@ -345,20 +380,18 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
         updateModel("networkInterface", updates);
     };
 
-    const handleSecurityChange = (security: "none" | "wep" | "wpa") => {
+    const handleSecurityToggle = (enabled: boolean) => {
         updateModel("networkInterface", {
-            wifiSecurity: security,
-            wifiPassword: security === "none" ? null : model.networkInterface.wifiPassword,
+            wifiSecurity: enabled ? "wpa" : "none",
+            wifiPassword: enabled ? model.networkInterface.wifiPassword : null,
         });
     };
 
-    const handleBandChange = (band: "auto" | "bg" | "a") => {
+    const handleBandChange = (band: WifiBand) => {
         updateModel("networkInterface", { wifiBand: band });
     };
 
-    // Show password field when a secured network is selected (via scan or manual entry)
-    // Show password when security is not 'none' (null defaults to WPA, matching the radio state)
-    const showPassword = model.networkInterface.wifiSecurity !== "none" && (scanUnavailable || selectedSsid !== null);
+    const showPasswordField = scanUnavailable || selectedSsid !== null;
 
     return (
         <Stack hasGutter>
@@ -377,10 +410,15 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
             {!isScanning && (
                 <>
                     <StackItem>
-                        <Table aria-label={_("WiFi network selector")} variant="compact">
+                        <Table aria-label={_("WiFi network selector")} variant="compact" borders={false}>
                             <Thead>
                                 <Tr>
-                                    <Th screenReaderText="Row select" />
+                                    <Th
+                                        screenReaderText={_("Row select")}
+                                        modifier="fitContent"
+                                        className="pf-v6-c-table__check"
+                                        style={{ maxWidth: "2.5rem" }}
+                                    />
                                     <Th>{columnNames.ssid}</Th>
                                     <Th>{columnNames.signal}</Th>
                                     <Th>{columnNames.security}</Th>
@@ -388,29 +426,26 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
                                 </Tr>
                             </Thead>
                             <Tbody>
-                                {networks.map((network, index) => (
+                                {networks.map((network) => (
                                     <Tr key={network.ssid}>
-                                        <Td>
-                                            <Radio
-                                                id={`wifi-radio-${index}`}
-                                                name="wifi-network-select"
-                                                isChecked={selectedSsid === network.ssid}
-                                                onChange={() => handleNetworkSelection(network.ssid)}
-                                                aria-label={`Select ${network.ssid}`}
-                                            />
+                                        <Td
+                                            modifier="fitContent"
+                                            className="pf-v6-c-table__check"
+                                            style={{ maxWidth: "2.5rem", verticalAlign: "middle" }}
+                                        >
+                                            <label>
+                                                <input
+                                                    type="radio"
+                                                    name="wifi-network-select"
+                                                    checked={model.networkInterface.wifiSsid === network.ssid}
+                                                    onChange={() => handleNetworkSelection(network.ssid)}
+                                                    aria-label={_("Select network $0", network.ssid)}
+                                                />
+                                            </label>
                                         </Td>
                                         <Td dataLabel={columnNames.ssid}>{network.ssid}</Td>
                                         <Td dataLabel={columnNames.signal}>
-                                            <span
-                                                style={{
-                                                    fontFamily: "monospace",
-                                                    verticalAlign: "bottom",
-                                                    lineHeight: "1",
-                                                }}
-                                            >
-                                                {getSignalIcon(network.strength)}
-                                            </span>{" "}
-                                            {network.strength}%
+                                            <SignalStrengthIcon strength={network.strength} />
                                         </Td>
                                         <Td dataLabel={columnNames.security}>{network.security}</Td>
                                         <Td dataLabel={columnNames.band}>
@@ -418,20 +453,54 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
                                         </Td>
                                     </Tr>
                                 ))}
+                                {networks.length === 0 && (
+                                    <Tr>
+                                        <Td
+                                            modifier="fitContent"
+                                            className="pf-v6-c-table__check"
+                                            style={{ maxWidth: "2.5rem" }}
+                                        />
+                                        <Td colSpan={4}>
+                                            <Bullseye>
+                                                <EmptyState
+                                                    titleText={_("No WiFi networks found")}
+                                                    headingLevel="h3"
+                                                    variant={EmptyStateVariant.xs}
+                                                    icon={WifiEmptyStateIcon}
+                                                >
+                                                    <EmptyStateBody>
+                                                        {_(
+                                                            "Ensure the network is powered on and the device is connected to the network."
+                                                        )}
+                                                    </EmptyStateBody>
+                                                </EmptyState>
+                                            </Bullseye>
+                                        </Td>
+                                    </Tr>
+                                )}
                             </Tbody>
                         </Table>
-                        <Button variant="link" onClick={handleRescan} icon={<WifiIcon />}>
-                            {_("Rescan")}
-                        </Button>
                     </StackItem>
 
-                    {scanUnavailable && (
-                        <StackItem>
-                            <Alert variant="warning" title={_("WiFi scanning unavailable")} isInline>
-                                {_("WiFi scanning while in access point mode is unavailable on this hardware.")}
-                            </Alert>
-                        </StackItem>
-                    )}
+                    <StackItem>
+                        <WithTooltip
+                            showTooltip={isScanning || scanUnavailable}
+                            content={
+                                isScanning
+                                    ? _("Scanning...")
+                                    : _("WiFi scanning while in access point mode is unavailable on this hardware.")
+                            }
+                        >
+                            <Button
+                                variant="link"
+                                onClick={handleRescan}
+                                icon={<WifiIcon />}
+                                isDisabled={isScanning || scanUnavailable}
+                            >
+                                {_("Rescan")}
+                            </Button>
+                        </WithTooltip>
+                    </StackItem>
 
                     <StackItem>
                         <FormGroup label={_("WiFi Network (SSID)")} isRequired fieldId="wifi-ssid">
@@ -445,28 +514,25 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
                         </FormGroup>
                     </StackItem>
                     <StackItem>
-                        <FormGroup label={_("Security")} fieldId="wifi-security">
-                            <Flex justifyContent={{ default: "justifyContentSpaceBetween" }}>
-                                <FlexItem>
-                                    <Radio
-                                        id="wifi-security-wpa"
-                                        name="wifi-security"
-                                        label={_("WPA/WPA2/WPA3")}
-                                        isChecked={model.networkInterface.wifiSecurity !== "none"}
-                                        onChange={() => handleSecurityChange("wpa")}
+                        <FeatureSwitch
+                            fieldId="wifi-security"
+                            label={_("Use WPA/WPA2/WPA3 security")}
+                            isChecked={model.networkInterface.wifiSecurity !== "none"}
+                            onToggle={handleSecurityToggle}
+                        >
+                            {showPasswordField && (
+                                <FormGroup label={_("WiFi Password")} isRequired fieldId="wifi-password">
+                                    <TextInput
+                                        type="password"
+                                        id="wifi-password"
+                                        value={model.networkInterface.wifiPassword || ""}
+                                        onChange={(_, value) => handlePasswordChange(value)}
+                                        aria-label={_("WiFi password")}
+                                        placeholder={_("Enter WiFi password")}
                                     />
-                                </FlexItem>
-                                <FlexItem>
-                                    <Radio
-                                        id="wifi-security-none"
-                                        name="wifi-security"
-                                        label={_("None (open)")}
-                                        isChecked={model.networkInterface.wifiSecurity === "none"}
-                                        onChange={() => handleSecurityChange("none")}
-                                    />
-                                </FlexItem>
-                            </Flex>
-                        </FormGroup>
+                                </FormGroup>
+                            )}
+                        </FeatureSwitch>
                     </StackItem>
                     {selectedHasDualBand && (
                         <StackItem>
@@ -506,20 +572,6 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
                             </FormGroup>
                         </StackItem>
                     )}
-                    {showPassword && (
-                        <StackItem>
-                            <FormGroup label={_("WiFi Password")} isRequired fieldId="wifi-password">
-                                <TextInput
-                                    type="password"
-                                    id="wifi-password"
-                                    value={model.networkInterface.wifiPassword || ""}
-                                    onChange={(_, value) => handlePasswordChange(value)}
-                                    aria-label={_("WiFi password")}
-                                    placeholder={_("Enter WiFi password")}
-                                />
-                            </FormGroup>
-                        </StackItem>
-                    )}
                 </>
             )}
         </Stack>
@@ -528,26 +580,35 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
 
 export const NetworkVlanSelector = () => {
     const { model, updateModel } = useModelContext();
-    const [useVlan, setUseVlan] = React.useState(false);
-    const [vlanError, setVlanError] = React.useState<string | null>(null);
+    const [vlanInputError, setVlanInputError] = React.useState<string | null>(null);
+    const useVlan = model.networkInterface.vlanEnabled;
+    const vlanError =
+        vlanInputError ?? validateVlanConfig(model.networkInterface.vlanEnabled, model.networkInterface.vlanId);
 
-    const setVlanId = (vlanId: number | null) => {
-        updateModel("networkInterface", { vlanId });
-    };
-
-    const onToggleUseVlan = (useVlan: boolean) => {
-        setVlanError(null);
-        setUseVlan(useVlan);
+    const onToggleUseVlan = (enabled: boolean) => {
+        setVlanInputError(null);
+        updateModel("networkInterface", {
+            vlanEnabled: enabled,
+            vlanId: enabled ? model.networkInterface.vlanId : null,
+        });
     };
 
     const onVlanIdChange = (_event: React.FormEvent<HTMLInputElement>, valStr: string) => {
-        const value = parseInt(valStr, 10);
-        if (isNaN(value) || value < 1 || value > 4094) {
-            setVlanError(_("VLAN ID must be a number between 1 and 4094"));
+        if (!valStr.trim()) {
+            setVlanInputError(null);
+            updateModel("networkInterface", { vlanId: null });
             return;
         }
-        setVlanError(null);
-        setVlanId(value);
+
+        const value = parseInt(valStr, 10);
+        if (isNaN(value) || value < 1 || value > 4094) {
+            setVlanInputError(_("VLAN ID must be a number between 1 and 4094"));
+            updateModel("networkInterface", { vlanId: null });
+            return;
+        }
+
+        setVlanInputError(null);
+        updateModel("networkInterface", { vlanId: value });
     };
 
     return (
