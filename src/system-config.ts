@@ -5,6 +5,13 @@ import { getDefaultInterface, getDhcpHostname, applyNetworkConfiguration } from 
 import { getNtpServers, configureNtpServers, closeServerTime } from "./services/ntp";
 import { applyProxyConfiguration } from "./services/proxy";
 import { applyLabelsConfiguration } from "./services/labels";
+import {
+    CONFIG_ACTION_IDS,
+    indexedActionId,
+    makeStepAction,
+    type StepAction,
+    type SystemConfigurationApplyResult,
+} from "./wizard/enrollment-progress-types";
 
 export interface SystemInfo {
     hostname: string;
@@ -53,27 +60,37 @@ export class SystemConfigurationService {
         networkManager: NetworkManagerModel | undefined,
         model: Model,
         options?: { skipNetwork?: boolean; skipActivation?: boolean }
-    ): Promise<{ success: boolean; results: string[]; singleNic: boolean }> {
-        const allResults: string[] = [];
+    ): Promise<SystemConfigurationApplyResult> {
+        const actions: StepAction[] = [];
         let hasErrors = false;
         let singleNic = false;
 
-        // 1. Apply hostname
         if (model.hostname.value && model.hostname.value.trim()) {
             try {
                 await setHostname(model.hostname.value);
-                allResults.push(`✓ Hostname set to: ${model.hostname.value}`);
+                actions.push(
+                    makeStepAction(
+                        CONFIG_ACTION_IDS.HOSTNAME,
+                        `Hostname set to: ${model.hostname.value}`,
+                        "success"
+                    )
+                );
             } catch (error) {
-                allResults.push(`✗ ${String(error)}`);
+                actions.push(
+                    makeStepAction(CONFIG_ACTION_IDS.HOSTNAME, String(error), "error")
+                );
                 hasErrors = true;
             }
         } else {
-            allResults.push("- Hostname: No changes required");
+            actions.push(
+                makeStepAction(CONFIG_ACTION_IDS.HOSTNAME_UNCHANGED, "Hostname: No changes required", "success")
+            );
         }
 
-        // 2. Apply network configuration
         if (options?.skipNetwork) {
-            allResults.push("- Network: deferred to systemd-run transient unit");
+            actions.push(
+                makeStepAction(CONFIG_ACTION_IDS.NETWORK_DEFERRED, "Network: deferred to systemd-run transient unit", "success")
+            );
         } else if (model.networkInterface.selectedInterface && networkManager) {
             try {
                 const networkApplyResult = await applyNetworkConfiguration(
@@ -81,49 +98,54 @@ export class SystemConfigurationService {
                     model,
                     options?.skipActivation
                 );
-                networkApplyResult.results.forEach((result) => allResults.push(`✓ ${result}`));
+                actions.push(...networkApplyResult.actions);
                 singleNic = networkApplyResult.singleNic;
             } catch (error) {
-                allResults.push(`✗ ${String(error)}`);
+                actions.push(
+                    makeStepAction(CONFIG_ACTION_IDS.NETWORK_UNAVAILABLE, String(error), "error")
+                );
                 hasErrors = true;
             }
         } else {
-            allResults.push("- Network: No interface selected or NetworkManager unavailable");
+            actions.push(
+                makeStepAction(
+                    CONFIG_ACTION_IDS.NETWORK_NO_INTERFACE,
+                    "Network: No interface selected or NetworkManager unavailable",
+                    "success"
+                )
+            );
         }
 
-        // 3. Apply NTP configuration
         try {
-            const ntpResults = await configureNtpServers(
+            const ntpActions = await configureNtpServers(
                 model.networkServices.ntp.servers,
                 model.networkServices.ntp.autoConfig
             );
-            ntpResults.forEach((result) => allResults.push(`✓ ${result}`));
+            actions.push(...ntpActions);
         } catch (error) {
-            allResults.push(`✗ ${String(error)}`);
+            actions.push(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.NTP, 0), String(error), "error"));
             hasErrors = true;
         }
 
-        // 4. Apply proxy configuration
         try {
-            const proxyResults = await applyProxyConfiguration(model.networkServices.proxy);
-            proxyResults.forEach((result) => allResults.push(`✓ ${result}`));
+            const proxyActions = await applyProxyConfiguration(model.networkServices.proxy);
+            actions.push(...proxyActions);
         } catch (error) {
-            allResults.push(`✗ ${String(error)}`);
+            actions.push(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.PROXY, 0), String(error), "error"));
             hasErrors = true;
         }
 
-        // 5. Apply labels configuration
         try {
-            const labelResults = await applyLabelsConfiguration(model.labels, model.alias, model.hostname.value);
-            labelResults.forEach((result) => allResults.push(`✓ ${result}`));
+            const labelActions = await applyLabelsConfiguration(model.labels, model.alias, model.hostname.value);
+            actions.push(...labelActions);
         } catch (error) {
-            allResults.push(`✗ ${String(error)}`);
+            actions.push(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.LABELS, 0), String(error), "error"));
             hasErrors = true;
         }
 
         return {
             success: !hasErrors,
-            results: allResults,
+            actions,
             singleNic,
         };
     }

@@ -3,8 +3,11 @@ import cockpit from "cockpit";
 
 import { Bullseye } from "@patternfly/react-core/dist/esm/layouts/Bullseye/Bullseye";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
-import { EmptyState, EmptyStateVariant } from "@patternfly/react-core/dist/esm/components/EmptyState/index.js";
-import { EmptyStateBody } from "@patternfly/react-core/dist/esm/components/EmptyState/index.js";
+import {
+    EmptyState,
+    EmptyStateBody,
+    EmptyStateVariant,
+} from "@patternfly/react-core/dist/esm/components/EmptyState/index.js";
 import { Flex } from "@patternfly/react-core/dist/esm/layouts/Flex/Flex";
 import { FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/FlexItem";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";

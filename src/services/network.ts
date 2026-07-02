@@ -4,10 +4,23 @@ import { Model } from "../model-context";
 import { ONBOARDING_PROFILE_PREFIX } from "../paths";
 import { waitForProxy, waitForProxyWithTimeout } from "./dbus-helpers";
 import { WifiSecurity } from "../types.js";
+import {
+    CONFIG_ACTION_IDS,
+    indexedActionId,
+    makeStepAction,
+    type ActionResult,
+    type StepAction,
+} from "../wizard/enrollment-progress-types";
 
 export interface NetworkApplyResult {
-    results: string[];
+    actions: StepAction[];
     singleNic: boolean;
+}
+
+const NETWORK_ACTION_PREFIX = "config-network";
+
+function pushNetworkAction(actions: StepAction[], actionTitle: string, result: ActionResult = "success"): void {
+    actions.push(makeStepAction(indexedActionId(NETWORK_ACTION_PREFIX, actions.length), actionTitle, result));
 }
 
 interface IpAddressData {
@@ -460,16 +473,16 @@ export async function applyNetworkConfiguration(
     model: Model,
     skipActivation = false
 ): Promise<NetworkApplyResult> {
-    const results: string[] = [];
+    const actions: StepAction[] = [];
 
     if (!networkManager) {
-        results.push("NetworkManager unavailable");
-        return { results, singleNic: false };
+        pushNetworkAction(actions, "NetworkManager unavailable", "error");
+        return { actions, singleNic: false };
     }
 
     if (!model.networkInterface.selectedInterface) {
-        results.push("No network interface selected");
-        return { results, singleNic: false };
+        pushNetworkAction(actions, "No network interface selected", "error");
+        return { actions, singleNic: false };
     }
 
     const ifaceName = model.networkInterface.selectedInterface;
@@ -521,7 +534,7 @@ export async function applyNetworkConfiguration(
                 if (isActive) {
                     console.log(`Stopping WiFi AP on ${ifaceName} before applying network config`);
                     await cockpit.spawn(["sudo", "systemctl", "stop", wifiApUnit], { err: "message" });
-                    results.push(`Stopped WiFi AP on ${ifaceName}`);
+                    pushNetworkAction(actions, `Stopped WiFi AP on ${ifaceName}`);
                 }
             } catch (apError) {
                 console.warn("Failed to stop WiFi AP service:", apError);
@@ -549,11 +562,11 @@ export async function applyNetworkConfiguration(
                 [settings]
             );
 
-            results.push(`Created new connection profile: ${connectionId}`);
+            pushNetworkAction(actions, `Created new connection profile: ${connectionId}`);
             console.log("New connection path:", newConnectionPath);
 
             if (skipActivation) {
-                results.push(`Created profile ${connectionId} (activation deferred to systemd-run)`);
+                pushNetworkAction(actions, `Created profile ${connectionId} (activation deferred to systemd-run)`);
             } else {
                 let devicePath = "/";
                 if (!isVlan) {
@@ -580,7 +593,7 @@ export async function applyNetworkConfiguration(
                     await waitForActivation(nmClient, activeConnPath);
                 }
 
-                results.push(`Activated connection ${connectionId} on ${effectiveIfaceName}`);
+                pushNetworkAction(actions, `Activated connection ${connectionId} on ${effectiveIfaceName}`);
             }
         } catch (networkError) {
             const errorMsg = String(networkError);
@@ -604,27 +617,27 @@ export async function applyNetworkConfiguration(
             const prefixLength = model.networkAddress.ipv4.subnetMask
                 ? subnetMaskToPrefixLength(model.networkAddress.ipv4.subnetMask)
                 : 24;
-            results.push(`IPv4 configured: ${model.networkAddress.ipv4.address}/${prefixLength}`);
+            pushNetworkAction(actions, `IPv4 configured: ${model.networkAddress.ipv4.address}/${prefixLength}`);
         } else if (model.networkAddress.ipv4.method === "disabled") {
-            results.push("IPv4 disabled");
+            pushNetworkAction(actions, "IPv4 disabled");
         } else {
-            results.push("IPv4 configured for automatic (DHCP)");
+            pushNetworkAction(actions, "IPv4 configured for automatic (DHCP)");
         }
 
         if (model.networkAddress.ipv6.method === "static") {
-            results.push(`IPv6 configured: ${model.networkAddress.ipv6.address}`);
+            pushNetworkAction(actions, `IPv6 configured: ${model.networkAddress.ipv6.address}`);
         } else if (model.networkAddress.ipv6.method === "disabled") {
-            results.push("IPv6 disabled");
+            pushNetworkAction(actions, "IPv6 disabled");
         } else if (model.networkAddress.ipv6.method === "dhcp") {
-            results.push("IPv6 configured for stateful DHCPv6");
+            pushNetworkAction(actions, "IPv6 configured for stateful DHCPv6");
         } else {
-            results.push("IPv6 configured for automatic (SLAAC)");
+            pushNetworkAction(actions, "IPv6 configured for automatic (SLAAC)");
         }
     } catch (error) {
         throw new Error(`Network configuration failed: ${String(error)}`);
     }
 
-    return { results, singleNic: isSingleNic };
+    return { actions, singleNic: isSingleNic };
 }
 
 async function deleteOnboardingProfiles(ifaceName?: string): Promise<void> {
@@ -677,17 +690,35 @@ async function deleteOnboardingProfiles(ifaceName?: string): Promise<void> {
     }
 }
 
-export async function rollbackNetworkConfiguration(): Promise<string[]> {
-    const results: string[] = [];
+export async function rollbackNetworkConfiguration(): Promise<StepAction[]> {
+    const actions: StepAction[] = [];
 
     try {
         await deleteOnboardingProfiles();
-        results.push("Rolled back network configuration: deleted onboarding profiles");
-        results.push("NetworkManager will fall back to previous connection automatically");
+        actions.push(
+            makeStepAction(
+                CONFIG_ACTION_IDS.ROLLBACK_PROFILES,
+                "Rolled back network configuration: deleted onboarding profiles",
+                "success"
+            )
+        );
+        actions.push(
+            makeStepAction(
+                CONFIG_ACTION_IDS.ROLLBACK_FALLBACK,
+                "NetworkManager will fall back to previous connection automatically",
+                "success"
+            )
+        );
     } catch (error) {
-        results.push(`Failed to roll back network configuration: ${String(error)}`);
+        actions.push(
+            makeStepAction(
+                CONFIG_ACTION_IDS.ROLLBACK_ERROR,
+                `Failed to roll back network configuration: ${String(error)}`,
+                "error"
+            )
+        );
         console.error("Network rollback error:", error);
     }
 
-    return results;
+    return actions;
 }

@@ -1,5 +1,12 @@
 import cockpit from "cockpit";
 
+import {
+    createActionEmitter,
+    ENROLLMENT_ACTION_IDS,
+    type OnStepAction,
+    type StepExecutionResult,
+} from "../wizard/enrollment-progress-types";
+
 const IPV4_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
 const IPV6_RE = /^[0-9a-fA-F:]+$/;
 
@@ -12,25 +19,26 @@ export interface CancellationSignal {
     process?: cockpit.Spawn<string> | undefined;
 }
 
-export interface ConnectivityResult {
-    success: boolean;
-    output: string;
-}
-
 export async function testNetworkConnectivity(
     testHost: string,
     iface: string | undefined,
     signal?: CancellationSignal,
-    onOutput?: (output: string) => void
-): Promise<ConnectivityResult> {
+    onAction?: OnStepAction
+): Promise<StepExecutionResult> {
+    const { emit, getActions } = createActionEmitter(onAction);
+
     try {
-        // DNS resolution — skip when the host is already an IP address
         if (isIPAddress(testHost)) {
-            onOutput?.("• Host is an IP address, skipping DNS resolution.");
+            emit({
+                id: "dns-skip-ip",
+                actionTitle: "Host is an IP address, skipping DNS resolution.",
+                result: "success",
+            });
         } else {
             try {
                 const dnsLabel = iface ? `${testHost} via ${iface}` : testHost;
-                onOutput?.(`• Resolving ${dnsLabel} via DNS...`);
+                const resolveTitle = `Resolving ${dnsLabel} via DNS`;
+                emit({ id: ENROLLMENT_ACTION_IDS.DNS_RESOLVE, actionTitle: resolveTitle, result: "pending" });
                 const dnsArgs = iface
                     ? ["resolvectl", "query", `--interface=${iface}`, testHost]
                     : ["getent", "hosts", testHost];
@@ -42,7 +50,7 @@ export async function testNetworkConnectivity(
                 if (signal) {
                     signal.process = undefined;
                 }
-                onOutput?.(" Success.");
+                emit({ id: ENROLLMENT_ACTION_IDS.DNS_RESOLVE, actionTitle: resolveTitle, result: "success" });
             } catch (dnsError) {
                 if (signal) {
                     signal.process = undefined;
@@ -53,16 +61,16 @@ export async function testNetworkConnectivity(
                     errorDetail = ` (exit status ${dnsError.exit_status})`;
                 }
 
-                const errorMsg = ` Failed${errorDetail}.\n  Please check network configuration.`;
-                onOutput?.(errorMsg);
-                return { success: false, output: errorMsg };
+                const errorTitle = `DNS resolution failed${errorDetail}. Please check network configuration.`;
+                emit({ id: ENROLLMENT_ACTION_IDS.DNS_RESOLVE, actionTitle: errorTitle, result: "error" });
+                return { success: false, actions: getActions() };
             }
         }
 
-        // Ping bound to the configured interface
         try {
             const pingLabel = iface ? `${testHost} via ${iface}` : testHost;
-            onOutput?.(`• Pinging ${pingLabel}...`);
+            const pingTitle = `Pinging ${pingLabel}`;
+            emit({ id: ENROLLMENT_ACTION_IDS.PING, actionTitle: pingTitle, result: "pending" });
             const pingArgs = ["timeout", "10", "ping", "-c", "1", "-W", "5"];
             if (iface) {
                 pingArgs.push("-I", iface);
@@ -76,16 +84,16 @@ export async function testNetworkConnectivity(
             if (signal) {
                 signal.process = undefined;
             }
-            onOutput?.(" Success.");
-            return { success: true, output: "success" };
+            emit({ id: ENROLLMENT_ACTION_IDS.PING, actionTitle: pingTitle, result: "success" });
+            return { success: true, actions: getActions() };
         } catch (pingError) {
             if (signal) {
                 signal.process = undefined;
             }
             console.warn(`Ping failed for ${testHost}:`, pingError);
-            const warningMsg = " Failed.\n  However, pings may be simply blocked by firewall.";
-            onOutput?.(warningMsg);
-            return { success: true, output: warningMsg };
+            const warningTitle = "Ping failed. However, pings may be simply blocked by firewall.";
+            emit({ id: ENROLLMENT_ACTION_IDS.PING, actionTitle: warningTitle, result: "warning" });
+            return { success: true, actions: getActions() };
         }
     } catch (error) {
         if (signal) {
@@ -94,8 +102,8 @@ export async function testNetworkConnectivity(
         console.error("Connectivity test error:", error);
         const errorMsg = error instanceof Error ? error.message : String(error);
         const fullErrorMsg = `Network connectivity test failed: ${errorMsg}`;
-        onOutput?.(fullErrorMsg);
-        return { success: false, output: fullErrorMsg };
+        emit({ id: "connectivity-error", actionTitle: fullErrorMsg, result: "error" });
+        return { success: false, actions: getActions() };
     }
 }
 
@@ -103,18 +111,19 @@ export async function verifyServiceConnectivity(
     endpoint: string,
     useExisting: boolean,
     signal?: CancellationSignal,
-    onOutput?: (output: string) => void
-): Promise<ConnectivityResult> {
-    if (useExisting) {
-        onOutput?.(
-            "Enrollment credentials are already configured on this device. Verifying connectivity to the server.\n"
-        );
-    }
+    onAction?: OnStepAction
+): Promise<StepExecutionResult> {
+    const { emit, getActions } = createActionEmitter(onAction);
+
+    const credentialTitle = useExisting
+        ? "The connectivity to the server in the existing enrollment credentials will be verified next."
+        : "The connectivity to the server in the new enrollment credentials will be verified next.";
+    emit({ id: ENROLLMENT_ACTION_IDS.CREDENTIAL_SELECTION, actionTitle: credentialTitle, result: "info" });
 
     if (!endpoint) {
         const msg = "No endpoint configured — cannot verify connectivity.";
-        onOutput?.(msg);
-        return { success: false, output: msg };
+        emit({ id: "verify-endpoint-missing", actionTitle: msg, result: "error" });
+        return { success: false, actions: getActions() };
     }
 
     let hostname: string;
@@ -122,16 +131,20 @@ export async function verifyServiceConnectivity(
         hostname = new URL(endpoint).hostname;
     } catch {
         const msg = `Invalid endpoint URL: ${endpoint}`;
-        onOutput?.(msg);
-        return { success: false, output: msg };
+        emit({ id: "verify-endpoint-invalid", actionTitle: msg, result: "error" });
+        return { success: false, actions: getActions() };
     }
 
-    // DNS resolution — skip when the hostname is already an IP address
     if (isIPAddress(hostname)) {
-        onOutput?.("• Host is an IP address, skipping DNS resolution.");
+        emit({
+            id: "dns-skip-ip",
+            actionTitle: "Host is an IP address, skipping DNS resolution.",
+            result: "success",
+        });
     } else {
         try {
-            onOutput?.(`• Resolving ${hostname}...`);
+            const resolveTitle = `Resolving ${hostname}`;
+            emit({ id: ENROLLMENT_ACTION_IDS.DNS_RESOLVE, actionTitle: resolveTitle, result: "pending" });
             const dnsProc = cockpit.spawn(["getent", "hosts", hostname], { err: "ignore" });
             if (signal) {
                 signal.process = dnsProc;
@@ -140,20 +153,20 @@ export async function verifyServiceConnectivity(
             if (signal) {
                 signal.process = undefined;
             }
-            onOutput?.(" Success.");
+            emit({ id: ENROLLMENT_ACTION_IDS.DNS_RESOLVE, actionTitle: resolveTitle, result: "success" });
         } catch {
             if (signal) {
                 signal.process = undefined;
             }
-            const msg = ` Failed.\n  Cannot resolve ${hostname}. Check DNS configuration.`;
-            onOutput?.(msg);
-            return { success: false, output: msg };
+            const msg = `Cannot resolve ${hostname}. Check DNS configuration.`;
+            emit({ id: ENROLLMENT_ACTION_IDS.DNS_RESOLVE, actionTitle: msg, result: "error" });
+            return { success: false, actions: getActions() };
         }
     }
 
-    // HTTPS connection test
     try {
-        onOutput?.(`• Connecting to ${endpoint}...`);
+        const connectTitle = `Connecting to ${endpoint}`;
+        emit({ id: ENROLLMENT_ACTION_IDS.CONNECT_ENDPOINT, actionTitle: connectTitle, result: "pending" });
         const curlProc = cockpit.spawn(
             [
                 "curl",
@@ -176,14 +189,15 @@ export async function verifyServiceConnectivity(
         if (signal) {
             signal.process = undefined;
         }
-        onOutput?.(" Success.");
-        return { success: true, output: "Connectivity verified" };
+
+        emit({ id: ENROLLMENT_ACTION_IDS.CONNECT_ENDPOINT, actionTitle: connectTitle, result: "success" });
+        return { success: true, actions: getActions() };
     } catch {
         if (signal) {
             signal.process = undefined;
         }
-        const msg = ` Failed.\n  Cannot connect to ${endpoint}. The server may be unreachable.`;
-        onOutput?.(msg);
-        return { success: false, output: msg };
+        const msg = `Cannot connect to ${endpoint}. The server may be unreachable.`;
+        emit({ id: ENROLLMENT_ACTION_IDS.CONNECT_ENDPOINT, actionTitle: msg, result: "error" });
+        return { success: false, actions: getActions() };
     }
 }

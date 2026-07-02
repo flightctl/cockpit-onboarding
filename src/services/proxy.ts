@@ -1,14 +1,21 @@
 import { SCRIPT_PROXY } from "../paths";
 import type { ProxyConfig } from "../types";
 import { spawnWithParamsFile } from "./spawn-helpers";
+import {
+    CONFIG_ACTION_IDS,
+    indexedActionId,
+    makeStepAction,
+    type StepAction,
+} from "../wizard/enrollment-progress-types";
 
-export async function applyProxyConfiguration(proxy: ProxyConfig): Promise<string[]> {
-    // TODO: Review backend wiring for proxy.applyForHttps (apply-proxy.sh).
-    const results: string[] = [];
+export async function applyProxyConfiguration(proxy: ProxyConfig): Promise<StepAction[]> {
+    const actions: StepAction[] = [];
 
     if (!proxy.enabled || !proxy.hostname || !proxy.port) {
-        results.push("Proxy: No changes required");
-        return results;
+        actions.push(
+            makeStepAction(indexedActionId(CONFIG_ACTION_IDS.PROXY, 0), "Proxy: No changes required", "success")
+        );
+        return actions;
     }
 
     const params: Record<string, string | number> = {
@@ -38,10 +45,16 @@ export async function applyProxyConfiguration(proxy: ProxyConfig): Promise<strin
 
     try {
         await spawnWithParamsFile(SCRIPT_PROXY, params, ".proxy-params-");
-        results.push(`Proxy configured: ${proxy.protocol}://${proxy.hostname}:${proxy.port}`);
+        actions.push(
+            makeStepAction(
+                indexedActionId(CONFIG_ACTION_IDS.PROXY, 0),
+                `Proxy configured: ${proxy.protocol}://${proxy.hostname}:${proxy.port}`,
+                "success"
+            )
+        );
     } catch (error) {
         throw new Error(`Proxy configuration failed: ${String(error)}`);
     }
 
-    return results;
+    return actions;
 }

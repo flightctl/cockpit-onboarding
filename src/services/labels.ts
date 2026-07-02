@@ -5,6 +5,7 @@ import type { GenericLabel, LabelsState } from "../types";
 import type { AliasState } from "../model-context";
 import { resolveAliasValue, ALIAS_LABEL_KEY } from "./alias";
 import { spawnWithParamsFile } from "./spawn-helpers";
+import { CONFIG_ACTION_IDS, indexedActionId, makeStepAction, type StepAction } from "../wizard/enrollment-progress-types";
 
 const _ = cockpit.gettext;
 
@@ -22,8 +23,8 @@ export async function applyLabelsConfiguration(
     labels: LabelsState,
     alias: AliasState,
     hostname: string
-): Promise<string[]> {
-    const results: string[] = [];
+): Promise<StepAction[]> {
+    const actions: StepAction[] = [];
 
     const defaultLabels = buildLabelMap(labels.deviceLabels);
     const deviceAlias = resolveAliasValue(alias, hostname);
@@ -37,8 +38,8 @@ export async function applyLabelsConfiguration(
     const systemInfoCount = Object.keys(systemInfoLabels).length;
 
     if (defaultCount === 0 && systemInfoCount === 0) {
-        results.push(_("Labels: No changes required"));
-        return results;
+        actions.push(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.LABELS, 0), _("Labels: No changes required"), "success"));
+        return actions;
     }
 
     const params = {
@@ -49,23 +50,32 @@ export async function applyLabelsConfiguration(
     try {
         await spawnWithParamsFile(SCRIPT_LABELS, params, ".labels-params-");
 
+        let actionIndex = 0;
         if (defaultCount > 0) {
-            results.push(
-                cockpit.format(
-                    cockpit.ngettext("Applied $0 default label", "Applied $0 default labels", defaultCount),
-                    defaultCount
+            actions.push(
+                makeStepAction(
+                    indexedActionId(CONFIG_ACTION_IDS.LABELS, actionIndex++),
+                    cockpit.format(
+                        cockpit.ngettext("Applied $0 default label", "Applied $0 default labels", defaultCount),
+                        defaultCount
+                    ),
+                    "success"
                 )
             );
         }
         if (systemInfoCount > 0) {
-            results.push(
-                cockpit.format(
-                    cockpit.ngettext(
-                        "Applied $0 system-info mapping",
-                        "Applied $0 system-info mappings",
+            actions.push(
+                makeStepAction(
+                    indexedActionId(CONFIG_ACTION_IDS.LABELS, actionIndex),
+                    cockpit.format(
+                        cockpit.ngettext(
+                            "Applied $0 system-info mapping",
+                            "Applied $0 system-info mappings",
+                            systemInfoCount
+                        ),
                         systemInfoCount
                     ),
-                    systemInfoCount
+                    "success"
                 )
             );
         }
@@ -73,5 +83,5 @@ export async function applyLabelsConfiguration(
         throw new Error(cockpit.format(_("Labels configuration failed: $0"), String(error)));
     }
 
-    return results;
+    return actions;
 }
