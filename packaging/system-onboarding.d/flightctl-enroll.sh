@@ -21,6 +21,11 @@
 # See: specs/001-system-onboarding/contracts/enrollment-api.md
 set -euo pipefail
 
+# systemd-run transient units and sudo do not always set HOME. flightctl login
+# still resolves the default config path via os.UserConfigDir() even when
+# --config-dir is provided.
+export HOME="${HOME:-/root}"
+
 # Load enrollment parameters from JSON file (passed as $1 by the executor).
 # sudo sanitizes the environment, so env vars set via cockpit.spawn's environ
 # option won't reach this script. Parameters are passed via a temp file instead.

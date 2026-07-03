@@ -21,9 +21,27 @@
 # }
 set -euo pipefail
 
+# systemd-run transient units do not set HOME; child scripts and tools may need it.
+export HOME="${HOME:-/root}"
+
 LOG_FILE="/var/log/cockpit-system-onboarding-apply.log"
+WATCHDOG_STATUS_FILE="/var/lib/cockpit-system-onboarding/.watchdog-status"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$LOG_FILE"; }
+
+write_app_failure_status() {
+    local message="$1"
+    local timestamp
+    timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    mkdir -p "$(dirname "$WATCHDOG_STATUS_FILE")"
+    cat > "$WATCHDOG_STATUS_FILE" <<EOF
+{
+  "status": "app_failure",
+  "message": "${message}",
+  "timestamp": "${timestamp}"
+}
+EOF
+}
 
 # Allowed directories for enrollment scripts — must match sudoers entries
 ALLOWED_SCRIPT_DIRS=(
@@ -207,6 +225,7 @@ if [ "$SCRIPT_COUNT" -gt 0 ]; then
         log "Running enrollment script: $SCRIPT_PATH"
         if ! "$SCRIPT_PATH" "$SCRIPT_PARAMS"; then
             log "ERROR: Enrollment script failed: $SCRIPT_PATH"
+            write_app_failure_status "Enrollment script failed: ${SCRIPT_PATH}"
             rm -f "$SCRIPT_PARAMS"
             exit 1
         fi

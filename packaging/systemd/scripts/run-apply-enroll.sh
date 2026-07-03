@@ -33,6 +33,7 @@ exec systemd-run \
     "--unit=${UNIT_NAME}" \
     '--property=Type=oneshot' \
     '--remain-after-exit' \
+    '--property=Environment=HOME=/root' \
     '--' \
     "$APPLY_SCRIPT" \
     "$PARAMS_FILE"
