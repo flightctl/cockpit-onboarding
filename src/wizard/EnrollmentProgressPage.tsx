@@ -101,6 +101,24 @@ const StepActionRow: React.FunctionComponent<{ action: StepAction }> = ({ action
     </Flex>
 );
 
+const getNextEnrollmentStepId = (steps: Step[], afterStepId: string | null): string | null => {
+    const startIndex = afterStepId ? steps.findIndex((step) => step.id === afterStepId) + 1 : 0;
+    const nextStep = steps.slice(Math.max(0, startIndex)).find((step) => step.status !== "success");
+    return nextStep?.id ?? null;
+};
+
+const findEnrollmentStep = (steps: Step[]): Step | undefined =>
+    steps.find((step) => step.id.startsWith("enroll-")) ??
+    steps.find((step) => step.id === `enroll-${FLIGHTCTL_SERVICE_ID}`);
+
+const findOrphanActionStep = (steps: Step[]): Step | undefined =>
+    steps.find((step) => step.status === "failed") ??
+    findEnrollmentStep(steps) ??
+    steps.find((step) => step.status === "delegated");
+
+const isBackgroundEnrollmentFailure = (item: EnrollmentProgressResultItem): boolean =>
+    item.type === "action" && item.action.id.startsWith("background-enrollment-failure-");
+
 const groupResultsByStep = (
     steps: Step[],
     results: EnrollmentProgressResultItem[]
@@ -117,20 +135,25 @@ const groupResultsByStep = (
                 continue;
             }
 
-            const targetStepId = currentStepId ?? steps.find((step) => step.status === "delegated")?.id ?? steps[0]?.id;
-            if (targetStepId) {
-                groups[targetStepId].push(item);
-            }
+            currentStepId = getNextEnrollmentStepId(steps, currentStepId);
             continue;
+        }
+
+        if (isBackgroundEnrollmentFailure(item)) {
+            const enrollStep = findEnrollmentStep(steps);
+            if (enrollStep) {
+                groups[enrollStep.id].push(item);
+                continue;
+            }
         }
 
         if (currentStepId) {
             groups[currentStepId].push(item);
-        } else if (item.type === "action") {
-            const targetStep =
-                steps.find((step) => step.status === "failed") ??
-                steps.find((step) => step.status === "delegated") ??
-                steps.find((step) => step.id === `enroll-${FLIGHTCTL_SERVICE_ID}`);
+            continue;
+        }
+
+        if (item.type === "action") {
+            const targetStep = findOrphanActionStep(steps);
             if (targetStep) {
                 groups[targetStep.id].push(item);
             }
@@ -720,21 +743,49 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             }
             delegatedFailureHandledRef.current = true;
             setDelegatedFailureMessage(message);
-            setSteps((prev) => prev.map((s) => (s.status === "delegated" ? { ...s, status: "failed" } : s)));
-            setResults((prev) => {
-                const failureLines = message
-                    .split("\n")
-                    .map((line) => line.trim())
-                    .filter((line) => line.length > 0);
-                const failureActions: EnrollmentProgressResultItem[] = failureLines.map((line, index) => ({
-                    type: "action",
-                    action: {
-                        id: `background-enrollment-failure-${index}`,
-                        actionTitle: line,
-                        result: "error",
-                    },
-                }));
-                return [...prev, ...failureActions];
+            const failureLines = message
+                .split("\n")
+                .map((line) => line.trim())
+                .filter((line) => line.length > 0);
+            setSteps((prevSteps) => {
+                setResults((prevResults) => {
+                    const updated: EnrollmentProgressResultItem[] = [...prevResults];
+                    updated.push({ type: "header", content: _("Testing network connectivity") });
+                    updated.push({
+                        type: "action",
+                        action: makeStepAction(
+                            ENROLLMENT_ACTION_IDS.BACKGROUND_CONNECTIVITY_CONFIRMED,
+                            _("Network connectivity confirmed"),
+                            "success"
+                        ),
+                    });
+
+                    const enrollStep = prevSteps.find((step) => step.id.startsWith("enroll-"));
+                    if (enrollStep) {
+                        updated.push({ type: "header", content: enrollStep.name });
+                    }
+
+                    failureLines.forEach((line, index) => {
+                        updated.push({
+                            type: "action",
+                            action: makeStepAction(`background-enrollment-failure-${index}`, line, "error"),
+                        });
+                    });
+                    return updated;
+                });
+
+                return prevSteps.map((step) => {
+                    if (step.id === "test-connectivity") {
+                        return { ...step, status: "success" as const };
+                    }
+                    if (step.id.startsWith("enroll-")) {
+                        return { ...step, status: "failed" as const };
+                    }
+                    if (step.id === "finalize" && step.status === "delegated") {
+                        return { ...step, status: "pending" as const };
+                    }
+                    return step;
+                });
             });
             updateModel("enrollmentProgress", { executionState: "failed" });
         };
