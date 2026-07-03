@@ -441,7 +441,13 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             const configResult = await systemConfigurationService.applySystemConfiguration(networkManager, model, {
                 skipNetwork: true,
             });
-            if (!configResult.success) {
+            if (configResult.success) {
+                onAction({
+                    id: ENROLLMENT_ACTION_IDS.APPLY_HOSTNAME_NTP,
+                    actionTitle: _("Applying hostname and NTP configuration"),
+                    result: "success",
+                });
+            } else {
                 onAction({
                     id: ENROLLMENT_ACTION_IDS.APPLY_HOSTNAME_NTP,
                     actionTitle: _("Failed to apply hostname/NTP configuration"),
@@ -452,6 +458,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 updateModel("enrollmentProgress", { executionState: "failed" });
                 return;
             }
+
             configResult.actions.forEach((action) => onAction(action));
 
             const deferredTitle = _("Creating network profile (activation deferred)");
@@ -530,14 +537,21 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         setResults([...resultsBuffer]);
 
         try {
-            await cockpit.spawn(["sudo", SCRIPT_RUN_APPLY_ENROLL, masterParamsFile], { err: "out" });
+            await cockpit.spawn(["sudo", SCRIPT_RUN_APPLY_ENROLL, masterParamsFile], { err: "message" });
         } catch (error) {
             console.error("Failed to launch systemd-run:", error);
+            const errorMsg = error instanceof Error ? error.message : String(error);
             onAction({
                 id: "single-nic-launch-error",
-                actionTitle: `Failed to launch background service: ${String(error)}`,
+                actionTitle: cockpit.format(
+                    _(
+                        "Configuration was applied, but network activation and enrollment could not be started in the background. $0"
+                    ),
+                    errorMsg || _("No additional error details were returned.")
+                ),
                 result: "error",
             });
+
             for (const f of tempFilesToCleanup) {
                 cockpit.spawn(["rm", "-f", f], { err: "message" }).catch(() => {});
             }
@@ -751,10 +765,8 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             <StackItem>
                 <Card>
                     <CardBody>
-                        <Title headingLevel="h3" size="md">
-                            {_("Overall Progress")}
-                        </Title>
                         <Progress
+                            title={_("Overall progress")}
                             value={overallProgress}
                             size="lg"
                             variant={executionState === "failed" ? "danger" : "success"}
