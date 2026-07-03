@@ -26,6 +26,7 @@ import {
 } from "@patternfly/react-icons";
 
 import { useModelContext } from "../model-context";
+import { useConfig } from "../app";
 import { systemConfigurationService } from "../system-config";
 import { getHostnameInfo } from "../services/hostname";
 import { getSetupInterface, applyNetworkConfiguration, rollbackNetworkConfiguration } from "../services/network";
@@ -37,7 +38,7 @@ import { testNetworkConnectivity, verifyServiceConnectivity, CancellationSignal 
 import { buildEnrollmentParams, executeEnrollmentScript, finalizeEnrollment } from "../services/enrollment";
 import { createSecureTempFile } from "../services/spawn-helpers";
 import { Interface } from "../../pkg/networkmanager/interfaces.js";
-import { FLIGHTCTL_SCRIPT_PATH, FLIGHTCTL_SERVICE_ID, FLIGHTCTL_SERVICE_NAME } from "../flightctl-enrollment";
+import { FLIGHTCTL_SCRIPT_PATH, FLIGHTCTL_SERVICE_ID, getBrandName } from "../flightctl-enrollment";
 import {
     ENROLLMENT_ACTION_IDS,
     ENROLLMENT_STEP_PAUSE_MS,
@@ -163,6 +164,8 @@ const getStepStatusLabel = (status: StepStatus): string | null => {
 export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized?: boolean }> = ({
     isApplyAuthorized = false,
 }) => {
+    const { config } = useConfig();
+    const brandName = getBrandName(config);
     const { model, updateModel, networkManager, cancelEnrollmentRef } = useModelContext();
     const [hasStarted, setHasStarted] = useState(false);
     const [isEnrollmentSelected, setIsEnrollmentSelected] = useState(false);
@@ -252,8 +255,8 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 initialSteps.push({
                     id: `enroll-${FLIGHTCTL_SERVICE_ID}`,
                     name: isUsingExisting
-                        ? cockpit.format(_("Verifying connectivity to $0"), FLIGHTCTL_SERVICE_NAME)
-                        : cockpit.format(_("Enrolling into $0"), FLIGHTCTL_SERVICE_NAME),
+                        ? cockpit.format(_("Verifying connectivity to $0"), brandName)
+                        : cockpit.format(_("Enrolling into $0"), brandName),
                     status: "pending",
                     isBuiltIn: false,
                 });
@@ -322,7 +325,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                             return await verifyServiceConnectivity(endpoint, true, signalRef.current, onAction);
                         }
 
-                        const params = buildEnrollmentParams(model);
+                        const params = buildEnrollmentParams(model, brandName);
                         return await executeEnrollmentScript(
                             FLIGHTCTL_SCRIPT_PATH,
                             params,
@@ -487,7 +490,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         if (isEnrollmentSelected) {
             const enrollment = model.enrollment;
             if (!enrollment.useExisting) {
-                const params = buildEnrollmentParams(model);
+                const params = buildEnrollmentParams(model, brandName);
                 const pf = await createSecureTempFile(JSON.stringify(params), `.enrollment-${FLIGHTCTL_SERVICE_ID}-`);
                 tempFilesToCleanup.push(pf);
                 enrollmentScriptEntries.push({ scriptPath: FLIGHTCTL_SCRIPT_PATH, paramsFile: pf });
@@ -796,7 +799,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                                                         className="pf-v6-u-ml-sm"
                                                         onClick={() => window.open(step.deviceUrl, "_blank")}
                                                     >
-                                                        {_("View in the Flight Control UI")}
+                                                        {cockpit.format(_("View in the $0 UI"), brandName)}
                                                     </Button>
                                                 )}
                                             </FlexItem>

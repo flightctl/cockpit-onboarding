@@ -21,6 +21,7 @@ import { Icon } from "@patternfly/react-core/dist/esm/components/Icon";
 
 import { AliasMode, useModelContext } from "../model-context";
 import { useConfig } from "../app";
+import { getBrandName } from "../flightctl-enrollment";
 import { getSetupInterface } from "../services/network";
 import { resolveAliasValue } from "../services/alias";
 import { WIZARD_STEP_IDS, type WizardStepId } from "./WizardSteps";
@@ -115,9 +116,11 @@ const ReviewLabelGroup = ({ labels, compareKeys, emptyLabel }: ReviewLabelGroupP
 const EnrollmentCardBody = ({
     enrollment,
     defaultEndpoint,
+    brandName,
 }: {
     enrollment: ServiceEnrollmentConfig;
     defaultEndpoint: string | undefined;
+    brandName: string;
 }) => {
     const { selected, useExisting, credentials } = enrollment;
     if (!selected) {
@@ -146,7 +149,7 @@ const EnrollmentCardBody = ({
                 </DescriptionListGroup>
             )}
             <DescriptionListGroup>
-                <DescriptionListTerm>{_("Flight Control server")}</DescriptionListTerm>
+                <DescriptionListTerm>{cockpit.format(_("$0 server"), brandName)}</DescriptionListTerm>
                 <DescriptionListDescription>{enrollmentEndpoint}</DescriptionListDescription>
             </DescriptionListGroup>
         </>
@@ -204,6 +207,7 @@ const ReviewSectionCard = ({
 export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelectedEnrollments }) => {
     const { model, networkManager } = useModelContext();
     const { config } = useConfig();
+    const brandName = getBrandName(config);
 
     const interfaces = networkManager?.list_interfaces() || [];
     const setupIface = getSetupInterface(interfaces);
@@ -448,6 +452,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
                             <EnrollmentCardBody
                                 enrollment={model.enrollment}
                                 defaultEndpoint={config?.flightctl?.defaultEndpoint}
+                                brandName={brandName}
                             />
                         </ReviewSectionCard>
                     </StackItem>

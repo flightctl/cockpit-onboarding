@@ -9,9 +9,15 @@ export type {
 
 export const FLIGHTCTL_SERVICE_ID = "flightctl";
 
-export const FLIGHTCTL_SERVICE_NAME = "Flight Control";
+export const DEFAULT_BRAND_NAME = "Flight Control";
 
-export const FLIGHTCTL_DESCRIPTION = "Enroll this device into Flight Control fleet management";
+/** @deprecated Use getBrandName(config) for runtime branding */
+export const FLIGHTCTL_SERVICE_NAME = DEFAULT_BRAND_NAME;
+
+export function getBrandName(config?: { brandName?: string } | null): string {
+    const name = config?.brandName?.trim();
+    return name || DEFAULT_BRAND_NAME;
+}
 
 export const FLIGHTCTL_SCRIPT_PATH = "/usr/share/cockpit/system-onboarding/system-onboarding.d/flightctl-enroll.sh";
 
@@ -21,11 +27,15 @@ export interface FlightctlServiceDescriptor {
     scriptPath: string;
 }
 
-export const defaultFlightctlServiceDescriptor: FlightctlServiceDescriptor = {
-    id: FLIGHTCTL_SERVICE_ID,
-    name: FLIGHTCTL_SERVICE_NAME,
-    scriptPath: FLIGHTCTL_SCRIPT_PATH,
-};
+export function getFlightctlServiceDescriptor(config?: { brandName?: string } | null): FlightctlServiceDescriptor {
+    return {
+        id: FLIGHTCTL_SERVICE_ID,
+        name: getBrandName(config),
+        scriptPath: FLIGHTCTL_SCRIPT_PATH,
+    };
+}
+
+export const defaultFlightctlServiceDescriptor = getFlightctlServiceDescriptor();
 
 export function isFlightctlAuthMethod(value: unknown): value is FlightctlAuthMethod {
     return value === "token" || value === "password";
