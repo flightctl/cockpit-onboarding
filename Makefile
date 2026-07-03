@@ -209,6 +209,10 @@ $(NODE_MODULES_STAMP): package.json package-lock.json
 deploy-test-vm:
 	hack/deploy-test-vm.sh
 
+install-flightctl-on-vm:
+	@test -n "$(VM_IP)" || (echo "Usage: make install-flightctl-on-vm VM_IP=<vm-ip>" >&2; exit 1)
+	hack/install-flightctl-on-vm.sh "$(VM_IP)"
+
 clean-test-vm:
 	hack/clean-test-vm.sh
 
@@ -239,9 +243,10 @@ help:
 	@echo ""
 	@echo "VM targets:"
 	@echo "  deploy-test-vm   Create a Fedora test VM with WiFi simulation"
+	@echo "  install-flightctl-on-vm  Install flightctl RPMs on an existing test VM (VM_IP=<ip>)"
 	@echo "  clean-test-vm    Destroy the test VM and clean up"
 	@echo ""
 	@echo "i18n targets:"
 	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check vm print-vm deploy-test-vm clean-test-vm help
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check vm print-vm deploy-test-vm install-flightctl-on-vm clean-test-vm help

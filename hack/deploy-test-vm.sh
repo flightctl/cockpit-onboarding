@@ -222,6 +222,9 @@ provision_vm() {
     echo "Installing RPM on VM..."
     run_ssh "${vm_ip}" "sudo dnf install -y /tmp/${rpm_basename}"
 
+    echo "Installing Flight Control agent and CLI..."
+    "${SCRIPT_DIR}/install-flightctl-on-vm.sh" "${vm_ip}"
+
     echo "Enabling and starting cockpit and onboarding setup..."
     run_ssh "${vm_ip}" "sudo systemctl enable --now cockpit.socket"
     run_ssh "${vm_ip}" "sudo systemctl enable --now cockpit-system-onboarding-setup.service"
