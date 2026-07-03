@@ -30,7 +30,7 @@ import { systemConfigurationService } from "../system-config";
 import { getHostnameInfo } from "../services/hostname";
 import { getSetupInterface, applyNetworkConfiguration, rollbackNetworkConfiguration } from "../services/network";
 import { writeAttemptedMarker } from "../attempted-marker";
-import { SCRIPT_RUN_APPLY_ENROLL } from "../paths";
+import { SCRIPT_RUN_APPLY_ENROLL, MARKER_COMPLETE } from "../paths";
 import { SubtleHeading } from "../components/Headings.js";
 import { armWatchdog, disarmWatchdog, readWatchdogStatus } from "../services/watchdog";
 import { testNetworkConnectivity, verifyServiceConnectivity, CancellationSignal } from "../services/connectivity";
@@ -558,7 +558,11 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         }
 
         setSingleNic(true);
-        updateModel("enrollmentProgress", { executionState: "success", overallProgress: 100 });
+        updateModel("enrollmentProgress", {
+            executionState: "success",
+            overallProgress: 100,
+            backgroundCompletion: true,
+        });
     };
 
     // Main execution function
@@ -751,6 +755,31 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
     }, [singleNic, executionState, updateModel]);
 
     useEffect(() => {
+        if (!singleNic || executionState !== "success") {
+            return;
+        }
+
+        const markerFile = cockpit.file(MARKER_COMPLETE, { superuser: "try" });
+        const checkCompletionMarker = () => {
+            markerFile
+                .read()
+                .then((content) => {
+                    if (content !== null) {
+                        window.location.reload();
+                    }
+                })
+                .catch(() => {});
+        };
+
+        checkCompletionMarker();
+        const intervalId = window.setInterval(checkCompletionMarker, 3000);
+        return () => {
+            window.clearInterval(intervalId);
+            markerFile.close();
+        };
+    }, [singleNic, executionState]);
+
+    useEffect(() => {
         if (!activeStepId) {
             return;
         }
@@ -924,9 +953,15 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                                 title={_("Onboarding continues in the background")}
                                 className="pf-v6-u-mt-md"
                             >
-                                {_(
-                                    "Network activation and enrollment have been delegated to a background service. Your browser connection will be lost when the new network configuration is applied. Check /var/log/cockpit-system-onboarding-apply.log on the device for progress."
-                                )}
+                                {(() => {
+                                    const hostname = model.hostname.value?.trim() || _("this device");
+                                    return cockpit.format(
+                                        _(
+                                            "Network activation and enrollment continue in the background. Your browser connection will be lost when the new network configuration is applied. You do not need to click Finish — onboarding completes automatically. When the network is ready, open Cockpit again at https://$0:9090 using a system account. The temporary onboarding account is removed when setup finishes. Progress is logged to /var/log/cockpit-system-onboarding-apply.log."
+                                        ),
+                                        hostname
+                                    );
+                                })()}
                             </Alert>
                         )}
                     </CardBody>
