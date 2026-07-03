@@ -612,9 +612,7 @@ export const ModelProvider: React.FunctionComponent<{
                 wifiBand: previousAttempt.networkInterface?.wifiBand ?? prev.networkInterface.wifiBand,
                 vlanEnabled:
                     previousAttempt.networkInterface?.vlanEnabled ??
-                    (previousAttempt.networkInterface?.vlanId != null
-                        ? true
-                        : prev.networkInterface.vlanEnabled),
+                    (previousAttempt.networkInterface?.vlanId != null ? true : prev.networkInterface.vlanEnabled),
                 vlanId: previousAttempt.networkInterface?.vlanId ?? prev.networkInterface.vlanId,
             },
             networkAddress: previousAttempt.networkAddress ?? prev.networkAddress,

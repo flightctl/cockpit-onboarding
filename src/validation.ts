@@ -610,9 +610,7 @@ export const getOverlappingLabelKeys = (first: { key: string }[], second: { key:
  * Parse URL authority when the built-in URL constructor rejects valid DNS hostnames
  * (e.g. api.192.124.12.22 where the suffix looks like an IPv4 address).
  */
-const parseUrlAuthorityFallback = (
-    url: string
-): { protocol: string; hostname: string; port: string | null } | null => {
+const parseUrlAuthorityFallback = (url: string): { protocol: string; hostname: string; port: string | null } | null => {
     const match = url.match(/^(https?):\/\/([^/?#]+)/i);
     if (!match) {
         return null;

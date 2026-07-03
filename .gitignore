@@ -9,6 +9,7 @@
 *.pyc
 *.rpm
 .env*
+.vscode
 
 # toplevel (/...)
 /Test*.html

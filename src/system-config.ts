@@ -69,16 +69,10 @@ export class SystemConfigurationService {
             try {
                 await setHostname(model.hostname.value);
                 actions.push(
-                    makeStepAction(
-                        CONFIG_ACTION_IDS.HOSTNAME,
-                        `Hostname set to: ${model.hostname.value}`,
-                        "success"
-                    )
+                    makeStepAction(CONFIG_ACTION_IDS.HOSTNAME, `Hostname set to: ${model.hostname.value}`, "success")
                 );
             } catch (error) {
-                actions.push(
-                    makeStepAction(CONFIG_ACTION_IDS.HOSTNAME, String(error), "error")
-                );
+                actions.push(makeStepAction(CONFIG_ACTION_IDS.HOSTNAME, String(error), "error"));
                 hasErrors = true;
             }
         } else {
@@ -89,7 +83,11 @@ export class SystemConfigurationService {
 
         if (options?.skipNetwork) {
             actions.push(
-                makeStepAction(CONFIG_ACTION_IDS.NETWORK_DEFERRED, "Network: deferred to systemd-run transient unit", "success")
+                makeStepAction(
+                    CONFIG_ACTION_IDS.NETWORK_DEFERRED,
+                    "Network: deferred to systemd-run transient unit",
+                    "success"
+                )
             );
         } else if (model.networkInterface.selectedInterface && networkManager) {
             try {
@@ -101,9 +99,7 @@ export class SystemConfigurationService {
                 actions.push(...networkApplyResult.actions);
                 singleNic = networkApplyResult.singleNic;
             } catch (error) {
-                actions.push(
-                    makeStepAction(CONFIG_ACTION_IDS.NETWORK_UNAVAILABLE, String(error), "error")
-                );
+                actions.push(makeStepAction(CONFIG_ACTION_IDS.NETWORK_UNAVAILABLE, String(error), "error"));
                 hasErrors = true;
             }
         } else {
