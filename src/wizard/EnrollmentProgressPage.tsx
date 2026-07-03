@@ -32,7 +32,7 @@ import { getSetupInterface, applyNetworkConfiguration, rollbackNetworkConfigurat
 import { writeAttemptedMarker } from "../attempted-marker";
 import { SCRIPT_RUN_APPLY_ENROLL } from "../paths";
 import { SubtleHeading } from "../components/Headings.js";
-import { armWatchdog, disarmWatchdog } from "../services/watchdog";
+import { armWatchdog, disarmWatchdog, readWatchdogStatus } from "../services/watchdog";
 import { testNetworkConnectivity, verifyServiceConnectivity, CancellationSignal } from "../services/connectivity";
 import { buildEnrollmentParams, executeEnrollmentScript, finalizeEnrollment } from "../services/enrollment";
 import { createSecureTempFile } from "../services/spawn-helpers";
@@ -126,6 +126,14 @@ const groupResultsByStep = (
 
         if (currentStepId) {
             groups[currentStepId].push(item);
+        } else if (item.type === "action") {
+            const targetStep =
+                steps.find((step) => step.status === "failed") ??
+                steps.find((step) => step.status === "delegated") ??
+                steps.find((step) => step.id === `enroll-${FLIGHTCTL_SERVICE_ID}`);
+            if (targetStep) {
+                groups[targetStep.id].push(item);
+            }
         }
     }
 
@@ -169,10 +177,12 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
     const [steps, setSteps] = useState<Step[]>([]);
     const [results, setResults] = useState<EnrollmentProgressResultItem[]>([]);
     const [singleNic, setSingleNic] = useState(false);
+    const [delegatedFailureMessage, setDelegatedFailureMessage] = useState<string | null>(null);
     const [expandedStepIds, setExpandedStepIds] = useState<string[]>([]);
     const networkAppliedRef = React.useRef(false);
     const shouldCancelRef = React.useRef(false);
     const signalRef = React.useRef<CancellationSignal>({ cancelled: false });
+    const delegatedFailureHandledRef = React.useRef(false);
 
     const getStepStatusIcon = (status: StepStatus) => {
         switch (status) {
@@ -696,6 +706,51 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
     const activeStepId = getActiveStepId(steps, executionState);
 
     useEffect(() => {
+        if (!singleNic || executionState !== "success") {
+            return;
+        }
+
+        const handleDelegatedFailure = (message: string) => {
+            if (delegatedFailureHandledRef.current) {
+                return;
+            }
+            delegatedFailureHandledRef.current = true;
+            setDelegatedFailureMessage(message);
+            setSteps((prev) => prev.map((s) => (s.status === "delegated" ? { ...s, status: "failed" } : s)));
+            setResults((prev) => {
+                const failureLines = message
+                    .split("\n")
+                    .map((line) => line.trim())
+                    .filter((line) => line.length > 0);
+                const failureActions: EnrollmentProgressResultItem[] = failureLines.map((line, index) => ({
+                    type: "action",
+                    action: {
+                        id: `background-enrollment-failure-${index}`,
+                        actionTitle: line,
+                        result: "error",
+                    },
+                }));
+                return [...prev, ...failureActions];
+            });
+            updateModel("enrollmentProgress", { executionState: "failed" });
+        };
+
+        const pollWatchdogStatus = async () => {
+            const status = await readWatchdogStatus();
+            if (status?.status === "app_failure") {
+                handleDelegatedFailure(status.message);
+            }
+        };
+
+        pollWatchdogStatus().catch(() => {});
+        const intervalId = window.setInterval(() => {
+            pollWatchdogStatus().catch(() => {});
+        }, 3000);
+
+        return () => window.clearInterval(intervalId);
+    }, [singleNic, executionState, updateModel]);
+
+    useEffect(() => {
         if (!activeStepId) {
             return;
         }
@@ -834,8 +889,23 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
 
                         {executionState === "failed" && (
                             <Alert variant="danger" title={_("Enrollment failed")} className="pf-v6-u-mt-md">
-                                {_(
-                                    "The enrollment process was cancelled or failed. Network changes have been rolled back. Please check the step details and try again."
+                                {delegatedFailureMessage ? (
+                                    <Stack hasGutter>
+                                        <StackItem>
+                                            {_(
+                                                "Background enrollment failed. Review the error details below and try again."
+                                            )}
+                                        </StackItem>
+                                        <StackItem>
+                                            {delegatedFailureMessage.split("\n").map((line, index) => (
+                                                <Content key={index}>{line}</Content>
+                                            ))}
+                                        </StackItem>
+                                    </Stack>
+                                ) : (
+                                    _(
+                                        "The enrollment process was cancelled or failed. Network changes have been rolled back. Please check the step details and try again."
+                                    )
                                 )}
                             </Alert>
                         )}

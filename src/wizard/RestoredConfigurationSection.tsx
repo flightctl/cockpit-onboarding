@@ -97,15 +97,17 @@ const getAlertContent = (watchdogStatus?: WatchdogStatusData | null) => {
                 extraDetails: getExtraDetails(watchdogStatus),
             };
         }
-        case "app_failure":
+        case "app_failure": {
+            const detail = watchdogStatus.message?.trim();
             return {
-                variant: "info",
+                variant: "warning",
                 title: _("Enrollment did not complete"),
                 body: _(
                     "Network connectivity is working, but enrollment did not complete. You can retry without changing network settings."
                 ),
-                extraDetails: getExtraDetails(watchdogStatus),
+                extraDetails: detail ? [detail, ...getExtraDetails(watchdogStatus)] : getExtraDetails(watchdogStatus),
             };
+        }
         default:
             return {
                 variant: "info",

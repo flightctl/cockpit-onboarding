@@ -34,13 +34,13 @@ write_app_failure_status() {
     local timestamp
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     mkdir -p "$(dirname "$WATCHDOG_STATUS_FILE")"
-    cat > "$WATCHDOG_STATUS_FILE" <<EOF
-{
-  "status": "app_failure",
-  "message": "${message}",
-  "timestamp": "${timestamp}"
-}
-EOF
+    jq -n \
+        --arg status "app_failure" \
+        --arg message "$message" \
+        --arg timestamp "$timestamp" \
+        '{status: $status, message: $message, timestamp: $timestamp}' > "$WATCHDOG_STATUS_FILE"
+    chown onboarding:onboarding "$WATCHDOG_STATUS_FILE"
+    chmod 0644 "$WATCHDOG_STATUS_FILE"
 }
 
 # Allowed directories for enrollment scripts — must match sudoers entries
@@ -223,9 +223,11 @@ if [ "$SCRIPT_COUNT" -gt 0 ]; then
             exit 1
         fi
         log "Running enrollment script: $SCRIPT_PATH"
-        if ! "$SCRIPT_PATH" "$SCRIPT_PARAMS"; then
+        enroll_output=""
+        if ! enroll_output=$("$SCRIPT_PATH" "$SCRIPT_PARAMS" 2>&1); then
             log "ERROR: Enrollment script failed: $SCRIPT_PATH"
-            write_app_failure_status "Enrollment script failed: ${SCRIPT_PATH}"
+            log "$enroll_output"
+            write_app_failure_status "$enroll_output"
             rm -f "$SCRIPT_PARAMS"
             exit 1
         fi

@@ -46,6 +46,7 @@ import { NetworkManagerModel, Interface } from "../pkg/networkmanager/interfaces
 import { ModelProvider, useModelContext } from "./model-context";
 import { loadConfig } from "./config-loader";
 import { readAttemptedMarker, AttemptedMarkerData } from "./attempted-marker";
+import { readWatchdogStatus } from "./services/watchdog";
 import { SystemOnboardingConfig } from "./types";
 
 import { NetworkPage } from "./wizard/NetworkPage.tsx";
@@ -65,7 +66,7 @@ import {
     validateNetworkServicesConfig,
 } from "./wizard/WizardSteps.ts";
 
-import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from "./paths";
+import { MARKER_COMPLETE, SCRIPT_CLEANUP } from "./paths";
 
 const _ = cockpit.gettext;
 
@@ -122,16 +123,9 @@ export const Application = () => {
                         console.log("Previous attempt data found, will pre-populate wizard");
                         setPreviousAttempt(attempt);
 
-                        try {
-                            const statusContent = await cockpit.file(WATCHDOG_STATUS).read();
-                            if (statusContent) {
-                                const parsed = JSON.parse(statusContent) as WatchdogStatusData;
-                                if (parsed.status === "network_failure" || parsed.status === "app_failure") {
-                                    setWatchdogStatus(parsed);
-                                }
-                            }
-                        } catch {
-                            // No watchdog status file or parse error — not a rollback scenario
+                        const status = await readWatchdogStatus();
+                        if (status) {
+                            setWatchdogStatus(status);
                         }
                     }
                 }
