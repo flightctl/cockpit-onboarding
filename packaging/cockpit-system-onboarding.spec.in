@@ -36,8 +36,6 @@ Recommends: dnsmasq
 
 %{NPM_PROVIDES}
 
-%global brand_name Flight Control
-
 %description
 Cockpit System Onboarding Module
 
@@ -50,7 +48,7 @@ rm -rf dist
 %endif
 
 %build
-NODE_ENV=production BRAND_NAME="%{brand_name}" make
+NODE_ENV=production BRAND_NAME="%{!?brand_name:Flight Control}%{?brand_name}" make
 
 %install
 %make_install PREFIX=/usr
