@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 VM_NAME="cockpit-onboarding-test"
+SNAPSHOT_NAME="fresh"
 VM_RAM=4096
 VM_VCPUS=2
 VM_DISK_SIZE=20
@@ -420,6 +421,27 @@ check_existing_vm() {
     fi
 }
 
+create_fresh_snapshot() {
+    local vm_ip="$1"
+
+    echo "Creating '${SNAPSHOT_NAME}' snapshot for fast reset (make reset-test-vm)..."
+    if virsh snapshot-info "${VM_NAME}" "${SNAPSHOT_NAME}" &>/dev/null; then
+        virsh snapshot-delete "${VM_NAME}" "${SNAPSHOT_NAME}" --metadata
+    fi
+
+    echo "Shutting down VM for disk snapshot..."
+    virsh destroy "${VM_NAME}"
+
+    virsh snapshot-create-as "${VM_NAME}" "${SNAPSHOT_NAME}" \
+        --description "Post deploy-test-vm provisioning state" \
+        --disk-only --atomic
+    echo "Snapshot '${SNAPSHOT_NAME}' created."
+
+    echo "Starting VM..."
+    virsh start "${VM_NAME}"
+    wait_for_ssh "${vm_ip}"
+}
+
 main() {
     check_existing_vm
     find_ssh_pubkey > /dev/null
@@ -477,8 +499,11 @@ main() {
     echo "      # Reload the driver inside the VM to pick up firmware"
     echo "      ssh fedora@${vm_ip} 'sudo modprobe -r <driver> && sudo modprobe <driver>'"
     echo ""
-    echo "  Clean up with: make clean-test-vm"
+    echo "  Reset after testing: make reset-test-vm"
+    echo "  Clean up with:       make clean-test-vm"
     echo "========================================="
+
+    create_fresh_snapshot "${vm_ip}"
 }
 
-main
+main "$@"
