@@ -26,6 +26,15 @@ const NetworkAddressSection = () => {
     const setupInterface = getSetupInterface(interfaces);
     const isSetupInterface = setupInterface !== null && model.networkInterface.selectedInterface === setupInterface;
 
+    // Hide arping/ping availability check buttons when they can't produce reliable results:
+    // - setup interface: changing its IP would break the browser session
+    // - WiFi: arping over WiFi is unreliable
+    // - VLAN: the VLAN sub-interface doesn't exist yet, so arping on the base interface can't reach the VLAN's gateway
+    const hideAvailabilityChecks =
+        isSetupInterface ||
+        model.networkInterface.interfaceType === "wifi" ||
+        model.networkInterface.vlanId !== null;
+
     const isMissingNetworkConfig =
         model.networkAddress.ipv4.method === "disabled" && model.networkAddress.ipv6.method === "disabled";
 
@@ -37,10 +46,10 @@ const NetworkAddressSection = () => {
                 </Title>
             </StackItem>
             <StackItem>
-                <NetworkConfigIPv4 isSetupInterface={isSetupInterface} />
+                <NetworkConfigIPv4 hideAvailabilityChecks={hideAvailabilityChecks} />
             </StackItem>
             <StackItem>
-                <NetworkConfigIPv6 isSetupInterface={isSetupInterface} />
+                <NetworkConfigIPv6 hideAvailabilityChecks={hideAvailabilityChecks} />
             </StackItem>
             {isMissingNetworkConfig && (
                 <StackItem className="pf-v6-u-my-md">
@@ -51,7 +60,7 @@ const NetworkAddressSection = () => {
     );
 };
 
-const NetworkConfigIPv4 = ({ isSetupInterface = false }: { isSetupInterface?: boolean }) => {
+const NetworkConfigIPv4 = ({ hideAvailabilityChecks = false }: { hideAvailabilityChecks?: boolean }) => {
     const { model, updateNestedModel } = useModelContext();
 
     const setIpv4Method = (method: "dhcp" | "static" | "disabled") => {
@@ -100,7 +109,7 @@ const NetworkConfigIPv4 = ({ isSetupInterface = false }: { isSetupInterface?: bo
                                         onChange={() => setIpv4Method("static")}
                                         body={
                                             selectedIpv4Method === "static" && (
-                                                <StaticIpv4Configuration isSetupInterface={isSetupInterface} />
+                                                <StaticIpv4Configuration hideAvailabilityChecks={hideAvailabilityChecks} />
                                             )
                                         }
                                     />
@@ -117,7 +126,7 @@ const NetworkConfigIPv4 = ({ isSetupInterface = false }: { isSetupInterface?: bo
     );
 };
 
-const NetworkConfigIPv6 = ({ isSetupInterface = false }: { isSetupInterface?: boolean }) => {
+const NetworkConfigIPv6 = ({ hideAvailabilityChecks = false }: { hideAvailabilityChecks?: boolean }) => {
     const { model, updateNestedModel } = useModelContext();
 
     const setIpv6Method = (method: "auto" | "dhcp" | "static" | "disabled") => {
@@ -174,7 +183,7 @@ const NetworkConfigIPv6 = ({ isSetupInterface = false }: { isSetupInterface?: bo
                                         onChange={() => setIpv6Method("static")}
                                         body={
                                             selectedIpv6Method === "static" && (
-                                                <StaticIpv6Configuration isSetupInterface={isSetupInterface} />
+                                                <StaticIpv6Configuration hideAvailabilityChecks={hideAvailabilityChecks} />
                                             )
                                         }
                                     />
