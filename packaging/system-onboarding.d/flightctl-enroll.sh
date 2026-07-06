@@ -100,8 +100,8 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
     cleanup() { rm -rf "$TMPDIR"; }
     trap cleanup EXIT
 
-    # Step 1: Login to Flight Control API
-    echo "Logging into Flight Control..."
+    # Step 1: Login to management service API
+    echo "Logging into ${ENROLLMENT_SERVICE_NAME}..."
     if [ -n "$TOKEN" ]; then
         if ! output=$(flightctl login "$ENROLLMENT_ENDPOINT" --token "$TOKEN" --config-dir "$TMPDIR" -k 2>&1); then
             echo "Error: flightctl login failed (token auth)" >&2
@@ -169,8 +169,8 @@ systemctl restart flightctl-agent || {
 }
 
 if [ "${ENROLLMENT_USE_EXISTING:-false}" = "true" ]; then
-    echo "Successfully restarted Flight Control agent with existing credentials"
+    echo "Successfully restarted ${ENROLLMENT_SERVICE_NAME} agent with existing credentials"
 else
-    echo "Successfully provisioned enrollment credentials to Flight Control agent"
+    echo "Successfully provisioned enrollment credentials to ${ENROLLMENT_SERVICE_NAME} agent"
 fi
 exit 0

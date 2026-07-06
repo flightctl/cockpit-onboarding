@@ -30,6 +30,12 @@
       "default": false,
       "description": "Automatically reboot the system after applying configuration changes"
     },
+    "brandName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Product name shown in the onboarding plugin UI. Set at build time via the BRAND_NAME environment variable."
+    },
     "network": {
       "type": "object",
       "description": "Network interface configuration for initial system access",
@@ -266,6 +272,7 @@
   "examples": [
     {
       "version": "1.0",
+      "brandName": "Flight Control",
       "runOnce": true,
       "keepCockpit": false,
       "hideModules": true,

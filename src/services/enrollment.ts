@@ -1,7 +1,7 @@
 import cockpit from "cockpit";
 import { SCRIPT_FINALIZE } from "../paths";
 import type { Model } from "../model-context";
-import { buildFlightctlCredentialsJson, defaultFlightctlServiceDescriptor } from "../flightctl-enrollment";
+import { buildFlightctlCredentialsJson, getFlightctlServiceDescriptor } from "../flightctl-enrollment";
 import type { CancellationSignal } from "./connectivity";
 import { disarmWatchdog } from "./watchdog";
 import { deleteAttemptedMarker } from "../attempted-marker";
@@ -31,13 +31,14 @@ function getExitCodeMessage(exitCode: number, endpoint?: string): string | null 
     return template;
 }
 
-export function buildEnrollmentParams(model: Model): Record<string, unknown> {
+export function buildEnrollmentParams(model: Model, brandName?: string): Record<string, unknown> {
     const enrollment = model.enrollment;
     const networkProxy = model.networkServices.proxy;
+    const service = getFlightctlServiceDescriptor(brandName !== undefined ? { brandName } : null);
 
     return {
-        ENROLLMENT_SERVICE_ID: defaultFlightctlServiceDescriptor.id,
-        ENROLLMENT_SERVICE_NAME: defaultFlightctlServiceDescriptor.name,
+        ENROLLMENT_SERVICE_ID: service.id,
+        ENROLLMENT_SERVICE_NAME: service.name,
         ENROLLMENT_ENDPOINT: enrollment.endpoint || "",
         ENROLLMENT_CREDENTIALS_JSON: buildFlightctlCredentialsJson(enrollment.credentials),
         ENROLLMENT_USE_EXISTING: Boolean(enrollment.useExisting),

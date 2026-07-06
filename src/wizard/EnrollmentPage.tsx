@@ -17,6 +17,7 @@ import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js
 
 import { useModelContext } from "../model-context";
 import { useConfig } from "../app";
+import { getBrandName } from "../flightctl-enrollment";
 import { validateURL } from "../validation";
 import ValidatedTextInput from "../components/ValidatedTextInput";
 import FeatureSwitch from "../components/FeatureSwitch";
@@ -34,6 +35,7 @@ const _ = cockpit.gettext;
 
 export const EnrollmentPage = () => {
     const { config } = useConfig();
+    const brandName = getBrandName(config);
     const { model, updateModel } = useModelContext();
     const enrollment = model.enrollment;
     const defaultEndpoint = config?.flightctl?.defaultEndpoint ?? "";
@@ -125,14 +127,14 @@ export const EnrollmentPage = () => {
         <Stack hasGutter>
             <StackItem>
                 <Title headingLevel="h2" size="md">
-                    {_("Flight Control enrollment")}
+                    {cockpit.format(_("$0 enrollment"), brandName)}
                 </Title>
             </StackItem>
 
             <StackItem>
                 <FeatureSwitch
                     fieldId="flightctl-enrollment"
-                    label={_("Enroll this device into Flight Control")}
+                    label={cockpit.format(_("Enroll this device into $0"), brandName)}
                     isChecked={enrollment.selected}
                     onToggle={handleEnrollmentToggle}
                 >
@@ -288,7 +290,10 @@ export const EnrollmentPage = () => {
                                                     </StackItem>
 
                                                     <StackItem>
-                                                        <FormGroup label={_("Flight Control server")} isRequired>
+                                                        <FormGroup
+                                                            label={cockpit.format(_("$0 server"), brandName)}
+                                                            isRequired
+                                                        >
                                                             <ValidatedTextInput
                                                                 id="endpoint-flightctl"
                                                                 value={serviceEndpoint}

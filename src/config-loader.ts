@@ -16,6 +16,7 @@ const USER_CONFIG_PATH = "/etc/cockpit/system-onboarding/config.json";
 // Default configuration if no files are found
 const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
     version: "1.0",
+    brandName: "Flight Control",
     runOnce: true,
     keepCockpit: false,
     hideModules: true,
@@ -145,6 +146,16 @@ export function validateConfig(config: SystemOnboardingConfig): void {
 
     if (config.version !== "1.0") {
         throw new Error(`Configuration validation failed: version must be '1.0', got '${config.version}'`);
+    }
+
+    if (config.brandName !== undefined) {
+        if (typeof config.brandName !== "string") {
+            throw new Error("Configuration validation failed: brandName must be a string");
+        }
+
+        if (config.brandName.length < 1 || config.brandName.length > 100) {
+            throw new Error("Configuration validation failed: brandName length must be between 1 and 100 characters");
+        }
     }
 
     // Validate flightctl configuration if present

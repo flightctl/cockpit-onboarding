@@ -28,6 +28,14 @@ Cockpit System Onboarding runs inside [Cockpit](https://cockpit-project.org/) on
 make rpm
 ```
 
+When building the RPM, you can specify the brand name shown in the enrollment UI:
+
+```sh
+BRAND_NAME="My Brand" NODE_ENV=production make rpm
+```
+
+The default brand name is `Flight Control`. The value is baked into the shipped `config.json` as `brandName` and used for enrollment service labels. Runtime overrides via `/etc/cockpit/system-onboarding/config.json` can still change the brand name if needed.
+
 This produces `cockpit-system-onboarding-*.noarch.rpm` in the repository root. Install it on the target device:
 
 ```sh
