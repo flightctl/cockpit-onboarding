@@ -69,6 +69,7 @@ export interface Model {
         executionState: "idle" | "running" | "success" | "failed"; // overall execution state
         canCancel: boolean; // whether cancellation is possible
         overallProgress: number; // 0-100 percentage
+        backgroundCompletion?: boolean; // single-NIC: apply-and-enroll.sh finishes without UI Finish
     };
 }
 

@@ -46,6 +46,7 @@ import { NetworkManagerModel, Interface } from "../pkg/networkmanager/interfaces
 import { ModelProvider, useModelContext } from "./model-context";
 import { loadConfig } from "./config-loader";
 import { readAttemptedMarker, AttemptedMarkerData } from "./attempted-marker";
+import { readWatchdogStatus } from "./services/watchdog";
 import { SystemOnboardingConfig } from "./types";
 
 import { NetworkPage } from "./wizard/NetworkPage.tsx";
@@ -65,9 +66,29 @@ import {
     validateNetworkServicesConfig,
 } from "./wizard/WizardSteps.ts";
 
-import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from "./paths";
+import { MARKER_COMPLETE, SCRIPT_CLEANUP } from "./paths";
 
 const _ = cockpit.gettext;
+
+interface OnboardingCompleteMarker {
+    completedAt?: string;
+    hostname?: string;
+}
+
+const getOnboardingCompleteMessage = (marker: OnboardingCompleteMarker | null): string => {
+    const hostname = marker?.hostname?.trim();
+    if (hostname) {
+        return cockpit.format(
+            _(
+                "System onboarding has already been completed on this device. Open Cockpit at https://$0:9090 with a system account. The temporary onboarding account is no longer available."
+            ),
+            hostname
+        );
+    }
+    return _(
+        "System onboarding has already been completed on this device. Open Cockpit at https://<hostname>:9090 with a system account. The temporary onboarding account is no longer available."
+    );
+};
 
 // Configuration context to provide loaded configuration throughout the app
 interface ConfigContextType {
@@ -92,6 +113,7 @@ export const Application = () => {
     const [checkingMarker, setCheckingMarker] = useState(true);
     const [previousAttempt, setPreviousAttempt] = useState<AttemptedMarkerData | null>(null);
     const [watchdogStatus, setWatchdogStatus] = useState<WatchdogStatusData | null>(null);
+    const [completionMarker, setCompletionMarker] = useState<OnboardingCompleteMarker | null>(null);
 
     const nmService = useObject(() => service.proxy("NetworkManager"), null, []);
     useEvent(nmService, "changed");
@@ -113,6 +135,11 @@ export const Application = () => {
             .then(async (content) => {
                 if (content !== null) {
                     setOnboardingComplete(true);
+                    try {
+                        setCompletionMarker(JSON.parse(content) as OnboardingCompleteMarker);
+                    } catch {
+                        setCompletionMarker(null);
+                    }
                     console.log("Onboarding already complete (marker file exists)");
                 } else {
                     setOnboardingComplete(false);
@@ -122,16 +149,9 @@ export const Application = () => {
                         console.log("Previous attempt data found, will pre-populate wizard");
                         setPreviousAttempt(attempt);
 
-                        try {
-                            const statusContent = await cockpit.file(WATCHDOG_STATUS).read();
-                            if (statusContent) {
-                                const parsed = JSON.parse(statusContent) as WatchdogStatusData;
-                                if (parsed.status === "network_failure" || parsed.status === "app_failure") {
-                                    setWatchdogStatus(parsed);
-                                }
-                            }
-                        } catch {
-                            // No watchdog status file or parse error — not a rollback scenario
+                        const status = await readWatchdogStatus();
+                        if (status) {
+                            setWatchdogStatus(status);
                         }
                     }
                 }
@@ -172,7 +192,7 @@ export const Application = () => {
             <div id="system-onboarding-already-complete">
                 <EmptyStatePanel
                     title={_("Onboarding complete")}
-                    paragraph={_("System onboarding has already been completed on this device.")}
+                    paragraph={getOnboardingCompleteMessage(completionMarker)}
                 />
             </div>
         );
@@ -343,6 +363,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     };
 
     const enrollmentExecutionState = model.enrollmentProgress.executionState;
+    const backgroundCompletion = Boolean(model.enrollmentProgress.backgroundCompletion);
 
     // It should not be possible to abandon the "Apply" step via the navigation buttons.
     // Once the user has reached that step, they must complete the process or cancel it.
@@ -437,22 +458,19 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                 </WizardFooterWrapper>
             );
         } else if (enrollmentExecutionState === "success") {
-            // On success: navigate to completion page immediately, then run cleanup
-            // after a short delay. Cleanup tears down the WiFi AP, so we must show
-            // the user feedback first before the connection drops.
             const wantReboot = config?.autoReboot === true;
             const runCleanup = () =>
                 cockpit
                     .spawn(["sudo", SCRIPT_CLEANUP], { err: "message" })
                     .catch((error) => console.warn("Cleanup failed:", error));
             const handleFinish = () => {
-                // Marker file is already written — reload shows the "Onboarding complete" page
                 window.location.reload();
-                // Fire cleanup after a delay so the page has time to render
-                setTimeout(() => runCleanup(), 2000);
+                if (!backgroundCompletion) {
+                    // Multi-NIC: cleanup tears down the WiFi AP after the user sees feedback.
+                    setTimeout(() => runCleanup(), 2000);
+                }
             };
             const handleFinishAndReboot = () => {
-                // Reboot triggers systemd ExecStop which runs cleanup automatically
                 cockpit
                     .spawn(["sudo", "shutdown", "-r", "now"], { err: "message" })
                     .catch((error) => console.error("Failed to trigger reboot:", error));
@@ -460,8 +478,12 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
             return {
                 isBackDisabled: true,
                 isNextDisabled: false,
-                nextButtonText: wantReboot ? _("Finish & Reboot") : _("Finish"),
-                onNext: wantReboot ? handleFinishAndReboot : handleFinish,
+                nextButtonText: backgroundCompletion
+                    ? _("Reload")
+                    : wantReboot
+                      ? _("Finish & Reboot")
+                      : _("Finish"),
+                onNext: wantReboot && !backgroundCompletion ? handleFinishAndReboot : handleFinish,
                 isCancelHidden: true,
             };
         } else if (enrollmentExecutionState === "failed") {

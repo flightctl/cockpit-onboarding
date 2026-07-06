@@ -77,6 +77,8 @@ write_status() {
   }
 }
 EOF
+    chown onboarding:onboarding "$STATUS_FILE"
+    chmod 0644 "$STATUS_FILE"
 }
 
 rollback_network() {

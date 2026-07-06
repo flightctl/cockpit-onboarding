@@ -126,4 +126,13 @@ fi
 touch "${ONBOARDING_MARKER_DIR}/.onboarding-confirmed"
 echo "Created agent startup gate file"
 
+if systemctl list-unit-files flightctl-agent.service | grep -q flightctl-agent; then
+    systemctl enable flightctl-agent 2>/dev/null || true
+    if systemctl start flightctl-agent; then
+        echo "Started flightctl-agent"
+    else
+        echo "WARNING: flightctl-agent did not start; check journalctl -u flightctl-agent" >&2
+    fi
+fi
+
 echo "Post-onboarding cleanup complete"

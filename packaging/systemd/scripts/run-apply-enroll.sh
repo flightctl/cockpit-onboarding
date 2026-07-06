@@ -25,10 +25,15 @@ fi
 
 UNIT_NAME="flightctl-onboarding-apply-$(date +%s%N)"
 
+# --no-block: return after queuing the unit. Without it, systemd-run waits for
+# the job over D-Bus, which fails when invoked via sudo from cockpit-bridge
+# ("D-Bus connection terminated while waiting for jobs").
 exec systemd-run \
+    --no-block \
     "--unit=${UNIT_NAME}" \
     '--property=Type=oneshot' \
     '--remain-after-exit' \
+    '--property=Environment=HOME=/root' \
     '--' \
     "$APPLY_SCRIPT" \
     "$PARAMS_FILE"

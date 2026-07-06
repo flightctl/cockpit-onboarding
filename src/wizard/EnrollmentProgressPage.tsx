@@ -31,9 +31,9 @@ import { systemConfigurationService } from "../system-config";
 import { getHostnameInfo } from "../services/hostname";
 import { getSetupInterface, applyNetworkConfiguration, rollbackNetworkConfiguration } from "../services/network";
 import { writeAttemptedMarker } from "../attempted-marker";
-import { SCRIPT_RUN_APPLY_ENROLL } from "../paths";
+import { SCRIPT_RUN_APPLY_ENROLL, MARKER_COMPLETE } from "../paths";
 import { SubtleHeading } from "../components/Headings.js";
-import { armWatchdog, disarmWatchdog } from "../services/watchdog";
+import { armWatchdog, disarmWatchdog, readWatchdogStatus } from "../services/watchdog";
 import { testNetworkConnectivity, verifyServiceConnectivity, CancellationSignal } from "../services/connectivity";
 import { buildEnrollmentParams, executeEnrollmentScript, finalizeEnrollment } from "../services/enrollment";
 import { createSecureTempFile } from "../services/spawn-helpers";
@@ -102,6 +102,24 @@ const StepActionRow: React.FunctionComponent<{ action: StepAction }> = ({ action
     </Flex>
 );
 
+const getNextEnrollmentStepId = (steps: Step[], afterStepId: string | null): string | null => {
+    const startIndex = afterStepId ? steps.findIndex((step) => step.id === afterStepId) + 1 : 0;
+    const nextStep = steps.slice(Math.max(0, startIndex)).find((step) => step.status !== "success");
+    return nextStep?.id ?? null;
+};
+
+const findEnrollmentStep = (steps: Step[]): Step | undefined =>
+    steps.find((step) => step.id.startsWith("enroll-")) ??
+    steps.find((step) => step.id === `enroll-${FLIGHTCTL_SERVICE_ID}`);
+
+const findOrphanActionStep = (steps: Step[]): Step | undefined =>
+    steps.find((step) => step.status === "failed") ??
+    findEnrollmentStep(steps) ??
+    steps.find((step) => step.status === "delegated");
+
+const isBackgroundEnrollmentFailure = (item: EnrollmentProgressResultItem): boolean =>
+    item.type === "action" && item.action.id.startsWith("background-enrollment-failure-");
+
 const groupResultsByStep = (
     steps: Step[],
     results: EnrollmentProgressResultItem[]
@@ -118,15 +136,28 @@ const groupResultsByStep = (
                 continue;
             }
 
-            const targetStepId = currentStepId ?? steps.find((step) => step.status === "delegated")?.id ?? steps[0]?.id;
-            if (targetStepId) {
-                groups[targetStepId].push(item);
-            }
+            currentStepId = getNextEnrollmentStepId(steps, currentStepId);
             continue;
+        }
+
+        if (isBackgroundEnrollmentFailure(item)) {
+            const enrollStep = findEnrollmentStep(steps);
+            if (enrollStep) {
+                groups[enrollStep.id].push(item);
+                continue;
+            }
         }
 
         if (currentStepId) {
             groups[currentStepId].push(item);
+            continue;
+        }
+
+        if (item.type === "action") {
+            const targetStep = findOrphanActionStep(steps);
+            if (targetStep) {
+                groups[targetStep.id].push(item);
+            }
         }
     }
 
@@ -172,10 +203,12 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
     const [steps, setSteps] = useState<Step[]>([]);
     const [results, setResults] = useState<EnrollmentProgressResultItem[]>([]);
     const [singleNic, setSingleNic] = useState(false);
+    const [delegatedFailureMessage, setDelegatedFailureMessage] = useState<string | null>(null);
     const [expandedStepIds, setExpandedStepIds] = useState<string[]>([]);
     const networkAppliedRef = React.useRef(false);
     const shouldCancelRef = React.useRef(false);
     const signalRef = React.useRef<CancellationSignal>({ cancelled: false });
+    const delegatedFailureHandledRef = React.useRef(false);
 
     const getStepStatusIcon = (status: StepStatus) => {
         switch (status) {
@@ -565,7 +598,11 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         }
 
         setSingleNic(true);
-        updateModel("enrollmentProgress", { executionState: "success", overallProgress: 100 });
+        updateModel("enrollmentProgress", {
+            executionState: "success",
+            overallProgress: 100,
+            backgroundCompletion: true,
+        });
     };
 
     // Main execution function
@@ -713,6 +750,104 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
     const activeStepId = getActiveStepId(steps, executionState);
 
     useEffect(() => {
+        if (!singleNic || executionState !== "success") {
+            return;
+        }
+
+        const handleDelegatedFailure = (message: string) => {
+            if (delegatedFailureHandledRef.current) {
+                return;
+            }
+            delegatedFailureHandledRef.current = true;
+            setDelegatedFailureMessage(message);
+            const failureLines = message
+                .split("\n")
+                .map((line) => line.trim())
+                .filter((line) => line.length > 0);
+            setSteps((prevSteps) => {
+                setResults((prevResults) => {
+                    const updated: EnrollmentProgressResultItem[] = [...prevResults];
+                    updated.push({ type: "header", content: _("Testing network connectivity") });
+                    updated.push({
+                        type: "action",
+                        action: makeStepAction(
+                            ENROLLMENT_ACTION_IDS.BACKGROUND_CONNECTIVITY_CONFIRMED,
+                            _("Network connectivity confirmed"),
+                            "success"
+                        ),
+                    });
+
+                    const enrollStep = prevSteps.find((step) => step.id.startsWith("enroll-"));
+                    if (enrollStep) {
+                        updated.push({ type: "header", content: enrollStep.name });
+                    }
+
+                    failureLines.forEach((line, index) => {
+                        updated.push({
+                            type: "action",
+                            action: makeStepAction(`background-enrollment-failure-${index}`, line, "error"),
+                        });
+                    });
+                    return updated;
+                });
+
+                return prevSteps.map((step) => {
+                    if (step.id === "test-connectivity") {
+                        return { ...step, status: "success" as const };
+                    }
+                    if (step.id.startsWith("enroll-")) {
+                        return { ...step, status: "failed" as const };
+                    }
+                    if (step.id === "finalize" && step.status === "delegated") {
+                        return { ...step, status: "pending" as const };
+                    }
+                    return step;
+                });
+            });
+            updateModel("enrollmentProgress", { executionState: "failed" });
+        };
+
+        const pollWatchdogStatus = async () => {
+            const status = await readWatchdogStatus();
+            if (status?.status === "app_failure") {
+                handleDelegatedFailure(status.message);
+            }
+        };
+
+        pollWatchdogStatus().catch(() => {});
+        const intervalId = window.setInterval(() => {
+            pollWatchdogStatus().catch(() => {});
+        }, 3000);
+
+        return () => window.clearInterval(intervalId);
+    }, [singleNic, executionState, updateModel]);
+
+    useEffect(() => {
+        if (!singleNic || executionState !== "success") {
+            return;
+        }
+
+        const markerFile = cockpit.file(MARKER_COMPLETE, { superuser: "try" });
+        const checkCompletionMarker = () => {
+            markerFile
+                .read()
+                .then((content) => {
+                    if (content !== null) {
+                        window.location.reload();
+                    }
+                })
+                .catch(() => {});
+        };
+
+        checkCompletionMarker();
+        const intervalId = window.setInterval(checkCompletionMarker, 3000);
+        return () => {
+            window.clearInterval(intervalId);
+            markerFile.close();
+        };
+    }, [singleNic, executionState]);
+
+    useEffect(() => {
         if (!activeStepId) {
             return;
         }
@@ -849,8 +984,23 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
 
                         {executionState === "failed" && (
                             <Alert variant="danger" title={_("Enrollment failed")} className="pf-v6-u-mt-md">
-                                {_(
-                                    "The enrollment process was cancelled or failed. Network changes have been rolled back. Please check the step details and try again."
+                                {delegatedFailureMessage ? (
+                                    <Stack hasGutter>
+                                        <StackItem>
+                                            {_(
+                                                "Background enrollment failed. Review the error details below and try again."
+                                            )}
+                                        </StackItem>
+                                        <StackItem>
+                                            {delegatedFailureMessage.split("\n").map((line, index) => (
+                                                <Content key={index}>{line}</Content>
+                                            ))}
+                                        </StackItem>
+                                    </Stack>
+                                ) : (
+                                    _(
+                                        "The enrollment process was cancelled or failed. Network changes have been rolled back. Please check the step details and try again."
+                                    )
                                 )}
                             </Alert>
                         )}
@@ -869,9 +1019,15 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                                 title={_("Onboarding continues in the background")}
                                 className="pf-v6-u-mt-md"
                             >
-                                {_(
-                                    "Network activation and enrollment have been delegated to a background service. Your browser connection will be lost when the new network configuration is applied. Check /var/log/cockpit-system-onboarding-apply.log on the device for progress."
-                                )}
+                                {(() => {
+                                    const hostname = model.hostname.value?.trim() || _("this device");
+                                    return cockpit.format(
+                                        _(
+                                            "Network activation and enrollment continue in the background. Your browser connection will be lost when the new network configuration is applied. You do not need to click Finish — onboarding completes automatically. When the network is ready, open Cockpit again at https://$0:9090 using a system account. The temporary onboarding account is removed when setup finishes. Progress is logged to /var/log/cockpit-system-onboarding-apply.log."
+                                        ),
+                                        hostname
+                                    );
+                                })()}
                             </Alert>
                         )}
                     </CardBody>
