@@ -197,11 +197,19 @@ In the wizard, select the new NIC (`enp8s0`), enable VLAN, and configure:
 
 ### Resetting between tests
 
+After an enrollment run, reset the VM to its post-deploy state:
+
 ```sh
-hack/test-vm-reset.sh [vm-ip]
+make reset-test-vm
 ```
 
-Removes all onboarding profiles, cleans up VLAN subinterfaces, clears completion markers, and restarts Cockpit.
+This reverts the libvirt `fresh` disk snapshot created by `make deploy-test-vm` (~10 seconds).
+
+To fully recreate the VM from scratch:
+
+```sh
+make clean-test-vm && make deploy-test-vm
+```
 
 ## Captive Portal Detection
 

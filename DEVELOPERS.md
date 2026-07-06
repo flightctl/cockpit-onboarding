@@ -88,6 +88,14 @@ make deploy-test-vm
 
 This downloads a Fedora Cloud image, creates a VM with two ethernet interfaces and two virtual WiFi radios (`mac80211_hwsim`), installs all dependencies, builds and installs the onboarding RPM, and starts the setup service. The VM IP is printed at the end — access the wizard at `https://<ip>:9090`.
 
+A libvirt snapshot named `fresh` is taken when provisioning completes. Use it to reset the VM to this exact state after an enrollment test run without rebuilding the VM:
+
+```sh
+make reset-test-vm
+```
+
+Snapshot revert takes about 10 seconds.
+
 After the VM is ready, sync local code changes on every rebuild:
 
     RSYNC=fedora@<ip> make watch

@@ -218,6 +218,9 @@ deploy-test-vm:
 clean-test-vm:
 	hack/clean-test-vm.sh
 
+reset-test-vm:
+	hack/reset-test-vm.sh
+
 help:
 	@echo "Development targets:"
 	@echo "  all              Build the project (default)"
@@ -245,9 +248,10 @@ help:
 	@echo ""
 	@echo "VM targets:"
 	@echo "  deploy-test-vm   Create a Fedora test VM with WiFi simulation"
+	@echo "  reset-test-vm    Reset VM to post-deploy state after enrollment testing"
 	@echo "  clean-test-vm    Destroy the test VM and clean up"
 	@echo ""
 	@echo "i18n targets:"
 	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check vm print-vm deploy-test-vm clean-test-vm help
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check vm print-vm deploy-test-vm reset-test-vm clean-test-vm help
