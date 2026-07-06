@@ -110,24 +110,16 @@ describe("validateSystemHostname", () => {
         });
 
         test("rejects special characters", () => {
-            expect(validateSystemHostname("server_01")).toBe(
-                "Hostname can only contain letters, numbers, and hyphens"
-            );
+            expect(validateSystemHostname("server_01")).toBe("Hostname can only contain letters, numbers, and hyphens");
             expect(validateSystemHostname("server@example.com")).toBe(
                 "Hostname can only contain letters, numbers, and hyphens"
             );
-            expect(validateSystemHostname("server#1")).toBe(
-                "Hostname can only contain letters, numbers, and hyphens"
-            );
-            expect(validateSystemHostname("server$")).toBe(
-                "Hostname can only contain letters, numbers, and hyphens"
-            );
+            expect(validateSystemHostname("server#1")).toBe("Hostname can only contain letters, numbers, and hyphens");
+            expect(validateSystemHostname("server$")).toBe("Hostname can only contain letters, numbers, and hyphens");
         });
 
         test("rejects spaces", () => {
-            expect(validateSystemHostname("my server")).toBe(
-                "Hostname can only contain letters, numbers, and hyphens"
-            );
+            expect(validateSystemHostname("my server")).toBe("Hostname can only contain letters, numbers, and hyphens");
         });
     });
 

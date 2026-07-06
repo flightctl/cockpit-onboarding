@@ -607,6 +607,77 @@ export const getOverlappingLabelKeys = (first: { key: string }[], second: { key:
 };
 
 /**
+ * Parse URL authority when the built-in URL constructor rejects valid DNS hostnames
+ * (e.g. api.192.124.12.22 where the suffix looks like an IPv4 address).
+ */
+const parseUrlAuthorityFallback = (url: string): { protocol: string; hostname: string; port: string | null } | null => {
+    const match = url.match(/^(https?):\/\/([^/?#]+)/i);
+    if (!match) {
+        return null;
+    }
+
+    const protocol = `${match[1].toLowerCase()}:`;
+    const authority = match[2];
+
+    if (authority.startsWith("[")) {
+        const closeBracket = authority.indexOf("]");
+        if (closeBracket === -1) {
+            return null;
+        }
+        const hostname = authority.slice(1, closeBracket);
+        const rest = authority.slice(closeBracket + 1);
+        if (rest === "") {
+            return { protocol, hostname, port: null };
+        }
+        if (!rest.startsWith(":")) {
+            return null;
+        }
+        return { protocol, hostname, port: rest.slice(1) || null };
+    }
+
+    const lastColon = authority.lastIndexOf(":");
+    if (lastColon === -1) {
+        return { protocol, hostname: authority, port: null };
+    }
+
+    const potentialPort = authority.slice(lastColon + 1);
+    if (!/^\d+$/.test(potentialPort)) {
+        return { protocol, hostname: authority, port: null };
+    }
+
+    return {
+        protocol,
+        hostname: authority.slice(0, lastColon),
+        port: potentialPort,
+    };
+};
+
+const validateUrlComponents = (protocol: string, hostname: string, port: string | null): string | null => {
+    if (!["http:", "https:"].includes(protocol)) {
+        return "URL must use http:// or https:// protocol";
+    }
+
+    if (!hostname || hostname.length === 0) {
+        return "URL must have a valid hostname";
+    }
+
+    const hostnameError = validateHostnameOrIP(hostname, true);
+    if (hostnameError) {
+        return `URL hostname is invalid: ${hostnameError}`;
+    }
+
+    if (port) {
+        const portNum = parseInt(port, 10);
+        const portError = validatePort(Number.isNaN(portNum) ? null : portNum, false);
+        if (portError) {
+            return `URL port is invalid: ${portError}`;
+        }
+    }
+
+    return null;
+};
+
+/**
  * Validate URL
  *
  * @param url - The URL to validate
@@ -622,27 +693,14 @@ export const validateURL = (url: string, required = true): string | null => {
 
     try {
         const urlObj = new URL(trimmedUrl);
-
-        // Check for valid protocol (http or https)
-        if (!["http:", "https:"].includes(urlObj.protocol)) {
-            return "URL must use http:// or https:// protocol";
-        }
-
-        // Check that hostname is valid and not empty
-        if (!urlObj.hostname || urlObj.hostname.length === 0) {
-            return "URL must have a valid hostname";
-        }
-
-        // Use the existing hostname validation function for consistency
-        const hostnameError = validateHostname(urlObj.hostname, true);
-        if (hostnameError) {
-            return `URL hostname is invalid: ${hostnameError}`;
-        }
-
-        return null;
+        return validateUrlComponents(urlObj.protocol, urlObj.hostname, urlObj.port || null);
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (_e) {
-        return "Invalid URL format";
+        const parsed = parseUrlAuthorityFallback(trimmedUrl);
+        if (!parsed) {
+            return "Invalid URL format";
+        }
+        return validateUrlComponents(parsed.protocol, parsed.hostname, parsed.port);
     }
 };
 

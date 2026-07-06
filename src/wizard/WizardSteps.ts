@@ -10,6 +10,7 @@ import {
     validateHostnameOrIP,
     validateManualNtpServers,
     validatePort,
+    validateURL,
     validateVlanConfig,
     hasUniqueLabelKeys,
     validateLabelKey,
@@ -170,6 +171,10 @@ export const validateEnrollmentStep = (model: Model): boolean => {
         return false;
     }
 
+    if (validateURL(endpoint, true) !== null) {
+        return false;
+    }
+
     return validateFlightctlCredentials(enrollment.credentials);
 };
 
@@ -187,9 +192,7 @@ export const validateLabelsStep = (model: Model): boolean => {
         return false;
     }
 
-    const activeDeviceLabels = model.labels.deviceLabels.filter(
-        ({ key, value }) => key.length > 0 || value.length > 0
-    );
+    const activeDeviceLabels = model.labels.deviceLabels.filter(({ key, value }) => key.length > 0 || value.length > 0);
     if (!hasUniqueLabelKeys(activeDeviceLabels)) {
         return false;
     }

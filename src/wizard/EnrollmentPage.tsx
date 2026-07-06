@@ -12,6 +12,7 @@ import { Divider } from "@patternfly/react-core/dist/esm/components/Divider/inde
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { TextArea } from "@patternfly/react-core/dist/esm/components/TextArea/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 
@@ -195,9 +196,8 @@ export const EnrollmentPage = () => {
                                                                                     label={_("Token")}
                                                                                     isRequired
                                                                                 >
-                                                                                    <TextInput
+                                                                                    <TextArea
                                                                                         id="credential-token"
-                                                                                        type="password"
                                                                                         value={newToken}
                                                                                         onChange={(_event, value) =>
                                                                                             updateServiceCredentials({
@@ -205,6 +205,7 @@ export const EnrollmentPage = () => {
                                                                                                 token: value,
                                                                                             })
                                                                                         }
+                                                                                        rows={2}
                                                                                         isRequired
                                                                                     />
                                                                                     <Button

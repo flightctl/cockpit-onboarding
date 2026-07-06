@@ -5,15 +5,20 @@ import type { GenericLabel, LabelsState } from "../types";
 import type { AliasState } from "../model-context";
 import { resolveAliasValue, ALIAS_LABEL_KEY } from "./alias";
 import { spawnWithParamsFile } from "./spawn-helpers";
-import { CONFIG_ACTION_IDS, indexedActionId, makeStepAction, type StepAction } from "../wizard/enrollment-progress-types";
+import {
+    CONFIG_ACTION_IDS,
+    indexedActionId,
+    makeStepAction,
+    type StepAction,
+} from "../wizard/enrollment-progress-types";
 
 const _ = cockpit.gettext;
 
-const buildLabelMap = (labels: GenericLabel[]): Record<string, string> => {
+const buildLabelMap = (labels: GenericLabel[], isValueRequired: boolean): Record<string, string> => {
     const genericLabels: Record<string, string> = {};
     for (const { key, value } of labels) {
-        if (key && value) {
-            genericLabels[key] = value;
+        if (key && (!isValueRequired || value)) {
+            genericLabels[key] = value || "";
         }
     }
     return genericLabels;
@@ -26,19 +31,21 @@ export async function applyLabelsConfiguration(
 ): Promise<StepAction[]> {
     const actions: StepAction[] = [];
 
-    const defaultLabels = buildLabelMap(labels.deviceLabels);
+    const defaultLabels = buildLabelMap(labels.deviceLabels, false);
     const deviceAlias = resolveAliasValue(alias, hostname);
     if (deviceAlias) {
         defaultLabels[ALIAS_LABEL_KEY] = deviceAlias;
     }
 
-    const systemInfoLabels = buildLabelMap(labels.systemInfoMappings);
+    const systemInfoLabels = buildLabelMap(labels.systemInfoMappings, true);
 
     const defaultCount = Object.keys(defaultLabels).length;
     const systemInfoCount = Object.keys(systemInfoLabels).length;
 
     if (defaultCount === 0 && systemInfoCount === 0) {
-        actions.push(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.LABELS, 0), _("Labels: No changes required"), "success"));
+        actions.push(
+            makeStepAction(indexedActionId(CONFIG_ACTION_IDS.LABELS, 0), _("Labels: No changes required"), "success")
+        );
         return actions;
     }
 
