@@ -18,7 +18,11 @@ const _ = cockpit.gettext;
 type ArpingResult = "conflict" | "available" | "error" | null;
 type GatewayArpingResult = "reachable" | "unreachable" | "error" | null;
 
-export const StaticIpv4Configuration = ({ isSetupInterface = false }: { isSetupInterface?: boolean }) => {
+export const StaticIpv4Configuration = ({
+    hideAvailabilityChecks = false,
+}: {
+    hideAvailabilityChecks?: boolean;
+}) => {
     const { model, updateNestedModel } = useModelContext();
 
     const [validationErrors, setValidationErrors] = React.useState({
@@ -115,7 +119,7 @@ export const StaticIpv4Configuration = ({ isSetupInterface = false }: { isSetupI
         updateNestedModel("networkAddress", "ipv4", { gateway });
     };
 
-    const fieldColSpan = isSetupInterface ? 12 : (10 as gridSpans);
+    const fieldColSpan = hideAvailabilityChecks ? 12 : (10 as gridSpans);
     const buttonColSpan = 2 as gridSpans;
 
     return (
@@ -133,7 +137,7 @@ export const StaticIpv4Configuration = ({ isSetupInterface = false }: { isSetupI
                             />
                         </GridItem>
 
-                        {!isSetupInterface && (
+                        {!hideAvailabilityChecks && (
                             <GridItem md={buttonColSpan}>
                                 <Button
                                     variant="secondary"
@@ -202,7 +206,7 @@ export const StaticIpv4Configuration = ({ isSetupInterface = false }: { isSetupI
                                 placeholder={_("e.g. 192.168.1.1")}
                             />
                         </GridItem>
-                        {!isSetupInterface && (
+                        {!hideAvailabilityChecks && (
                             <GridItem md={buttonColSpan}>
                                 <Button
                                     variant="secondary"

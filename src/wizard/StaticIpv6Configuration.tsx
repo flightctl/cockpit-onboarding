@@ -17,7 +17,11 @@ const _ = cockpit.gettext;
 type Ping6Result = "available" | "conflict" | "error" | null;
 type Ping6GwResult = "reachable" | "unreachable" | "error" | null;
 
-export const StaticIpv6Configuration = ({ isSetupInterface = false }: { isSetupInterface?: boolean }) => {
+export const StaticIpv6Configuration = ({
+    hideAvailabilityChecks = false,
+}: {
+    hideAvailabilityChecks?: boolean;
+}) => {
     const { model, updateNestedModel } = useModelContext();
 
     const [validationErrors, setValidationErrors] = React.useState({
@@ -112,7 +116,7 @@ export const StaticIpv6Configuration = ({ isSetupInterface = false }: { isSetupI
         updateNestedModel("networkAddress", "ipv6", { gateway });
     };
 
-    const fieldColSpan = isSetupInterface ? 12 : (10 as gridSpans);
+    const fieldColSpan = hideAvailabilityChecks ? 12 : (10 as gridSpans);
     const buttonColSpan = 2 as gridSpans;
 
     return (
@@ -130,7 +134,7 @@ export const StaticIpv6Configuration = ({ isSetupInterface = false }: { isSetupI
                                 placeholder={_("e.g. 2001:db8::1/64")}
                             />
                         </GridItem>
-                        {!isSetupInterface && (
+                        {!hideAvailabilityChecks && (
                             <GridItem md={buttonColSpan}>
                                 <Button
                                     variant="secondary"
@@ -184,7 +188,7 @@ export const StaticIpv6Configuration = ({ isSetupInterface = false }: { isSetupI
                                 placeholder={_("e.g. 2001:db8::1")}
                             />
                         </GridItem>
-                        {!isSetupInterface && (
+                        {!hideAvailabilityChecks && (
                             <GridItem md={buttonColSpan}>
                                 <Button
                                     variant="secondary"
