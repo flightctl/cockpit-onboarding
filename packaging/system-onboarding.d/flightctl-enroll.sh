@@ -49,6 +49,8 @@ if [ -n "${1:-}" ] && [ -f "$1" ]; then
     ENROLLMENT_PROXY_USERNAME=$(jq -r '.ENROLLMENT_PROXY_USERNAME // empty' "$1")
     ENROLLMENT_PROXY_PASSWORD=$(jq -r '.ENROLLMENT_PROXY_PASSWORD // empty' "$1")
     ENROLLMENT_PROXY_NO_PROXY=$(jq -r '.ENROLLMENT_PROXY_NO_PROXY // empty' "$1")
+    ENROLLMENT_TLS_MODE=$(jq -r '.ENROLLMENT_TLS_MODE // "system"' "$1")
+    ENROLLMENT_CA_CERT_PEM=$(jq -r '.ENROLLMENT_CA_CERT_PEM // empty' "$1")
     export ENROLLMENT_SERVICE_ID ENROLLMENT_SERVICE_NAME ENROLLMENT_ENDPOINT
     rm -f "$1"
 fi
@@ -143,6 +145,17 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
     cleanup() { rm -rf "$TMPDIR"; }
     trap cleanup EXIT
 
+    # TLS settings passed to flightctl login are persisted in the config
+    # and reused by subsequent commands (e.g. flightctl certificate request).
+    TLS_ARGS=()
+    if [ "${ENROLLMENT_TLS_MODE:-system}" = "insecure" ]; then
+        TLS_ARGS+=("-k")
+    elif [ "${ENROLLMENT_TLS_MODE:-system}" = "customCa" ] && [ -n "${ENROLLMENT_CA_CERT_PEM:-}" ]; then
+        echo "$ENROLLMENT_CA_CERT_PEM" > "$TMPDIR/ca.crt"
+        chmod 600 "$TMPDIR/ca.crt"
+        TLS_ARGS+=("--certificate-authority" "$TMPDIR/ca.crt")
+    fi
+
     # Write credentials JSON to a temp file for --credentials-file
     CREDS_FILE=$(mktemp -p "$TMPDIR" creds.XXXXXX.json)
     echo "$ENROLLMENT_CREDENTIALS_JSON" > "$CREDS_FILE"
@@ -150,7 +163,7 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
 
     # Step 1: Login to management service API
     echo "STEP: Logging into ${ENROLLMENT_SERVICE_NAME}"
-    if ! output=$(flightctl login "$ENROLLMENT_ENDPOINT" --credentials-file "$CREDS_FILE" --config-dir "$TMPDIR" -k 2>&1); then
+    if ! output=$(flightctl login "$ENROLLMENT_ENDPOINT" --credentials-file "$CREDS_FILE" --config-dir "$TMPDIR" "${TLS_ARGS[@]}" 2>&1); then
         echo "ERROR: flightctl login failed"
         echo "$output" >&2
         exit 2

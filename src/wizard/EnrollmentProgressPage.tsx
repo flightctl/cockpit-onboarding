@@ -357,7 +357,14 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                         const endpoint = enrollment.endpoint ?? "";
 
                         if (enrollment.useExisting) {
-                            return await verifyServiceConnectivity(endpoint, true, signalRef.current, onAction);
+                            return await verifyServiceConnectivity(
+                                endpoint,
+                                true,
+                                signalRef.current,
+                                onAction,
+                                enrollment.tlsMode,
+                                enrollment.caCertPem
+                            );
                         }
 
                         const params = buildEnrollmentParams(model, brandName);
