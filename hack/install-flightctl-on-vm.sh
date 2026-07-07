@@ -5,8 +5,7 @@
 #
 # Environment:
 #   SKIP_FLIGHTCTL=1          Skip installation entirely
-#   FLIGHTCTL_REPO_URL        Primary .repo file (default: rpm.flightctl.io for Fedora)
-#   FLIGHTCTL_REPO_FALLBACK   Fallback COPR .repo if primary fails (Fedora only)
+#   FLIGHTCTL_REPO_URL        .repo file (default: COPR @redhat-et/flightctl-dev for Fedora)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,8 +29,7 @@ fi
 
 VM_IP="$1"
 FEDORA_VERSION="${FEDORA_VERSION:-43}"
-FLIGHTCTL_REPO_URL="${FLIGHTCTL_REPO_URL:-https://rpm.flightctl.io/flightctl-fedora.repo}"
-FLIGHTCTL_REPO_FALLBACK="${FLIGHTCTL_REPO_FALLBACK:-https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl/repo/fedora-${FEDORA_VERSION}/flightctl-redhat-et-flightctl-fedora-${FEDORA_VERSION}.repo}"
+FLIGHTCTL_REPO_URL="${FLIGHTCTL_REPO_URL:-https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-${FEDORA_VERSION}/flightctl-redhat-et-flightctl-dev-fedora-${FEDORA_VERSION}.repo}"
 
 run_ssh() {
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -43,33 +41,21 @@ echo "=== Installing flightctl packages on ${VM_IP} ==="
 
 run_ssh \
     FLIGHTCTL_REPO_URL="${FLIGHTCTL_REPO_URL}" \
-    FLIGHTCTL_REPO_FALLBACK="${FLIGHTCTL_REPO_FALLBACK}" \
     bash -s <<'REMOTE'
 set -euo pipefail
 
 PACKAGES=(flightctl-selinux flightctl-cli flightctl-agent)
-REPO_ID="flightctl"
 
-install_repo() {
-    local repo_url="$1"
-    echo "Adding repository: ${repo_url}"
-    sudo dnf install -y dnf-plugins-core
-    sudo rm -f "/etc/yum.repos.d/${REPO_ID}.repo"
-    sudo dnf config-manager addrepo --from-repofile="${repo_url}"
-}
+echo "Adding repository: ${FLIGHTCTL_REPO_URL}"
+sudo dnf install -y dnf-plugins-core
+sudo rm -f /etc/yum.repos.d/flightctl*.repo
+sudo dnf config-manager addrepo --from-repofile="${FLIGHTCTL_REPO_URL}"
 
-try_install() {
-    sudo dnf install -y "${PACKAGES[@]}"
-}
-
-if install_repo "${FLIGHTCTL_REPO_URL}" && try_install; then
-    echo "Installed flightctl packages from ${FLIGHTCTL_REPO_URL}"
-elif install_repo "${FLIGHTCTL_REPO_FALLBACK}" && try_install; then
-    echo "Installed flightctl packages from fallback repo ${FLIGHTCTL_REPO_FALLBACK}"
-else
-    echo "ERROR: Failed to install flightctl packages from primary and fallback repositories" >&2
+if ! sudo dnf install -y "${PACKAGES[@]}"; then
+    echo "ERROR: Failed to install flightctl packages from ${FLIGHTCTL_REPO_URL}" >&2
     exit 1
 fi
+echo "Installed flightctl packages from ${FLIGHTCTL_REPO_URL}"
 
 # Verify the agent package landed; the unit stays disabled until onboarding
 # completes (cockpit-system-onboarding installs a ConditionPathExists gate).
