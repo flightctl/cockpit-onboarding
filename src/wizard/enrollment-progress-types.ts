@@ -61,7 +61,6 @@ export interface AppliedItems {
 }
 
 export interface SystemConfigurationApplyResult extends ServiceActionsResult {
-    singleNic: boolean;
     appliedItems: AppliedItems;
     originalHostname?: string;
 }

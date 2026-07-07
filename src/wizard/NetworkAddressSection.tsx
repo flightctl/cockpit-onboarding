@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import cockpit from "cockpit";
 
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
@@ -7,7 +7,7 @@ import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 
 import { useModelContext } from "../model-context";
-import { getSetupInterface } from "../services/network";
+import { isConnectedViaInterface } from "../services/network";
 import { validateIpv4StaticConfig, validateIpv6StaticConfig } from "../validation";
 
 import FeatureSwitch from "../components/FeatureSwitch";
@@ -20,11 +20,17 @@ import { StaticIpv6Configuration } from "./StaticIpv6Configuration.tsx";
 const _ = cockpit.gettext;
 
 const NetworkAddressSection = () => {
-    const { model, networkManager } = useModelContext();
+    const { model } = useModelContext();
 
-    const interfaces = networkManager?.list_interfaces?.() || [];
-    const setupInterface = getSetupInterface(interfaces);
-    const isSetupInterface = setupInterface !== null && model.networkInterface.selectedInterface === setupInterface;
+    const [isSetupInterface, setIsSetupInterface] = useState(false);
+
+    useEffect(() => {
+        if (model.networkInterface.selectedInterface) {
+            isConnectedViaInterface(model.networkInterface.selectedInterface).then(setIsSetupInterface);
+        } else {
+            setIsSetupInterface(false);
+        }
+    }, [model.networkInterface.selectedInterface]);
 
     // Hide arping/ping availability check buttons when they can't produce reliable results:
     // - setup interface: changing its IP would break the browser session

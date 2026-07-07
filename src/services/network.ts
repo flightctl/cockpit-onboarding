@@ -1,5 +1,5 @@
 import cockpit from "cockpit";
-import { Interface, Ipv4Config, Ipv6Config, NetworkManagerModel } from "../../pkg/networkmanager/interfaces.js";
+import { Interface, NetworkManagerModel } from "../../pkg/networkmanager/interfaces.js";
 import { Model } from "../model-context";
 import { ONBOARDING_PROFILE_PREFIX } from "../paths";
 import { waitForProxy, waitForProxyWithTimeout } from "./dbus-helpers";
@@ -13,22 +13,12 @@ import {
 
 export interface NetworkApplyResult {
     actions: StepAction[];
-    singleNic: boolean;
 }
 
 const NETWORK_ACTION_PREFIX = "config-network";
 
 function pushNetworkAction(actions: StepAction[], actionTitle: string, result: ActionResult = "success"): void {
     actions.push(makeStepAction(indexedActionId(NETWORK_ACTION_PREFIX, actions.length), actionTitle, result));
-}
-
-interface IpAddressData {
-    address: string;
-    prefix: string;
-}
-
-interface IpConfigWithAddressData {
-    AddressData?: IpAddressData[];
 }
 
 export interface ConnectionIpSettings {
@@ -50,10 +40,6 @@ type ActiveConnectionProxy = cockpit.DBusProxy & {
     wait(callback?: () => void): void;
     State?: number;
 };
-
-function getAddressData(config: Ipv4Config | Ipv6Config): IpAddressData[] {
-    return (config as IpConfigWithAddressData).AddressData || [];
-}
 
 function dbusPathResult(result: unknown[]): string {
     const value = result[0];
@@ -84,40 +70,90 @@ export function mapWifiSecurity(security: string): WifiSecurity {
     }
 }
 
-export function getSetupInterface(interfaces: Interface[]): string | null {
-    const hostname = window.location.hostname;
+function normalizeIpv6(addr: string): string {
+    const mappedMatch = addr.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+    if (mappedMatch) {
+        return mappedMatch[1];
+    }
+    return addr.replace(/%.*$/, "");
+}
 
-    if (isLocalhost(hostname)) {
+function parseLocalAddressFromSsLine(line: string): string | null {
+    const fields = line.trim().split(/\s+/);
+    if (fields.length < 4) {
         return null;
     }
+    const localAddrPort = fields[3];
+    let addr: string;
+    if (localAddrPort.startsWith("[")) {
+        addr = localAddrPort.replace(/^\[/, "").replace(/\]:\d+$/, "");
+    } else {
+        addr = localAddrPort.replace(/:\d+$/, "");
+    }
+    if (!addr || addr === "*") {
+        return null;
+    }
+    return normalizeIpv6(addr);
+}
 
-    for (const iface of interfaces) {
-        if (!iface.Device) {
-            continue;
-        }
+function parseAddressFromIpAddrLine(line: string): string | null {
+    const match = line.match(/\s+inet6?\s+([^\s/]+)/);
+    if (!match) {
+        return null;
+    }
+    return normalizeIpv6(match[1]);
+}
 
-        const ip4Config = iface.Device.Ip4Config;
-        if (ip4Config) {
-            const addressData = getAddressData(ip4Config);
-            for (const addr of addressData) {
-                if (addr.address === hostname) {
-                    return iface.Name;
-                }
-            }
-        }
+export async function isConnectedViaInterface(ifaceName: string): Promise<boolean> {
+    if (isLocalhost(window.location.hostname)) {
+        return false;
+    }
 
-        const ip6Config = iface.Device.Ip6Config;
-        if (ip6Config) {
-            const addressData = getAddressData(ip6Config);
-            for (const addr of addressData) {
-                if (addr.address === hostname) {
-                    return iface.Name;
-                }
-            }
+    const port = window.location.port || "9090";
+
+    let cockpitLocalAddrs: Set<string>;
+    try {
+        const ssOutput = await cockpit.spawn(
+            ["ss", "-Htn", "sport", "=", `:${port}`],
+            { err: "message" }
+        );
+        cockpitLocalAddrs = new Set(
+            ssOutput.split("\n")
+                .map(parseLocalAddressFromSsLine)
+                .filter((a): a is string => a !== null)
+        );
+    } catch (error) {
+        console.warn("Failed to query cockpit-ws connections:", error);
+        return false;
+    }
+
+    if (cockpitLocalAddrs.size === 0) {
+        return false;
+    }
+
+    let ifaceAddrs: Set<string>;
+    try {
+        const ipOutput = await cockpit.spawn(
+            ["ip", "-o", "addr", "show", ifaceName],
+            { err: "message" }
+        );
+        ifaceAddrs = new Set(
+            ipOutput.split("\n")
+                .map(parseAddressFromIpAddrLine)
+                .filter((a): a is string => a !== null)
+        );
+    } catch (error) {
+        console.warn("Failed to query interface addresses:", error);
+        return false;
+    }
+
+    for (const addr of cockpitLocalAddrs) {
+        if (ifaceAddrs.has(addr)) {
+            return true;
         }
     }
 
-    return null;
+    return false;
 }
 
 export async function getDefaultInterface(interfaces: Interface[]): Promise<string | null> {
@@ -476,18 +512,16 @@ export async function applyNetworkConfiguration(
 
     if (!networkManager) {
         pushNetworkAction(actions, "NetworkManager unavailable", "error");
-        return { actions, singleNic: false };
+        return { actions };
     }
 
     if (!model.networkInterface.selectedInterface) {
         pushNetworkAction(actions, "No network interface selected", "error");
-        return { actions, singleNic: false };
+        return { actions };
     }
 
     const ifaceName = model.networkInterface.selectedInterface;
     const interfaces: Interface[] = networkManager.list_interfaces();
-    const setupIface = getSetupInterface(interfaces);
-    const isSingleNic = setupIface !== null && setupIface === ifaceName;
 
     try {
         const selectedIface = interfaces.find((iface: Interface) => iface.Name === ifaceName);
@@ -588,9 +622,7 @@ export async function applyNetworkConfiguration(
                 );
 
                 const activeConnPath = dbusPathResult(activeConnResult);
-                if (!isSingleNic) {
-                    await waitForActivation(nmClient, activeConnPath);
-                }
+                await waitForActivation(nmClient, activeConnPath);
 
                 pushNetworkAction(actions, `Activated connection ${connectionId} on ${effectiveIfaceName}`);
             }
@@ -636,7 +668,7 @@ export async function applyNetworkConfiguration(
         throw new Error(`Network configuration failed: ${String(error)}`);
     }
 
-    return { actions, singleNic: isSingleNic };
+    return { actions };
 }
 
 async function deleteOnboardingProfiles(ifaceName?: string): Promise<void> {
