@@ -15,6 +15,14 @@
 #   ENROLLMENT_USE_EXISTING=true: Skip login and certificate steps. Write label/proxy drop-ins
 #     and restart agent when the onboarding gate allows it.
 #
+# Progress protocol — the UI parses stdout lines by prefix:
+#   STEP:  A new step is starting (UI shows spinner)
+#   OK:    The current step succeeded (UI shows checkmark)
+#   ERROR: The current step failed (UI shows error icon)
+#   INFO:  Informational message (UI shows info icon)
+#   DEVICE_URL: Device management URL (captured for "View in UI" link)
+#   (unprefixed lines are captured but not rendered)
+#
 # See: specs/001-system-onboarding/contracts/enrollment-api.md
 set -euo pipefail
 
@@ -68,25 +76,26 @@ finalize_agent_config() {
     # cockpit-system-onboarding installs a systemd drop-in that blocks flightctl-agent
     # until onboarding cleanup creates .onboarding-confirmed.
     if [ ! -f "$ONBOARDING_GATE_FILE" ]; then
-        echo "Onboarding gate active — deferring flightctl-agent start until onboarding completes"
+        echo "INFO: Onboarding gate active — deferring flightctl-agent start until onboarding completes"
         systemctl enable flightctl-agent 2>/dev/null || true
         return 0
     fi
 
-    echo "Restarting flightctl-agent..."
+    echo "STEP: Restarting flightctl-agent"
     if ! systemctl restart flightctl-agent; then
-        echo "Error: failed to restart flightctl-agent" >&2
+        echo "ERROR: Failed to restart flightctl-agent"
         exit 1
     fi
 
     for _ in $(seq 1 15); do
         if systemctl is-active --quiet flightctl-agent; then
+            echo "OK: flightctl-agent is running"
             return 0
         fi
         sleep 1
     done
 
-    echo "Error: flightctl-agent is not running after restart" >&2
+    echo "ERROR: flightctl-agent is not running after restart"
     journalctl -u flightctl-agent -n 30 --no-pager >&2 || true
     exit 1
 }
@@ -94,15 +103,14 @@ finalize_agent_config() {
 # Verify required tools
 for cmd in jq systemctl; do
     if ! command -v "$cmd" &>/dev/null; then
-        echo "Error: '$cmd' is not installed" >&2
+        echo "ERROR: '$cmd' is not installed"
         exit 1
     fi
 done
 
 # Verify flightctl-agent is installed
-if ! systemctl list-unit-files flightctl-agent.service | grep -q flightctl-agent; then
-    echo "Error: flightctl-agent service is not installed" >&2
-    echo "Hint: install the flightctl-agent package before enrolling" >&2
+if ! systemctl cat flightctl-agent.service >/dev/null 2>&1; then
+    echo "ERROR: flightctl-agent service is not installed"
     exit 1
 fi
 
@@ -119,13 +127,13 @@ if [ "$ENROLLMENT_PROXY_ENABLED" = "true" ] && [ -n "$ENROLLMENT_PROXY_HOSTNAME"
     export HTTPS_PROXY="$PROXY_URL"
     export HTTP_PROXY="$PROXY_URL"
     export NO_PROXY="$PROXY_NO_PROXY"
-    echo "Using proxy: ${PROXY_SCHEME}://${ENROLLMENT_PROXY_HOSTNAME}:${ENROLLMENT_PROXY_PORT}"
+    echo "INFO: Using proxy ${PROXY_SCHEME}://${ENROLLMENT_PROXY_HOSTNAME}:${ENROLLMENT_PROXY_PORT}"
 fi
 
 if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
     # Verify flightctl CLI is available for new enrollment
     if ! command -v flightctl &>/dev/null; then
-        echo "Error: 'flightctl' is not installed" >&2
+        echo "ERROR: flightctl CLI is not installed"
         exit 1
     fi
 
@@ -141,16 +149,17 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
     chmod 0600 "$CREDS_FILE"
 
     # Step 1: Login to management service API
-    echo "Logging into ${ENROLLMENT_SERVICE_NAME}..."
+    echo "STEP: Logging into ${ENROLLMENT_SERVICE_NAME}"
     if ! output=$(flightctl login "$ENROLLMENT_ENDPOINT" --credentials-file "$CREDS_FILE" --config-dir "$TMPDIR" -k 2>&1); then
-        echo "Error: flightctl login failed" >&2
+        echo "ERROR: flightctl login failed"
         echo "$output" >&2
         exit 2
     fi
     rm -f "$CREDS_FILE"
+    echo "OK: Logged into ${ENROLLMENT_SERVICE_NAME}"
 
     # Step 2: Request enrollment certificate
-    echo "Requesting enrollment certificate..."
+    echo "STEP: Requesting enrollment certificate"
     # stdout contains the YAML config; stderr has progress output we suppress
     if ! flightctl certificate request \
         --signer=enrollment \
@@ -158,46 +167,35 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
         --output=embedded \
         --config-dir "$TMPDIR" \
         -d "$TMPDIR" > "$TMPDIR/config.yaml" 2>"$TMPDIR/cert-request.log"; then
-        echo "Error: flightctl certificate request failed" >&2
-        cat "$TMPDIR/cert-request.log" >&2
+        echo "ERROR: flightctl certificate request failed: $(cat "$TMPDIR/cert-request.log")"
         exit 1
     fi
+    echo "OK: Enrollment certificate received"
 
     # Step 3: Install agent config and enrollment certificates
-    echo "Installing agent configuration..."
-    mkdir -p "$(dirname "$AGENT_CONFIG")"
-    install_agent_certs "$TMPDIR"
-    install -m 0600 "$TMPDIR/config.yaml" "$AGENT_CONFIG" || {
-        echo "Error: failed to install $AGENT_CONFIG" >&2
+    echo "STEP: Installing agent configuration"
+    if ! mkdir -p "$(dirname "$AGENT_CONFIG")"; then
+        echo "ERROR: Failed to create config directory"
         exit 1
-    }
+    fi
+    if ! install_agent_certs "$TMPDIR"; then
+        echo "ERROR: Failed to install agent certificates"
+        exit 1
+    fi
+    if ! install -m 0600 "$TMPDIR/config.yaml" "$AGENT_CONFIG"; then
+        echo "ERROR: Failed to install $AGENT_CONFIG"
+        exit 1
+    fi
+    echo "OK: Agent configuration installed"
 else
-    echo "Using existing enrollment credentials — skipping login and certificate request."
-fi
-
-# Write systemd proxy drop-in for flightctl-agent if proxy is configured
-if [ -n "$PROXY_URL" ]; then
-    PROXY_DROPIN_DIR="/etc/systemd/system/flightctl-agent.service.d"
-    PROXY_DROPIN="${PROXY_DROPIN_DIR}/proxy.conf"
-    echo "Writing proxy configuration to $PROXY_DROPIN..."
-    mkdir -p "$PROXY_DROPIN_DIR"
-    PROXY_TMPFILE=$(mktemp "${PROXY_DROPIN}.XXXXXX")
-    cat > "$PROXY_TMPFILE" <<PROXY_EOF
-[Service]
-Environment="HTTPS_PROXY=${PROXY_URL}"
-Environment="HTTP_PROXY=${PROXY_URL}"
-Environment="NO_PROXY=${PROXY_NO_PROXY}"
-PROXY_EOF
-    chmod 0600 "$PROXY_TMPFILE"
-    mv "$PROXY_TMPFILE" "$PROXY_DROPIN"
-    systemctl daemon-reload
+    echo "INFO: Using existing enrollment credentials — skipping login and certificate request"
 fi
 
 finalize_agent_config
 
 if [ "${ENROLLMENT_USE_EXISTING:-false}" = "true" ]; then
-    echo "Successfully restarted ${ENROLLMENT_SERVICE_NAME} agent with existing credentials"
+    echo "OK: Flight Control agent restarted with existing credentials"
 else
-    echo "Successfully provisioned enrollment credentials to ${ENROLLMENT_SERVICE_NAME} agent"
+    echo "OK: Enrollment credentials provisioned to Flight Control agent"
 fi
 exit 0
