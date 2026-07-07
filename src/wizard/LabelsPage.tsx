@@ -264,9 +264,12 @@ export const LabelsPage = () => {
         const error = validateSystemHostname(value);
         setHostnameValidationError(error);
         updateModel("hostname", { value });
-        // If the alias is set to match the hostname, but after the changes it would be an invalid label value,
-        // the "hostname" AliasMode becomes disabled, so we change selection to CUSTOM.
-        if (aliasMode === AliasMode.HOSTNAME && validateLabelValue(value) !== null) {
+    };
+
+    // If the alias is set to match the hostname, but after the changes it would be an invalid label value,
+    // the "hostname" AliasMode becomes disabled, so we change selection to CUSTOM.
+    const onHostnameBlur = () => {
+        if (aliasMode === AliasMode.HOSTNAME && validateLabelValue(model.hostname.value) !== null) {
             setAliasMode(AliasMode.CUSTOM);
         }
     };
@@ -379,6 +382,7 @@ export const LabelsPage = () => {
                                     value={model.hostname.value}
                                     error={hostnameValidationError}
                                     onChange={(_, value) => setHostname(value)}
+                                    onBlur={onHostnameBlur}
                                     placeholder={_("e.g. my-system.example.com")}
                                     isDisabled={!isInitialized}
                                 />
