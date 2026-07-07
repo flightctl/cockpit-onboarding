@@ -29,7 +29,8 @@ import { useModelContext } from "../model-context";
 import { useConfig } from "../app";
 import { systemConfigurationService } from "../system-config";
 import { getHostnameInfo } from "../services/hostname";
-import { getSetupInterface, applyNetworkConfiguration, rollbackNetworkConfiguration } from "../services/network";
+import { getSetupInterface, applyNetworkConfiguration } from "../services/network";
+import { executeRollbackScript, type RollbackManifest } from "../services/rollback";
 import { writeAttemptedMarker } from "../attempted-marker";
 import { SCRIPT_RUN_APPLY_ENROLL, MARKER_COMPLETE } from "../paths";
 import { SubtleHeading } from "../components/Headings.js";
@@ -206,6 +207,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
     const [delegatedFailureMessage, setDelegatedFailureMessage] = useState<string | null>(null);
     const [expandedStepIds, setExpandedStepIds] = useState<string[]>([]);
     const networkAppliedRef = React.useRef(false);
+    const rollbackManifestRef = React.useRef<RollbackManifest>({});
     const shouldCancelRef = React.useRef(false);
     const signalRef = React.useRef<CancellationSignal>({ cancelled: false });
     const delegatedFailureHandledRef = React.useRef(false);
@@ -392,6 +394,28 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             }
             networkAppliedRef.current = true;
             updateModel("networkInterface", { wifiPassword: null });
+
+            const manifest: RollbackManifest = {};
+            if (result.appliedItems.hostname && result.originalHostname) {
+                manifest.hostname = { original: result.originalHostname };
+            }
+            if (result.appliedItems.network) {
+                const ifaceName = model.networkInterface.selectedInterface || "";
+                const vlanId = model.networkInterface.vlanId;
+                const isVlan = model.networkInterface.vlanEnabled && vlanId !== null && model.networkInterface.interfaceType !== "wifi";
+                const effectiveIfaceName = isVlan ? `${ifaceName}.${vlanId}` : ifaceName;
+                manifest.network = { connectionId: `flightctl-onboarding-${effectiveIfaceName}` };
+            }
+            if (result.appliedItems.ntp) {
+                manifest.ntp = true;
+            }
+            if (result.appliedItems.proxy) {
+                manifest.proxy = true;
+            }
+            if (result.appliedItems.labels) {
+                manifest.labels = true;
+            }
+            rollbackManifestRef.current = manifest;
 
             emit({
                 id: ENROLLMENT_ACTION_IDS.APPLY_CONFIGURATION,
@@ -671,16 +695,38 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 setExpandedStepIds((prev) => (prev.includes(step.id) ? prev : [...prev, step.id]));
                 completedSteps++;
             } else {
-                if (networkAppliedRef.current) {
-                    try {
-                        const rollbackResults = await rollbackNetworkConfiguration();
-                        rollbackResults.forEach((action) => {
-                            upsertStepAction(resultsBuffer, action);
-                        });
+                const hasRollbackItems = Object.keys(rollbackManifestRef.current).length > 0;
+                if (hasRollbackItems) {
+                    const rollbackName = _("Reverting changes");
+                    setSteps((prev) =>
+                        prev.map((s) =>
+                            s.id === "finalize" ? { ...s, name: rollbackName, status: "running" } : s
+                        )
+                    );
+                    resultsBuffer.push({ type: "header", content: rollbackName });
+                    setResults([...resultsBuffer]);
+
+                    const rollbackOnAction: OnStepAction = (action) => {
+                        upsertStepAction(resultsBuffer, action);
                         setResults([...resultsBuffer]);
-                    } catch (rollbackError) {
-                        console.error("Network rollback failed:", rollbackError);
-                    }
+                    };
+
+                    const rollbackResult = await executeRollbackScript(
+                        rollbackManifestRef.current,
+                        rollbackOnAction
+                    );
+
+                    const hasErrors = rollbackResult.actions.some((a) => a.result === "error");
+                    setSteps((prev) =>
+                        prev.map((s) =>
+                            s.id === "finalize"
+                                ? { ...s, status: hasErrors ? "warning" : "success" }
+                                : s
+                        )
+                    );
+                    setExpandedStepIds((prev) =>
+                        prev.includes("finalize") ? prev : [...prev, "finalize"]
+                    );
                 }
                 await disarmWatchdog();
                 updateModel("enrollmentProgress", { executionState: "failed" });
@@ -999,7 +1045,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                                     </Stack>
                                 ) : (
                                     _(
-                                        "The enrollment process was cancelled or failed. Network changes have been rolled back. Please check the step details and try again."
+                                        "The enrollment process was cancelled or failed. Applied changes have been reverted. Please check the step details and try again."
                                     )
                                 )}
                             </Alert>
@@ -1019,15 +1065,9 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                                 title={_("Onboarding continues in the background")}
                                 className="pf-v6-u-mt-md"
                             >
-                                {(() => {
-                                    const hostname = model.hostname.value?.trim() || _("this device");
-                                    return cockpit.format(
-                                        _(
-                                            "Network activation and enrollment continue in the background. Your browser connection will be lost when the new network configuration is applied. You do not need to click Finish — onboarding completes automatically. When the network is ready, open Cockpit again at https://$0:9090 using a system account. The temporary onboarding account is removed when setup finishes. Progress is logged to /var/log/cockpit-system-onboarding-apply.log."
-                                        ),
-                                        hostname
-                                    );
-                                })()}
+                                {_(
+                                    "Network activation and enrollment continue in the background. Your browser connection will be lost when the new network configuration is applied. You do not need to click Finish — onboarding completes automatically. Progress is logged to /var/log/cockpit-system-onboarding-apply.log."
+                                )}
                             </Alert>
                         )}
                     </CardBody>

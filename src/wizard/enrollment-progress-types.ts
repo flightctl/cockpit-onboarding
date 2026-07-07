@@ -33,9 +33,6 @@ export const CONFIG_ACTION_IDS = {
     NTP: "config-ntp",
     PROXY: "config-proxy",
     LABELS: "config-labels",
-    ROLLBACK_PROFILES: "rollback-profiles",
-    ROLLBACK_FALLBACK: "rollback-fallback",
-    ROLLBACK_ERROR: "rollback-error",
 } as const;
 
 export function makeStepAction(id: string, actionTitle: string, result: ActionResult): StepAction {
@@ -55,8 +52,18 @@ export interface StepExecutionResult extends ServiceActionsResult {
     deviceUrl?: string;
 }
 
+export interface AppliedItems {
+    hostname: boolean;
+    network: boolean;
+    ntp: boolean;
+    proxy: boolean;
+    labels: boolean;
+}
+
 export interface SystemConfigurationApplyResult extends ServiceActionsResult {
     singleNic: boolean;
+    appliedItems: AppliedItems;
+    originalHostname?: string;
 }
 
 export type EnrollmentProgressResultItem =

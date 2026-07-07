@@ -9,6 +9,7 @@ import {
     CONFIG_ACTION_IDS,
     indexedActionId,
     makeStepAction,
+    type AppliedItems,
     type StepAction,
     type SystemConfigurationApplyResult,
 } from "./wizard/enrollment-progress-types";
@@ -64,6 +65,16 @@ export class SystemConfigurationService {
         const actions: StepAction[] = [];
         let hasErrors = false;
         let singleNic = false;
+        const appliedItems: AppliedItems = {
+            hostname: false,
+            network: false,
+            ntp: false,
+            proxy: false,
+            labels: false,
+        };
+
+        const hostnameInfo = await getHostnameInfo().catch(() => ({ hostname: "", staticHostname: "" }));
+        const originalHostname = hostnameInfo.staticHostname || hostnameInfo.hostname;
 
         if (model.hostname.value && model.hostname.value.trim()) {
             try {
@@ -71,6 +82,7 @@ export class SystemConfigurationService {
                 actions.push(
                     makeStepAction(CONFIG_ACTION_IDS.HOSTNAME, `Hostname set to: ${model.hostname.value}`, "success")
                 );
+                appliedItems.hostname = true;
             } catch (error) {
                 actions.push(makeStepAction(CONFIG_ACTION_IDS.HOSTNAME, String(error), "error"));
                 hasErrors = true;
@@ -98,6 +110,7 @@ export class SystemConfigurationService {
                 );
                 actions.push(...networkApplyResult.actions);
                 singleNic = networkApplyResult.singleNic;
+                appliedItems.network = true;
             } catch (error) {
                 actions.push(makeStepAction(CONFIG_ACTION_IDS.NETWORK_UNAVAILABLE, String(error), "error"));
                 hasErrors = true;
@@ -118,6 +131,7 @@ export class SystemConfigurationService {
                 model.networkServices.ntp.autoConfig
             );
             actions.push(...ntpActions);
+            appliedItems.ntp = true;
         } catch (error) {
             actions.push(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.NTP, 0), String(error), "error"));
             hasErrors = true;
@@ -126,6 +140,7 @@ export class SystemConfigurationService {
         try {
             const proxyActions = await applyProxyConfiguration(model.networkServices.proxy);
             actions.push(...proxyActions);
+            appliedItems.proxy = true;
         } catch (error) {
             actions.push(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.PROXY, 0), String(error), "error"));
             hasErrors = true;
@@ -134,6 +149,7 @@ export class SystemConfigurationService {
         try {
             const labelActions = await applyLabelsConfiguration(model.labels, model.alias, model.hostname.value);
             actions.push(...labelActions);
+            appliedItems.labels = true;
         } catch (error) {
             actions.push(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.LABELS, 0), String(error), "error"));
             hasErrors = true;
@@ -143,6 +159,8 @@ export class SystemConfigurationService {
             success: !hasErrors,
             actions,
             singleNic,
+            appliedItems,
+            originalHostname,
         };
     }
 

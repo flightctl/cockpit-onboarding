@@ -5,7 +5,6 @@ import { ONBOARDING_PROFILE_PREFIX } from "../paths";
 import { waitForProxy, waitForProxyWithTimeout } from "./dbus-helpers";
 import { WifiSecurity } from "../types.js";
 import {
-    CONFIG_ACTION_IDS,
     indexedActionId,
     makeStepAction,
     type ActionResult,
@@ -690,35 +689,3 @@ async function deleteOnboardingProfiles(ifaceName?: string): Promise<void> {
     }
 }
 
-export async function rollbackNetworkConfiguration(): Promise<StepAction[]> {
-    const actions: StepAction[] = [];
-
-    try {
-        await deleteOnboardingProfiles();
-        actions.push(
-            makeStepAction(
-                CONFIG_ACTION_IDS.ROLLBACK_PROFILES,
-                "Rolled back network configuration: deleted onboarding profiles",
-                "success"
-            )
-        );
-        actions.push(
-            makeStepAction(
-                CONFIG_ACTION_IDS.ROLLBACK_FALLBACK,
-                "NetworkManager will fall back to previous connection automatically",
-                "success"
-            )
-        );
-    } catch (error) {
-        actions.push(
-            makeStepAction(
-                CONFIG_ACTION_IDS.ROLLBACK_ERROR,
-                `Failed to roll back network configuration: ${String(error)}`,
-                "error"
-            )
-        );
-        console.error("Network rollback error:", error);
-    }
-
-    return actions;
-}
