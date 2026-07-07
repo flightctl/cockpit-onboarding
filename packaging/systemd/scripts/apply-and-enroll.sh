@@ -17,7 +17,7 @@
 #   ],
 #   "hostname": "mydevice",
 #   "originalHostname": "localhost",
-#   "connectivityTestHost": "www.google.com"
+#   "connectivityTestHost": "flightctl.example.com"
 # }
 set -euo pipefail
 
@@ -74,7 +74,7 @@ INTERFACE_NAME=$(jq -r '.interfaceName // empty' "$PARAMS_FILE")
 EFFECTIVE_IFACE=$(jq -r '.effectiveIfaceName // .interfaceName // empty' "$PARAMS_FILE")
 HOSTNAME=$(jq -r '.hostname // empty' "$PARAMS_FILE")
 ORIGINAL_HOSTNAME=$(jq -r '.originalHostname // empty' "$PARAMS_FILE")
-CONNECTIVITY_TEST_HOST=$(jq -r '.connectivityTestHost // "www.google.com"' "$PARAMS_FILE")
+CONNECTIVITY_TEST_HOST=$(jq -r '.connectivityTestHost // empty' "$PARAMS_FILE")
 
 PROXY_MARKER="# cockpit-system-onboarding proxy"
 

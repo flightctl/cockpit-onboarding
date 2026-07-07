@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import cockpit from "cockpit";
 
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
@@ -12,6 +12,8 @@ import {
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Card, CardBody } from "@patternfly/react-core/dist/esm/components/Card/index.js";
+import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
+import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/Label";
 import { LabelGroup } from "@patternfly/react-core/dist/esm/components/Label/LabelGroup";
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
@@ -19,6 +21,7 @@ import { useWizardContext } from "@patternfly/react-core/dist/esm/components/Wiz
 import { ExclamationTriangleIcon } from "@patternfly/react-icons";
 import { Icon } from "@patternfly/react-core/dist/esm/components/Icon";
 
+import FormHelperText from "../components/HelperTexts";
 import { AliasMode, useModelContext } from "../model-context";
 import { useConfig } from "../app";
 import { getBrandName } from "../flightctl-enrollment";
@@ -26,6 +29,7 @@ import { getSetupInterface } from "../services/network";
 import { resolveAliasValue } from "../services/alias";
 import { WIZARD_STEP_IDS, type WizardStepId } from "./WizardSteps";
 import { GenericLabel, ServiceEnrollmentConfig } from "../types";
+import { validateHostnameOrIP } from "../validation";
 import WithTooltip from "../components/WithTooltip";
 
 const _ = cockpit.gettext;
@@ -205,9 +209,43 @@ const ReviewSectionCard = ({
 };
 
 export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelectedEnrollments }) => {
-    const { model, networkManager } = useModelContext();
+    const { model, updateModel, networkManager } = useModelContext();
     const { config } = useConfig();
     const brandName = getBrandName(config);
+
+    const defaultEndpoint = config?.flightctl?.defaultEndpoint ?? "";
+
+    useEffect(() => {
+        if (model.connectivityTestHostEdited) {
+            return;
+        }
+
+        const enrollment = model.enrollment;
+        if (enrollment.selected) {
+            let endpoint = enrollment.endpoint;
+            if (!endpoint && !enrollment.useExisting) {
+                endpoint = defaultEndpoint;
+            }
+            if (endpoint) {
+                try {
+                    const url = new URL(endpoint);
+                    updateModel("connectivityTestHost", url.hostname);
+                } catch {
+                    updateModel("connectivityTestHost", endpoint);
+                }
+                return;
+            }
+        }
+
+        const configHost = config?.connectivityTest?.host || "cockpit-project.org";
+        updateModel("connectivityTestHost", configHost);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [model.enrollment, defaultEndpoint]);
+
+    const setConnectivityTestHost = (value: string) => {
+        updateModel("connectivityTestHostEdited", true);
+        updateModel("connectivityTestHost", value);
+    };
 
     const interfaces = networkManager?.list_interfaces() || [];
     const setupIface = getSetupInterface(interfaces);
@@ -455,6 +493,44 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
                                 brandName={brandName}
                             />
                         </ReviewSectionCard>
+                    </StackItem>
+
+                    <StackItem>
+                        <Card isCompact>
+                            <CardBody>
+                                <FormGroup
+                                    label={_("Connectivity test host")}
+                                    isRequired
+                                >
+                                    <TextInput
+                                        id="review-connectivity-test-host"
+                                        value={model.connectivityTestHost}
+                                        onChange={(_event, value) =>
+                                            setConnectivityTestHost(value)
+                                        }
+                                        isRequired
+                                        validated={
+                                            validateHostnameOrIP(model.connectivityTestHost) === null
+                                                ? "default"
+                                                : "error"
+                                        }
+                                    />
+                                    <FormHelperText
+                                        content={
+                                            validateHostnameOrIP(model.connectivityTestHost) ??
+                                            _(
+                                                "Network connectivity to this host will be verified after applying network changes."
+                                            )
+                                        }
+                                        variant={
+                                            validateHostnameOrIP(model.connectivityTestHost) === null
+                                                ? "default"
+                                                : "error"
+                                        }
+                                    />
+                                </FormGroup>
+                            </CardBody>
+                        </Card>
                     </StackItem>
 
                     <StackItem>

@@ -63,6 +63,7 @@ import {
     validateEnrollmentStep,
     validateLabelsStep,
     validateNetworkServicesConfig,
+    validateReviewStep,
 } from "./wizard/WizardSteps.ts";
 
 import { MARKER_COMPLETE, SCRIPT_CLEANUP, WATCHDOG_STATUS } from "./paths";
@@ -326,6 +327,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
     const isNetworkServicesConfigValid = validateNetworkServicesConfig(model);
     const isEnrollmentStepValid = validateEnrollmentStep(model);
     const isLabelsStepValid = validateLabelsStep(model);
+    const isReviewStepValid = validateReviewStep(model);
 
     // Map step index to validation state
     const stepValidations = [
@@ -333,7 +335,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
         isNetworkServicesConfigValid,
         isEnrollmentStepValid,
         isLabelsStepValid,
-        true,
+        isReviewStepValid,
         true,
     ];
 
@@ -541,6 +543,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                         id={WIZARD_STEP_IDS.review}
                         footer={{
                             nextButtonText: reviewButtonText,
+                            isNextDisabled: !isReviewStepValid,
                             isCancelHidden: true,
                             // onMouseDown runs before Next navigation checks whether the progress step is enabled
                             nextButtonProps: { onMouseDown: authorizeApply },

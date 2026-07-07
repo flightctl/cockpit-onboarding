@@ -40,7 +40,7 @@ const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
         enabled: false,
     },
     connectivityTest: {
-        host: "www.google.com",
+        host: "cockpit-project.org",
     },
 };
 
