@@ -277,7 +277,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 },
                 {
                     id: "test-connectivity",
-                    name: _("Testing network connectivity"),
+                    name: cockpit.format(_("Testing network connectivity to $0"), model.connectivityTestHost),
                     status: "pending",
                     isBuiltIn: true,
                 },
@@ -315,7 +315,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 },
                 {
                     id: "test-connectivity",
-                    name: _("Testing network connectivity"),
+                    name: cockpit.format(_("Testing network connectivity to $0"), model.connectivityTestHost),
                     status: "pending",
                     isBuiltIn: true,
                 },
@@ -425,7 +425,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
     };
 
     const testConnectivity = async (onAction?: OnStepAction): Promise<StepExecutionResult> => {
-        const testHost = model.connectivityTestHost || "www.google.com";
+        const testHost = model.connectivityTestHost;
         const parentIface = model.networkInterface.selectedInterface || "";
         const vlanId = model.networkInterface.vlanId;
         const iface =
@@ -550,7 +550,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             enrollmentScripts: enrollmentScriptEntries,
             hostname: model.hostname.value,
             originalHostname,
-            connectivityTestHost: model.connectivityTestHost || "www.google.com",
+            connectivityTestHost: model.connectivityTestHost,
         };
         const masterParamsFile = await createSecureTempFile(JSON.stringify(masterParams), ".onboarding-apply-");
         tempFilesToCleanup.push(masterParamsFile);
@@ -613,7 +613,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         updateModel("enrollmentProgress", { executionState: "running" });
 
         await writeAttemptedMarker(model);
-        const testHost = model.connectivityTestHost || "www.google.com";
+        const testHost = model.connectivityTestHost;
         const watchdogTimeout = model.networkInterface.interfaceType === "wifi" ? 240 : 600;
         await armWatchdog(testHost, watchdogTimeout);
 

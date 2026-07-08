@@ -162,7 +162,10 @@ fi
 
 CONNECTIVITY_TEST_HOST=$(cat "$WATCHDOG_STATE_FILE" 2>/dev/null || echo "")
 if [ -z "$CONNECTIVITY_TEST_HOST" ] || [ "$CONNECTIVITY_TEST_HOST" = "armed" ]; then
-    CONNECTIVITY_TEST_HOST="www.google.com"
+    log "No connectivity test host configured, cannot verify network — keeping current configuration"
+    write_status "no_host" "No connectivity test host was configured for watchdog verification"
+    cleanup_watchdog
+    exit 0
 fi
 
 if [ -f "$MARKER_FILE" ]; then

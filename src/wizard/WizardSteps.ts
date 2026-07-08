@@ -259,10 +259,8 @@ export const validateNetworkServicesStep = (model: Model): boolean => {
 
 /**
  * Validate the review step
- * No validation needed - this is a summary/review page
+ * Required: A connectivity test host must be configured
  */
-export const validateReviewStep = (): boolean => {
-    // Review step has no validation requirements
-    // It's just a summary of all previous steps
-    return true;
+export const validateReviewStep = (model: Model): boolean => {
+    return validateHostnameOrIP(model.connectivityTestHost) === null;
 };

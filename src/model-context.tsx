@@ -62,6 +62,7 @@ export interface Model {
     enrollment: ServiceEnrollmentConfig;
     labels: LabelsState;
     connectivityTestHost: string;
+    connectivityTestHostEdited: boolean;
     enrollmentProgress: {
         currentStep: number; // 0-3
         stepStates: ("pending" | "running" | "success" | "error")[];
@@ -157,6 +158,7 @@ const initialModel: Model = {
         systemInfoMappings: [],
     },
     connectivityTestHost: "",
+    connectivityTestHostEdited: false,
     enrollmentProgress: {
         currentStep: 0,
         stepStates: ["pending", "pending", "pending", "pending"],
@@ -509,7 +511,7 @@ export const ModelProvider: React.FunctionComponent<{
 
             const flightctlEndpoint = config?.flightctl?.defaultEndpoint || flightctlConfig.serverUrl || "";
 
-            let connectivityHost = config?.connectivityTest?.host || "www.google.com";
+            let connectivityHost = config?.connectivityTest?.host || "cockpit-project.org";
             if (flightctlEndpoint) {
                 try {
                     const url = new URL(flightctlEndpoint);

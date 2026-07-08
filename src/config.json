@@ -20,7 +20,7 @@
     "defaultEndpoint": ""
   },
   "connectivityTest": {
-    "host": "www.google.com"
+    "host": "cockpit-project.org"
   },
   "led": {
     "enabled": false,
