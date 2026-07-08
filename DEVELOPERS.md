@@ -86,7 +86,7 @@ Create a Fedora QEMU/KVM VM pre-provisioned with the onboarding RPM, dual ethern
 make deploy-test-vm
 ```
 
-This downloads a Fedora Cloud image, creates a VM with two ethernet interfaces and two virtual WiFi radios (`mac80211_hwsim`), installs all dependencies, builds and installs the onboarding RPM, installs `flightctl-cli`, `flightctl-agent`, and `flightctl-selinux` from [rpm.flightctl.io](https://rpm.flightctl.io/), and starts the setup service. The VM IP is printed at the end — access the wizard at `https://<ip>:9090`.
+This downloads a Fedora Cloud image, creates a VM with two ethernet interfaces and two virtual WiFi radios (`mac80211_hwsim`), installs all dependencies, builds and installs the onboarding RPM, installs `flightctl-cli`, `flightctl-agent`, and `flightctl-selinux` from [COPR @redhat-et/flightctl-dev](https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/), and starts the setup service. The VM IP is printed at the end — access the wizard at `https://<ip>:9090`.
 
 To install flightctl packages on an existing test VM without redeploying:
 

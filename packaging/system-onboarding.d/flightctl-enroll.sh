@@ -5,12 +5,9 @@
 # Reads credentials from ENROLLMENT_CREDENTIALS_JSON and endpoint from
 # ENROLLMENT_ENDPOINT environment variables.
 #
-# Expected credential fields (from credentialsSchema, oneOf):
-#   Variant 1 - Token auth:
-#     token (required) - Flight Control API token
-#   Variant 2 - Username & password:
-#     username (required) - Flight Control username
-#     password (required) - Flight Control password
+# Credentials are passed via --credentials-file (a JSON file with 0600
+# permissions containing token or username+password fields). This avoids
+# exposing secrets in /proc/PID/cmdline.
 #
 # Modes:
 #   ENROLLMENT_USE_EXISTING=false (default): Login, request certificate, install agent config,
@@ -132,40 +129,25 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
         exit 1
     fi
 
-    # Parse credentials from environment (supports token or username+password)
-    TOKEN=$(echo "$ENROLLMENT_CREDENTIALS_JSON" | jq -r '.token // empty')
-    USERNAME=$(echo "$ENROLLMENT_CREDENTIALS_JSON" | jq -r '.username // empty')
-    PASSWORD=$(echo "$ENROLLMENT_CREDENTIALS_JSON" | jq -r '.password // empty')
-
-    # Validate that we have at least one auth method
-    if [ -z "$TOKEN" ] && { [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; }; then
-        echo "Error: credentials must contain either 'token' or both 'username' and 'password'" >&2
-        exit 2
-    fi
-
     # Create isolated temp directory for flightctl client config
     TMPDIR=$(mktemp -d)
     chmod 700 "$TMPDIR"
     cleanup() { rm -rf "$TMPDIR"; }
     trap cleanup EXIT
 
+    # Write credentials JSON to a temp file for --credentials-file
+    CREDS_FILE=$(mktemp -p "$TMPDIR" creds.XXXXXX.json)
+    echo "$ENROLLMENT_CREDENTIALS_JSON" > "$CREDS_FILE"
+    chmod 0600 "$CREDS_FILE"
+
     # Step 1: Login to management service API
     echo "Logging into ${ENROLLMENT_SERVICE_NAME}..."
-    if [ -n "$TOKEN" ]; then
-        if ! output=$(flightctl login "$ENROLLMENT_ENDPOINT" --token "$TOKEN" --config-dir "$TMPDIR" -k 2>&1); then
-            echo "Error: flightctl login failed (token auth)" >&2
-            echo "$output" >&2
-            exit 2
-        fi
-    else
-        # Note: -p exposes password in /proc/PID/cmdline; unavoidable with current
-        # flightctl CLI. The isolated temp config dir limits exposure window.
-        if ! output=$(flightctl login "$ENROLLMENT_ENDPOINT" -u "$USERNAME" -p "$PASSWORD" --config-dir "$TMPDIR" -k 2>&1); then
-            echo "Error: flightctl login failed (password auth)" >&2
-            echo "$output" >&2
-            exit 2
-        fi
+    if ! output=$(flightctl login "$ENROLLMENT_ENDPOINT" --credentials-file "$CREDS_FILE" --config-dir "$TMPDIR" -k 2>&1); then
+        echo "Error: flightctl login failed" >&2
+        echo "$output" >&2
+        exit 2
     fi
+    rm -f "$CREDS_FILE"
 
     # Step 2: Request enrollment certificate
     echo "Requesting enrollment certificate..."
