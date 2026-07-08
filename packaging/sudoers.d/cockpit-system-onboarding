@@ -23,6 +23,9 @@ onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/apply-labe
 # Finalization script (writes completion marker)
 onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/finalize-onboarding.sh *
 
+# Rollback script (reverts applied configuration on failure)
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/rollback-config.sh *
+
 # Cleanup script (executed after successful onboarding)
 onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh
 

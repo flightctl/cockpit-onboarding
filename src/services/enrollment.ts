@@ -5,13 +5,12 @@ import { buildFlightctlCredentialsJson, getFlightctlServiceDescriptor } from "..
 import type { CancellationSignal } from "./connectivity";
 import { disarmWatchdog } from "./watchdog";
 import { deleteAttemptedMarker } from "../attempted-marker";
-import { createSecureTempFile } from "./spawn-helpers";
+import { createSecureTempFile, createStreamParser } from "./spawn-helpers";
 import {
     createActionEmitter,
     ENROLLMENT_ACTION_IDS,
     makeStepAction,
     type OnStepAction,
-    type StepAction,
     type StepExecutionResult,
 } from "../wizard/enrollment-progress-types";
 
@@ -68,46 +67,7 @@ export async function executeEnrollmentScript(
     const endpoint = String(params.ENROLLMENT_ENDPOINT || "");
     const { emit, getActions } = createActionEmitter(onAction);
 
-    let streamLineIndex = 0;
-    let streamBuffer = "";
-    let currentStepAction: StepAction | undefined;
-
-    const processLine = (line: string) => {
-        if (line.startsWith("STEP:")) {
-            currentStepAction = {
-                id: `enrollment-stream-${streamLineIndex++}`,
-                actionTitle: line.slice(5).trim(),
-                result: "pending",
-            };
-            emit(currentStepAction);
-        } else if (line.startsWith("OK:")) {
-            const title = line.slice(3).trim();
-            if (currentStepAction) {
-                emit({ ...currentStepAction, actionTitle: title, result: "success" });
-                currentStepAction = undefined;
-            } else {
-                emit({ id: `enrollment-stream-${streamLineIndex++}`, actionTitle: title, result: "success" });
-            }
-        } else if (line.startsWith("ERROR:")) {
-            const title = line.slice(6).trim();
-            if (currentStepAction) {
-                emit({ ...currentStepAction, actionTitle: title, result: "error" });
-                currentStepAction = undefined;
-            } else {
-                emit({ id: `enrollment-stream-${streamLineIndex++}`, actionTitle: title, result: "error" });
-            }
-        } else if (line.startsWith("INFO:")) {
-            emit({ id: `enrollment-stream-${streamLineIndex++}`, actionTitle: line.slice(5).trim(), result: "info" });
-        }
-    };
-
-    const flushStreamBuffer = () => {
-        const trailing = streamBuffer.trim();
-        if (trailing) {
-            processLine(trailing);
-        }
-        streamBuffer = "";
-    };
+    const parser = createStreamParser("enrollment-stream", emit);
 
     try {
         paramsFile = await createSecureTempFile(JSON.stringify(params), `.enrollment-${serviceId}-`);
@@ -119,24 +79,15 @@ export async function executeEnrollmentScript(
             signal.process = proc;
         }
 
-        proc.stream((data) => {
+        parser.attach(proc, (data) => {
             capturedOutput += data;
-            streamBuffer += data;
-            const parts = streamBuffer.split("\n");
-            streamBuffer = parts.pop() ?? "";
-            for (const part of parts) {
-                const line = part.trim();
-                if (line) {
-                    processLine(line);
-                }
-            }
         });
 
         await proc;
         if (signal) {
             signal.process = undefined;
         }
-        flushStreamBuffer();
+        parser.flush();
 
         const deviceUrlMatch = capturedOutput.match(/^DEVICE_URL:\s*(.+)$/m);
         if (deviceUrlMatch) {
@@ -155,12 +106,8 @@ export async function executeEnrollmentScript(
         if (signal) {
             signal.process = undefined;
         }
-        flushStreamBuffer();
-
-        if (currentStepAction) {
-            emit({ ...currentStepAction, result: "error" });
-            currentStepAction = undefined;
-        }
+        parser.flush();
+        parser.markCurrentStepError();
 
         const hasErrorAction = getActions().some((a) => a.result === "error");
         if (!hasErrorAction) {
@@ -169,7 +116,7 @@ export async function executeEnrollmentScript(
                 friendlyMsg = getExitCodeMessage(error.exit_status, endpoint) || "";
             }
             emit({
-                id: `enrollment-stream-${streamLineIndex++}`,
+                id: parser.nextId(),
                 actionTitle: friendlyMsg || "Enrollment script failed",
                 result: "error",
             });

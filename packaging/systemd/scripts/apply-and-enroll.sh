@@ -94,39 +94,31 @@ HOSTNAME=$(jq -r '.hostname // empty' "$PARAMS_FILE")
 ORIGINAL_HOSTNAME=$(jq -r '.originalHostname // empty' "$PARAMS_FILE")
 CONNECTIVITY_TEST_HOST=$(jq -r '.connectivityTestHost // empty' "$PARAMS_FILE")
 
-PROXY_MARKER="# cockpit-system-onboarding proxy"
+ROLLBACK_SCRIPT="/usr/libexec/cockpit-system-onboarding/rollback-config.sh"
 
 rollback() {
-    log "Rolling back: deleting onboarding NM profiles..."
-    nmcli connection delete "$CONNECTION_ID" 2>/dev/null || true
-    if [ "$EFFECTIVE_IFACE" != "$INTERFACE_NAME" ] && [ -n "$INTERFACE_NAME" ]; then
-        nmcli connection delete "${CONNECTION_ID/$EFFECTIVE_IFACE/$INTERFACE_NAME}" 2>/dev/null || true
+    log "Rolling back applied configuration..."
+    local rollback_params
+    rollback_params=$(mktemp /tmp/.rollback-params-XXXXXX)
+    chmod 600 "$rollback_params"
+
+    local manifest='{'
+    manifest+="\"network\":{\"connectionId\":\"$CONNECTION_ID\"}"
+    if [ -n "$ORIGINAL_HOSTNAME" ]; then
+        manifest+=",\"hostname\":{\"original\":\"$ORIGINAL_HOSTNAME\"}"
     fi
+    manifest+=',\"ntp\":true,\"proxy\":true,\"labels\":true}'
+    echo "$manifest" > "$rollback_params"
+
+    "$ROLLBACK_SCRIPT" "$rollback_params" 2>&1 | while IFS= read -r line; do
+        log "$line"
+    done || true
+
     systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
     systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
     rm -f /var/lib/cockpit-system-onboarding/.watchdog-active 2>/dev/null || true
-
-    if [ -n "$ORIGINAL_HOSTNAME" ]; then
-        log "Rolling back hostname to: $ORIGINAL_HOSTNAME"
-        hostnamectl set-hostname "$ORIGINAL_HOSTNAME" 2>/dev/null || true
-    fi
-
-    log "Rolling back NTP configuration..."
-    rm -f /etc/systemd/timesyncd.conf.d/50-cockpit.conf 2>/dev/null || true
-    rm -f /etc/chrony/sources.d/cockpit.sources 2>/dev/null || true
-
-    log "Rolling back proxy configuration..."
-    rm -f /etc/systemd/system.conf.d/50-cockpit-onboarding-proxy.conf 2>/dev/null || true
-    if [ -f /etc/environment ]; then
-        sed -i "/${PROXY_MARKER}/,+3d" /etc/environment 2>/dev/null || true
-    fi
-    systemctl daemon-reexec 2>/dev/null || true
-
-    log "Rolling back labels configuration..."
-    rm -f /etc/flightctl/conf.d/50-cockpit-labels.yaml 2>/dev/null || true
-
     rm -f "$PARAMS_FILE" 2>/dev/null || true
-    log "Rollback complete -- NetworkManager will restore previous connection"
+    log "Rollback complete"
 }
 trap rollback ERR
 

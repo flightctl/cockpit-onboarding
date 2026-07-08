@@ -85,18 +85,20 @@ install -m 755 packaging/systemd/scripts/apply-proxy.sh %{buildroot}%{_libexecdi
 install -m 755 packaging/systemd/scripts/finalize-onboarding.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/watchdog-rollback.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/check-network.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/rollback-config.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/run-watchdog.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 
-# Install sudoers configuration
-mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding
-install -m 644 packaging/sudoers.d/cockpit-system-onboarding %{buildroot}%{_datadir}/cockpit/system-onboarding/sudoers.conf
+# Install sudoers configuration directly to /etc/sudoers.d
+mkdir -p %{buildroot}%{_sysconfdir}/sudoers.d
+install -m 0440 packaging/sudoers.d/cockpit-system-onboarding %{buildroot}%{_sysconfdir}/sudoers.d/cockpit-system-onboarding
 
 # Install module override files (for hiding other Cockpit modules)
 mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/overrides
 install -m 644 packaging/overrides/*.override.json %{buildroot}%{_datadir}/cockpit/system-onboarding/overrides/
 
-# Install polkit rules
-install -m 644 packaging/polkit/49-cockpit-system-onboarding.rules %{buildroot}%{_datadir}/cockpit/system-onboarding/
+# Install polkit rules directly to /etc/polkit-1/rules.d
+mkdir -p %{buildroot}%{_sysconfdir}/polkit-1/rules.d
+install -m 644 packaging/polkit/49-cockpit-system-onboarding.rules %{buildroot}%{_sysconfdir}/polkit-1/rules.d/
 
 # Install example enrollment scripts
 mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d
@@ -202,6 +204,8 @@ fi
 %dir %{_unitdir}/flightctl-agent.service.d
 %{_unitdir}/flightctl-agent.service.d/onboarding-gate.conf
 %{_libexecdir}/cockpit-system-onboarding/
+%config(noreplace) %attr(0440,root,root) %{_sysconfdir}/sudoers.d/cockpit-system-onboarding
+%{_sysconfdir}/polkit-1/rules.d/49-cockpit-system-onboarding.rules
 %dir %{_localstatedir}/lib/cockpit-system-onboarding
 
 %changelog
