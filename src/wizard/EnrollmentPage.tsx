@@ -440,6 +440,7 @@ export const EnrollmentPage = () => {
                                                                 variant="warning"
                                                                 isInline
                                                                 isPlain
+                                                                className="pf-v6-u-mt-sm"
                                                                 title={_(
                                                                     "TLS verification is disabled. The connection to the server will not be verified. This is not recommended for production use."
                                                                 )}
