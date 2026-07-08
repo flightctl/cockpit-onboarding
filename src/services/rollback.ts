@@ -1,10 +1,9 @@
 import cockpit from "cockpit";
 import { SCRIPT_ROLLBACK } from "../paths";
-import { createSecureTempFile } from "./spawn-helpers";
+import { createSecureTempFile, createStreamParser } from "./spawn-helpers";
 import {
     createActionEmitter,
     type OnStepAction,
-    type StepAction,
     type StepExecutionResult,
 } from "../wizard/enrollment-progress-types";
 
@@ -22,47 +21,7 @@ export async function executeRollbackScript(
 ): Promise<StepExecutionResult> {
     const { emit, getActions } = createActionEmitter(onAction);
     let paramsFile = "";
-
-    let streamLineIndex = 0;
-    let streamBuffer = "";
-    let currentStepAction: StepAction | undefined;
-
-    const processLine = (line: string) => {
-        if (line.startsWith("STEP:")) {
-            currentStepAction = {
-                id: `rollback-stream-${streamLineIndex++}`,
-                actionTitle: line.slice(5).trim(),
-                result: "pending",
-            };
-            emit(currentStepAction);
-        } else if (line.startsWith("OK:")) {
-            const title = line.slice(3).trim();
-            if (currentStepAction) {
-                emit({ ...currentStepAction, actionTitle: title, result: "success" });
-                currentStepAction = undefined;
-            } else {
-                emit({ id: `rollback-stream-${streamLineIndex++}`, actionTitle: title, result: "success" });
-            }
-        } else if (line.startsWith("ERROR:")) {
-            const title = line.slice(6).trim();
-            if (currentStepAction) {
-                emit({ ...currentStepAction, actionTitle: title, result: "error" });
-                currentStepAction = undefined;
-            } else {
-                emit({ id: `rollback-stream-${streamLineIndex++}`, actionTitle: title, result: "error" });
-            }
-        } else if (line.startsWith("INFO:")) {
-            emit({ id: `rollback-stream-${streamLineIndex++}`, actionTitle: line.slice(5).trim(), result: "info" });
-        }
-    };
-
-    const flushStreamBuffer = () => {
-        const trailing = streamBuffer.trim();
-        if (trailing) {
-            processLine(trailing);
-        }
-        streamBuffer = "";
-    };
+    const parser = createStreamParser("rollback-stream", emit);
 
     try {
         paramsFile = await createSecureTempFile(JSON.stringify(manifest), ".rollback-params-");
@@ -71,32 +30,18 @@ export async function executeRollbackScript(
             err: "out",
         });
 
-        proc.stream((data) => {
-            streamBuffer += data;
-            const parts = streamBuffer.split("\n");
-            streamBuffer = parts.pop() ?? "";
-            for (const part of parts) {
-                const line = part.trim();
-                if (line) {
-                    processLine(line);
-                }
-            }
-        });
+        parser.attach(proc);
 
         await proc;
-        flushStreamBuffer();
+        parser.flush();
         return { success: true, actions: getActions() };
     } catch {
-        flushStreamBuffer();
-
-        if (currentStepAction) {
-            emit({ ...currentStepAction, result: "error" });
-            currentStepAction = undefined;
-        }
+        parser.flush();
+        parser.markCurrentStepError();
 
         if (!getActions().some((a) => a.result === "error")) {
             emit({
-                id: `rollback-stream-${streamLineIndex++}`,
+                id: parser.nextId(),
                 actionTitle: "Rollback script failed",
                 result: "error",
             });

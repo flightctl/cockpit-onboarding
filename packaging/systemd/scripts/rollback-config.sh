@@ -5,11 +5,7 @@
 # JSON are rolled back; missing keys are skipped. Idempotent — removing
 # nonexistent files is a no-op.
 #
-# Progress protocol — the UI parses stdout lines by prefix:
-#   STEP:  A new step is starting (UI shows spinner)
-#   OK:    The current step succeeded (UI shows checkmark)
-#   ERROR: The current step failed (UI shows error icon)
-#   INFO:  Informational message (UI shows info icon)
+# Progress protocol — see flightctl-enroll.sh for prefix format (STEP/OK/ERROR/INFO).
 #
 # Params JSON format:
 #   {
