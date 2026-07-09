@@ -6,8 +6,8 @@ import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 
+import { useIsConnectedViaInterface } from "../hooks/useIsConnectedViaInterface";
 import { useModelContext } from "../model-context";
-import { getSetupInterface } from "../services/network";
 import { validateIpv4StaticConfig, validateIpv6StaticConfig } from "../validation";
 
 import FeatureSwitch from "../components/FeatureSwitch";
@@ -20,11 +20,9 @@ import { StaticIpv6Configuration } from "./StaticIpv6Configuration.tsx";
 const _ = cockpit.gettext;
 
 const NetworkAddressSection = () => {
-    const { model, networkManager } = useModelContext();
+    const { model } = useModelContext();
 
-    const interfaces = networkManager?.list_interfaces?.() || [];
-    const setupInterface = getSetupInterface(interfaces);
-    const isSetupInterface = setupInterface !== null && model.networkInterface.selectedInterface === setupInterface;
+    const isSetupInterface = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
 
     // Hide arping/ping availability check buttons when they can't produce reliable results:
     // - setup interface: changing its IP would break the browser session

@@ -25,7 +25,7 @@ import FormHelperText from "../components/HelperTexts";
 import { AliasMode, useModelContext } from "../model-context";
 import { useConfig } from "../app";
 import { getBrandName } from "../flightctl-enrollment";
-import { getSetupInterface } from "../services/network";
+import { useIsConnectedViaInterface } from "../hooks/useIsConnectedViaInterface";
 import { resolveAliasValue } from "../services/alias";
 import { WIZARD_STEP_IDS, type WizardStepId } from "./WizardSteps";
 import { GenericLabel, ServiceEnrollmentConfig } from "../types";
@@ -230,7 +230,7 @@ const ReviewSectionCard = ({
 };
 
 export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelectedEnrollments }) => {
-    const { model, updateModel, networkManager } = useModelContext();
+    const { model, updateModel } = useModelContext();
     const { config } = useConfig();
     const brandName = getBrandName(config);
 
@@ -268,9 +268,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
         updateModel("connectivityTestHost", value);
     };
 
-    const interfaces = networkManager?.list_interfaces() || [];
-    const setupIface = getSetupInterface(interfaces);
-    const isSingleNic = setupIface !== null && setupIface === model.networkInterface.selectedInterface;
+    const isSingleNic = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
 
     const aliasSummary =
         model.alias.mode === AliasMode.NONE

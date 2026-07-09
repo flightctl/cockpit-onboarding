@@ -3,19 +3,14 @@ import cockpit from "cockpit";
 
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 
+import { useIsConnectedViaInterface } from "../hooks/useIsConnectedViaInterface";
 import { useModelContext } from "../model-context";
-import { getSetupInterface } from "../services/network";
 import { Interface } from "../../pkg/networkmanager/interfaces";
 
 const _ = cockpit.gettext;
 
 const isEthernetNoCable = (selectedIface: Interface) => {
     return selectedIface.Device?.DeviceType === "ethernet" && selectedIface.Device?.Carrier === false;
-};
-
-const isSetupInterface = (interfaces: Interface[], selectedIface: Interface) => {
-    const setupInterface = getSetupInterface(interfaces);
-    return setupInterface !== null && selectedIface.Name === setupInterface;
 };
 
 const SetupInterfaceAlert = ({ isWifi }: { isWifi: boolean }) => {
@@ -38,11 +33,14 @@ const SelectedNetworkInterfaceAlert = () => {
 
     const interfaces = networkManager?.list_interfaces?.() || [];
     const selectedIface = interfaces.find((iface) => iface.Name === model.networkInterface.selectedInterface);
+
+    const isSetupIface = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
+
     if (!selectedIface) {
         return null;
     }
 
-    if (isSetupInterface(interfaces, selectedIface)) {
+    if (isSetupIface) {
         return <SetupInterfaceAlert isWifi={selectedIface?.Device?.DeviceType === "802-11-wireless"} />;
     }
 

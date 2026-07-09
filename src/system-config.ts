@@ -64,7 +64,6 @@ export class SystemConfigurationService {
     ): Promise<SystemConfigurationApplyResult> {
         const actions: StepAction[] = [];
         let hasErrors = false;
-        let singleNic = false;
         const appliedItems: AppliedItems = {
             hostname: false,
             network: false,
@@ -109,7 +108,6 @@ export class SystemConfigurationService {
                     options?.skipActivation
                 );
                 actions.push(...networkApplyResult.actions);
-                singleNic = networkApplyResult.singleNic;
                 appliedItems.network = true;
             } catch (error) {
                 actions.push(makeStepAction(CONFIG_ACTION_IDS.NETWORK_UNAVAILABLE, String(error), "error"));
@@ -158,7 +156,6 @@ export class SystemConfigurationService {
         return {
             success: !hasErrors,
             actions,
-            singleNic,
             appliedItems,
             originalHostname,
         };
