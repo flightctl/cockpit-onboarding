@@ -12,9 +12,14 @@ import { Divider } from "@patternfly/react-core/dist/esm/components/Divider/inde
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
+import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
+import { ClipboardCopy } from "@patternfly/react-core/dist/esm/components/ClipboardCopy/index.js";
+import { FileUpload } from "@patternfly/react-core/dist/esm/components/FileUpload/index.js";
+import { Popover } from "@patternfly/react-core/dist/esm/components/Popover/index.js";
 import { TextArea } from "@patternfly/react-core/dist/esm/components/TextArea/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
+import HelpIcon from "@patternfly/react-icons/dist/esm/icons/help-icon";
 
 import { useModelContext } from "../model-context";
 import { useConfig } from "../app";
@@ -29,6 +34,7 @@ import type {
     FlightctlPasswordCredentials,
     FlightctlTokenCredentials,
     ServiceEnrollmentConfig,
+    TlsMode,
 } from "../types";
 import { detectFlightctlConfig } from "../services/flightctl-config";
 
@@ -46,9 +52,11 @@ export const EnrollmentPage = () => {
     const [existingServerUrl, setExistingServerUrl] = useState("");
     const [endpointTouched, setEndpointTouched] = useState(false);
     const [endpointError, setEndpointError] = useState<string | undefined>();
+    const [caFilename, setCaFilename] = useState("");
 
     const credentials = enrollment.credentials;
     const authMethod = credentials?.authMethod ?? "token";
+    const tlsMode = enrollment.tlsMode ?? "system";
     const isUsingExisting = hasExistingCredentials && (enrollment.useExisting ?? false);
     const isEndpointFromExistingConfig = Boolean(existingServerUrl) && serviceEndpoint === existingServerUrl;
 
@@ -309,6 +317,136 @@ export const EnrollmentPage = () => {
                                                                 error={endpointTouched ? endpointError : undefined}
                                                             />
                                                         </FormGroup>
+                                                    </StackItem>
+
+                                                    <StackItem>
+                                                        <Divider />
+                                                    </StackItem>
+
+                                                    <StackItem>
+                                                        <FeatureSwitch
+                                                            fieldId="tls-verification"
+                                                            label={_("Verify TLS certificates")}
+                                                            isChecked={tlsMode !== "insecure"}
+                                                            onToggle={(checked) =>
+                                                                updateEnrollment({
+                                                                    tlsMode: checked ? ("system" as TlsMode) : ("insecure" as TlsMode),
+                                                                })
+                                                            }
+                                                        >
+                                                            <Stack hasGutter>
+                                                                <StackItem>
+                                                                    <Radio
+                                                                        id="tls-system"
+                                                                        name="tls-mode"
+                                                                        label={_("System default")}
+                                                                        isChecked={tlsMode === "system"}
+                                                                        onChange={() =>
+                                                                            updateEnrollment({ tlsMode: "system" as TlsMode })
+                                                                        }
+                                                                    />
+                                                                </StackItem>
+                                                                <StackItem>
+                                                                    <Radio
+                                                                        id="tls-custom-ca"
+                                                                        name="tls-mode"
+                                                                        label={_("Custom CA certificate")}
+                                                                        isChecked={tlsMode === "customCa"}
+                                                                        onChange={() =>
+                                                                            updateEnrollment({ tlsMode: "customCa" as TlsMode })
+                                                                        }
+                                                                        body={
+                                                                            tlsMode === "customCa" && (
+                                                                                <Stack hasGutter>
+                                                                                    <StackItem>
+                                                                                        <FormGroup label={_("CA certificate (PEM)")}>
+                                                                                            <FileUpload
+                                                                                                id="ca-cert-pem"
+                                                                                                type="text"
+                                                                                                value={enrollment.caCertPem ?? ""}
+                                                                                                filename={caFilename}
+                                                                                                onFileInputChange={(_event, file) =>
+                                                                                                    setCaFilename(file.name)
+                                                                                                }
+                                                                                                onDataChange={(_event, value) =>
+                                                                                                    updateEnrollment({ caCertPem: value })
+                                                                                                }
+                                                                                                onTextChange={(_event, value) =>
+                                                                                                    updateEnrollment({ caCertPem: value })
+                                                                                                }
+                                                                                                onClearClick={() => {
+                                                                                                    updateEnrollment({ caCertPem: "" });
+                                                                                                    setCaFilename("");
+                                                                                                }}
+                                                                                                allowEditingUploadedText
+                                                                                                browseButtonText={_("Browse...")}
+                                                                                                clearButtonText={_("Clear")}
+                                                                                                dropzoneProps={{
+                                                                                                    accept: { "application/x-pem-file": [".pem", ".crt", ".cer"] },
+                                                                                                }}
+                                                                                            />
+                                                                                        </FormGroup>
+                                                                                    </StackItem>
+                                                                                    <StackItem>
+                                                                                        <Popover
+                                                                                            minWidth="500px"
+                                                                                            headerContent={_("Finding your CA certificate")}
+                                                                                            bodyContent={
+                                                                                                <Stack hasGutter>
+                                                                                                    <StackItem>
+                                                                                                        <strong>{_("Quadlet deployment:")}</strong>
+                                                                                                        <ClipboardCopy
+                                                                                                            isReadOnly
+                                                                                                            hoverTip={_("Copy")}
+                                                                                                            clickTip={_("Copied")}
+                                                                                                            className="pf-v6-u-mt-sm pf-v6-u-font-family-monospace"
+                                                                                                        >
+                                                                                                            sudo cat /etc/flightctl/pki/ca.crt
+                                                                                                        </ClipboardCopy>
+                                                                                                    </StackItem>
+                                                                                                    <StackItem>
+                                                                                                        <strong>{_("Helm deployment:")}</strong>
+                                                                                                        <ClipboardCopy
+                                                                                                            isReadOnly
+                                                                                                            hoverTip={_("Copy")}
+                                                                                                            clickTip={_("Copied")}
+                                                                                                            className="pf-v6-u-mt-sm pf-v6-u-font-family-monospace"
+                                                                                                        >
+                                                                                                            {`kubectl get secret flightctl-ca -n <namespace> -o jsonpath='{.data.tls\\.crt}' | base64 -d`}
+                                                                                                        </ClipboardCopy>
+                                                                                                    </StackItem>
+                                                                                                </Stack>
+                                                                                            }
+                                                                                        >
+                                                                                            <Button
+                                                                                                variant="link"
+                                                                                                isInline
+                                                                                                className="pf-v6-u-mt-sm"
+                                                                                                icon={<HelpIcon />}
+                                                                                                iconPosition="start"
+                                                                                            >
+                                                                                                {_("Where can I find the CA certificate?")}
+                                                                                            </Button>
+                                                                                        </Popover>
+                                                                                    </StackItem>
+                                                                                </Stack>
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </StackItem>
+                                                            </Stack>
+                                                        </FeatureSwitch>
+                                                        {tlsMode === "insecure" && (
+                                                            <Alert
+                                                                variant="warning"
+                                                                isInline
+                                                                isPlain
+                                                                className="pf-v6-u-mt-sm"
+                                                                title={_(
+                                                                    "TLS verification is disabled. The connection to the server will not be verified. This is not recommended for production use."
+                                                                )}
+                                                            />
+                                                        )}
                                                     </StackItem>
                                                 </Stack>
                                             )
