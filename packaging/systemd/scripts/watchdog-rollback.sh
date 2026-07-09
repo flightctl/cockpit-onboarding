@@ -147,9 +147,15 @@ reenter_setup_mode() {
 }
 
 cleanup_watchdog() {
-    rm -f "$WATCHDOG_STATE_FILE"
-    systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
-    systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
+    disarm_watchdog
+}
+
+kill_running_apply_units() {
+    # Unit name pattern matches run-apply-enroll.sh: "flightctl-onboarding-apply-<timestamp>"
+    for unit in $(systemctl list-units --type=service --state=running --plain --no-legend 'flightctl-onboarding-apply-*' | awk '{print $1}'); do
+        log "Stopping running apply unit: $unit"
+        systemctl stop "$unit" 2>/dev/null || true
+    done
 }
 
 # Main logic
@@ -175,6 +181,8 @@ if [ -f "$MARKER_FILE" ]; then
     cleanup_watchdog
     exit 0
 fi
+
+kill_running_apply_units
 
 collect_diagnostics "$CONNECTIVITY_TEST_HOST"
 

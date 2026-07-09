@@ -36,3 +36,11 @@ load_config() {
 
     echo "$default"
 }
+
+# Disarm the connectivity watchdog so it cannot fire while the caller
+# writes a failure status or performs a rollback.
+disarm_watchdog() {
+    systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
+    systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
+    rm -f "${ONBOARDING_MARKER_DIR}/.watchdog-active" 2>/dev/null || true
+}
