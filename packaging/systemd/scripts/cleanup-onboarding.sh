@@ -127,6 +127,7 @@ touch "${ONBOARDING_MARKER_DIR}/.onboarding-confirmed"
 echo "Created agent startup gate file"
 
 systemctl unmask greenboot-healthcheck.service 2>/dev/null || true
+systemctl stop cockpit-system-onboarding-mask-greenboot.service 2>/dev/null || true
 systemctl disable cockpit-system-onboarding-mask-greenboot.service 2>/dev/null || true
 systemctl daemon-reload 2>/dev/null || true
 systemctl start greenboot-healthcheck.service 2>/dev/null || true
