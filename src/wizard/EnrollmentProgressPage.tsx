@@ -35,7 +35,7 @@ import { writeAttemptedMarker } from "../attempted-marker";
 import { SCRIPT_RUN_APPLY_ENROLL, MARKER_COMPLETE } from "../paths";
 import { SubtleHeading } from "../components/Headings.js";
 import { armWatchdog, disarmWatchdog, readWatchdogStatus } from "../services/watchdog";
-import { testNetworkConnectivity, verifyServiceConnectivity, CancellationSignal } from "../services/connectivity";
+import { testNetworkConnectivity, CancellationSignal } from "../services/connectivity";
 import { buildEnrollmentParams, executeEnrollmentScript, finalizeEnrollment } from "../services/enrollment";
 import { createSecureTempFile } from "../services/spawn-helpers";
 import { FLIGHTCTL_SCRIPT_PATH, FLIGHTCTL_SERVICE_ID, getBrandName } from "../flightctl-enrollment";
@@ -353,17 +353,9 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 default:
                     if (stepId === `enroll-${FLIGHTCTL_SERVICE_ID}`) {
                         const enrollment = model.enrollment;
-                        const endpoint = enrollment.endpoint ?? "";
 
                         if (enrollment.useExisting) {
-                            return await verifyServiceConnectivity(
-                                endpoint,
-                                true,
-                                signalRef.current,
-                                onAction,
-                                enrollment.tlsMode,
-                                enrollment.caCertPem
-                            );
+                            return { success: true, actions: [] };
                         }
 
                         const params = buildEnrollmentParams(model, brandName);

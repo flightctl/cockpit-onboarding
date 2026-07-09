@@ -61,6 +61,7 @@ export interface Model {
     networkServices: NetworkServicesState;
     enrollment: ServiceEnrollmentConfig;
     labels: LabelsState;
+    detectedServerUrl: string;
     connectivityTestHost: string;
     connectivityTestHostEdited: boolean;
     enrollmentProgress: {
@@ -157,6 +158,7 @@ const initialModel: Model = {
         deviceLabels: [],
         systemInfoMappings: [],
     },
+    detectedServerUrl: "",
     connectivityTestHost: "",
     connectivityTestHostEdited: false,
     enrollmentProgress: {
@@ -555,6 +557,7 @@ export const ModelProvider: React.FunctionComponent<{
                         }),
                     },
                 },
+                detectedServerUrl: flightctlConfig.serverUrl || "",
                 enrollment: patchEnrollment(prev.enrollment, {
                     ...(flightctlConfig.exists && flightctlConfig.hasCredentials && { useExisting: true }),
                     ...(flightctlEndpoint && { endpoint: flightctlEndpoint }),

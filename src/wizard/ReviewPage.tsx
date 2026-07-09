@@ -244,7 +244,9 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
         const enrollment = model.enrollment;
         if (enrollment.selected) {
             let endpoint = enrollment.endpoint;
-            if (!endpoint && !enrollment.useExisting) {
+            if (enrollment.useExisting && model.detectedServerUrl) {
+                endpoint = model.detectedServerUrl;
+            } else if (!endpoint && !enrollment.useExisting) {
                 endpoint = defaultEndpoint;
             }
             if (endpoint) {
@@ -261,7 +263,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
         const configHost = config?.connectivityTest?.host || "cockpit-project.org";
         updateModel("connectivityTestHost", configHost);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [model.enrollment, defaultEndpoint]);
+    }, [model.enrollment, model.detectedServerUrl, defaultEndpoint]);
 
     const setConnectivityTestHost = (value: string) => {
         updateModel("connectivityTestHostEdited", true);

@@ -6,8 +6,6 @@ import {
     type OnStepAction,
     type StepExecutionResult,
 } from "../wizard/enrollment-progress-types";
-import type { TlsMode } from "../types";
-import { createSecureTempFile } from "./spawn-helpers";
 
 const IPV4_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
 const IPV6_RE = /^[0-9a-fA-F:]+$/;
@@ -106,103 +104,5 @@ export async function testNetworkConnectivity(
         const fullErrorMsg = `Network connectivity test failed: ${errorMsg}`;
         emit({ id: "connectivity-error", actionTitle: fullErrorMsg, result: "error" });
         return { success: false, actions: getActions() };
-    }
-}
-
-export async function verifyServiceConnectivity(
-    endpoint: string,
-    useExisting: boolean,
-    signal?: CancellationSignal,
-    onAction?: OnStepAction,
-    tlsMode?: TlsMode,
-    caCertPem?: string
-): Promise<StepExecutionResult> {
-    const { emit, getActions } = createActionEmitter(onAction);
-
-    const credentialTitle = useExisting
-        ? "The connectivity to the server in the existing enrollment credentials will be verified next."
-        : "The connectivity to the server in the new enrollment credentials will be verified next.";
-    emit({ id: ENROLLMENT_ACTION_IDS.CREDENTIAL_SELECTION, actionTitle: credentialTitle, result: "info" });
-
-    if (!endpoint) {
-        const msg = "No endpoint configured — cannot verify connectivity.";
-        emit({ id: "verify-endpoint-missing", actionTitle: msg, result: "error" });
-        return { success: false, actions: getActions() };
-    }
-
-    let hostname: string;
-    try {
-        hostname = new URL(endpoint).hostname;
-    } catch {
-        const msg = `Invalid endpoint URL: ${endpoint}`;
-        emit({ id: "verify-endpoint-invalid", actionTitle: msg, result: "error" });
-        return { success: false, actions: getActions() };
-    }
-
-    if (isIPAddress(hostname)) {
-        emit({
-            id: "dns-skip-ip",
-            actionTitle: "Host is an IP address, skipping DNS resolution.",
-            result: "success",
-        });
-    } else {
-        try {
-            const resolveTitle = `Resolving ${hostname}`;
-            emit({ id: ENROLLMENT_ACTION_IDS.DNS_RESOLVE, actionTitle: resolveTitle, result: "pending" });
-            const dnsProc = cockpit.spawn(["getent", "hosts", hostname], { err: "ignore" });
-            if (signal) {
-                signal.process = dnsProc;
-            }
-            await dnsProc;
-            if (signal) {
-                signal.process = undefined;
-            }
-            emit({ id: ENROLLMENT_ACTION_IDS.DNS_RESOLVE, actionTitle: resolveTitle, result: "success" });
-        } catch {
-            if (signal) {
-                signal.process = undefined;
-            }
-            const msg = `Cannot resolve ${hostname}. Check DNS configuration.`;
-            emit({ id: ENROLLMENT_ACTION_IDS.DNS_RESOLVE, actionTitle: msg, result: "error" });
-            return { success: false, actions: getActions() };
-        }
-    }
-
-    let caCertFile = "";
-    try {
-        const curlArgs = ["curl", "-sf", "--max-time", "10"];
-        const effectiveTlsMode = tlsMode ?? "system";
-        if (effectiveTlsMode === "insecure") {
-            curlArgs.push("-k");
-        } else if (effectiveTlsMode === "customCa" && caCertPem) {
-            caCertFile = await createSecureTempFile(caCertPem, ".ca-cert-");
-            curlArgs.push("--cacert", caCertFile);
-        }
-        curlArgs.push("-o", "/dev/null", "-w", "%{http_code}", `${endpoint}/api/v1/version`);
-
-        const connectTitle = `Connecting to ${endpoint}`;
-        emit({ id: ENROLLMENT_ACTION_IDS.CONNECT_ENDPOINT, actionTitle: connectTitle, result: "pending" });
-        const curlProc = cockpit.spawn(curlArgs, { err: "ignore" });
-        if (signal) {
-            signal.process = curlProc;
-        }
-        await curlProc;
-        if (signal) {
-            signal.process = undefined;
-        }
-
-        emit({ id: ENROLLMENT_ACTION_IDS.CONNECT_ENDPOINT, actionTitle: connectTitle, result: "success" });
-        return { success: true, actions: getActions() };
-    } catch {
-        if (signal) {
-            signal.process = undefined;
-        }
-        const msg = `Cannot connect to ${endpoint}. The server may be unreachable.`;
-        emit({ id: ENROLLMENT_ACTION_IDS.CONNECT_ENDPOINT, actionTitle: msg, result: "error" });
-        return { success: false, actions: getActions() };
-    } finally {
-        if (caCertFile) {
-            cockpit.spawn(["rm", "-f", caCertFile], { err: "message" }).catch(() => {});
-        }
     }
 }
