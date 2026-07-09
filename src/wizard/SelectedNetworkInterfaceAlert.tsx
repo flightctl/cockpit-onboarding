@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import cockpit from "cockpit";
 
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 
+import { useIsConnectedViaInterface } from "../hooks/useIsConnectedViaInterface";
 import { useModelContext } from "../model-context";
-import { isConnectedViaInterface } from "../services/network";
 import { Interface } from "../../pkg/networkmanager/interfaces";
 
 const _ = cockpit.gettext;
@@ -34,15 +34,7 @@ const SelectedNetworkInterfaceAlert = () => {
     const interfaces = networkManager?.list_interfaces?.() || [];
     const selectedIface = interfaces.find((iface) => iface.Name === model.networkInterface.selectedInterface);
 
-    const [isSetupIface, setIsSetupIface] = useState(false);
-
-    useEffect(() => {
-        if (model.networkInterface.selectedInterface) {
-            isConnectedViaInterface(model.networkInterface.selectedInterface).then(setIsSetupIface);
-        } else {
-            setIsSetupIface(false);
-        }
-    }, [model.networkInterface.selectedInterface]);
+    const isSetupIface = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
 
     if (!selectedIface) {
         return null;

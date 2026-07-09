@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import cockpit from "cockpit";
 
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
@@ -25,7 +25,7 @@ import FormHelperText from "../components/HelperTexts";
 import { AliasMode, useModelContext } from "../model-context";
 import { useConfig } from "../app";
 import { getBrandName } from "../flightctl-enrollment";
-import { isConnectedViaInterface } from "../services/network";
+import { useIsConnectedViaInterface } from "../hooks/useIsConnectedViaInterface";
 import { resolveAliasValue } from "../services/alias";
 import { WIZARD_STEP_IDS, type WizardStepId } from "./WizardSteps";
 import { GenericLabel, ServiceEnrollmentConfig } from "../types";
@@ -268,15 +268,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
         updateModel("connectivityTestHost", value);
     };
 
-    const [isSingleNic, setIsSingleNic] = useState(false);
-
-    useEffect(() => {
-        if (model.networkInterface.selectedInterface) {
-            isConnectedViaInterface(model.networkInterface.selectedInterface).then(setIsSingleNic);
-        } else {
-            setIsSingleNic(false);
-        }
-    }, [model.networkInterface.selectedInterface]);
+    const isSingleNic = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
 
     const aliasSummary =
         model.alias.mode === AliasMode.NONE
