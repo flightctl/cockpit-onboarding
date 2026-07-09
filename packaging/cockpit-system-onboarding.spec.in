@@ -62,6 +62,7 @@ install -m 644 packaging/systemd/cockpit-system-onboarding-setup.service %{build
 install -m 644 packaging/systemd/cockpit-system-onboarding-wifi-ap@.service %{buildroot}%{_unitdir}/
 install -m 644 packaging/systemd/cockpit-system-onboarding-dnsmasq@.service %{buildroot}%{_unitdir}/
 install -m 644 packaging/systemd/cockpit-system-onboarding-captive-portal@.service %{buildroot}%{_unitdir}/
+install -m 644 packaging/systemd/cockpit-system-onboarding-mask-greenboot.service %{buildroot}%{_unitdir}/
 
 # Install flightctl-agent startup gate drop-in
 mkdir -p %{buildroot}%{_unitdir}/flightctl-agent.service.d
@@ -87,6 +88,7 @@ install -m 755 packaging/systemd/scripts/watchdog-rollback.sh %{buildroot}%{_lib
 install -m 755 packaging/systemd/scripts/check-network.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/rollback-config.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/run-watchdog.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/mask-greenboot.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 
 # Install sudoers configuration directly to /etc/sudoers.d
 mkdir -p %{buildroot}%{_sysconfdir}/sudoers.d
@@ -123,6 +125,8 @@ systemctl daemon-reload >/dev/null 2>&1 || :
 # Only enable if not already run (marker file doesn't exist)
 if [ ! -f /var/lib/cockpit-system-onboarding/.onboarding-complete ]; then
     systemctl enable cockpit-system-onboarding-setup.service >/dev/null 2>&1 || :
+    systemctl enable cockpit-system-onboarding-mask-greenboot.service >/dev/null 2>&1 || :
+    /usr/libexec/cockpit-system-onboarding/mask-greenboot.sh 2>/dev/null || :
 fi
 
 %preun
@@ -130,6 +134,8 @@ fi
 
 # Remove the flightctl-agent gate drop-in on package removal
 if [ $1 -eq 0 ]; then
+    systemctl unmask greenboot-healthcheck.service 2>/dev/null || :
+    systemctl disable cockpit-system-onboarding-mask-greenboot.service 2>/dev/null || :
     rm -f %{_unitdir}/flightctl-agent.service.d/onboarding-gate.conf || :
     rmdir %{_unitdir}/flightctl-agent.service.d 2>/dev/null || :
     systemctl daemon-reload >/dev/null 2>&1 || :
@@ -149,6 +155,8 @@ if [ $1 -eq 0 ]; then
             systemctl disable "$unit" 2>/dev/null || :
         done
     done
+
+    systemctl unmask greenboot-healthcheck.service 2>/dev/null || :
 
     # Stop the connectivity watchdog
     systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || :
@@ -201,6 +209,7 @@ fi
 %{_unitdir}/cockpit-system-onboarding-wifi-ap@.service
 %{_unitdir}/cockpit-system-onboarding-dnsmasq@.service
 %{_unitdir}/cockpit-system-onboarding-captive-portal@.service
+%{_unitdir}/cockpit-system-onboarding-mask-greenboot.service
 %dir %{_unitdir}/flightctl-agent.service.d
 %{_unitdir}/flightctl-agent.service.d/onboarding-gate.conf
 %{_libexecdir}/cockpit-system-onboarding/
