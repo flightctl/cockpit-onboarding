@@ -129,7 +129,8 @@ echo "Created agent startup gate file"
 systemctl unmask greenboot-healthcheck.service 2>/dev/null || true
 systemctl disable cockpit-system-onboarding-mask-greenboot.service 2>/dev/null || true
 systemctl daemon-reload 2>/dev/null || true
-echo "Unmasked greenboot-healthcheck.service"
+systemctl start greenboot-healthcheck.service 2>/dev/null || true
+echo "Restored greenboot-healthcheck.service"
 
 if systemctl list-unit-files flightctl-agent.service | grep -q flightctl-agent; then
     systemctl enable flightctl-agent 2>/dev/null || true

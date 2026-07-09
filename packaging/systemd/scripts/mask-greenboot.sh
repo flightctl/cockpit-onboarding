@@ -31,7 +31,7 @@ greenboot_present() {
     fi
     log "  Unit file not found at ${UNIT_FILE}"
 
-    if find /usr/lib/systemd -name "${SERVICE_NAME}" -quit 2>/dev/null | grep -q .; then
+    if [ -n "$(find /usr/lib/systemd -name "${SERVICE_NAME}" -print -quit 2>/dev/null)" ]; then
         log "  Found via find in /usr/lib/systemd"
         return 0
     fi
@@ -67,13 +67,6 @@ if mask_already_applied; then
 fi
 
 log "Applying mask..."
-mkdir -p /etc/systemd/system
-ln -sf /dev/null "${MASK_LINK}"
-log "Created symlink: ${MASK_LINK} -> /dev/null"
-
-systemctl daemon-reload 2>/dev/null || true
-log "Ran systemctl daemon-reload"
-
 systemctl mask --now "${SERVICE_NAME}" 2>/dev/null || true
 log "Ran systemctl mask --now ${SERVICE_NAME}"
 
