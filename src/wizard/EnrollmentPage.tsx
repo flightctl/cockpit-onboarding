@@ -389,6 +389,7 @@ export const EnrollmentPage = () => {
                                                                                     </StackItem>
                                                                                     <StackItem>
                                                                                         <Popover
+                                                                                            minWidth="500px"
                                                                                             headerContent={_("Finding your CA certificate")}
                                                                                             bodyContent={
                                                                                                 <Stack hasGutter>
