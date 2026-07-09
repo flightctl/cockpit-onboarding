@@ -1,6 +1,5 @@
 [Unit]
 Description=Mask greenboot health checks during system onboarding
-Documentation=https://github.com/cockpit-project/cockpit-system-onboarding
 Before=greenboot-healthcheck.service
 After=local-fs.target
 DefaultDependencies=no
