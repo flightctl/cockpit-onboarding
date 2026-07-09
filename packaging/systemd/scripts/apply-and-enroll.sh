@@ -31,6 +31,9 @@ log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$LOG_FILE"; }
 
 write_app_failure_status() {
     local message="$1"
+    systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
+    systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
+    rm -f /var/lib/cockpit-system-onboarding/.watchdog-active 2>/dev/null || true
     local timestamp
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     mkdir -p "$(dirname "$WATCHDOG_STATUS_FILE")"
@@ -98,6 +101,9 @@ ROLLBACK_SCRIPT="/usr/libexec/cockpit-system-onboarding/rollback-config.sh"
 
 rollback() {
     log "Rolling back applied configuration..."
+    systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
+    systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
+    rm -f /var/lib/cockpit-system-onboarding/.watchdog-active 2>/dev/null || true
     local rollback_params
     rollback_params=$(mktemp /tmp/.rollback-params-XXXXXX)
     chmod 600 "$rollback_params"
@@ -114,9 +120,6 @@ rollback() {
         log "$line"
     done || true
 
-    systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
-    systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
-    rm -f /var/lib/cockpit-system-onboarding/.watchdog-active 2>/dev/null || true
     rm -f "$PARAMS_FILE" 2>/dev/null || true
     log "Rollback complete"
 }
