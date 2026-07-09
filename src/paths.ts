@@ -15,5 +15,6 @@ export const SCRIPT_RUN_APPLY_ENROLL = `${SCRIPTS_DIR}/run-apply-enroll.sh`;
 export const SCRIPT_CHECK_NETWORK = `${SCRIPTS_DIR}/check-network.sh`;
 export const SCRIPT_RUN_WATCHDOG = `${SCRIPTS_DIR}/run-watchdog.sh`;
 export const SCRIPT_ROLLBACK = `${SCRIPTS_DIR}/rollback-config.sh`;
+export const SCRIPT_READ_FLIGHTCTL_CONFIG = `${SCRIPTS_DIR}/read-flightctl-config.sh`;
 
 export const ONBOARDING_PROFILE_PREFIX = "flightctl-onboarding-";

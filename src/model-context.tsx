@@ -513,13 +513,14 @@ export const ModelProvider: React.FunctionComponent<{
 
             const flightctlEndpoint = config?.flightctl?.defaultEndpoint || flightctlConfig.serverUrl || "";
 
+            const connectivityEndpoint = flightctlConfig.serverUrl || flightctlEndpoint;
             let connectivityHost = config?.connectivityTest?.host || "cockpit-project.org";
-            if (flightctlEndpoint) {
+            if (connectivityEndpoint) {
                 try {
-                    const url = new URL(flightctlEndpoint);
+                    const url = new URL(connectivityEndpoint);
                     connectivityHost = url.hostname;
                 } catch {
-                    connectivityHost = flightctlEndpoint;
+                    connectivityHost = connectivityEndpoint;
                 }
             }
 

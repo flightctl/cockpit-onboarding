@@ -119,10 +119,12 @@ const ReviewLabelGroup = ({ labels, compareKeys, emptyLabel }: ReviewLabelGroupP
 
 const EnrollmentCardBody = ({
     enrollment,
+    detectedServerUrl,
     defaultEndpoint,
     brandName,
 }: {
     enrollment: ServiceEnrollmentConfig;
+    detectedServerUrl: string;
     defaultEndpoint: string | undefined;
     brandName: string;
 }) => {
@@ -131,14 +133,14 @@ const EnrollmentCardBody = ({
         return <span>{_("Enrollment skipped")}</span>;
     }
 
-    const enrollmentEndpoint = enrollment.endpoint ?? defaultEndpoint;
+    const enrollmentEndpoint = (useExisting && detectedServerUrl) ? detectedServerUrl : (enrollment.endpoint ?? defaultEndpoint);
     const hasNewCredentials = selected && !useExisting;
     return (
         <>
             <DescriptionListGroup>
-                <DescriptionListTerm>{_("Credentials")}</DescriptionListTerm>
+                <DescriptionListTerm>{_("Enrollment certificate")}</DescriptionListTerm>
                 <DescriptionListDescription>
-                    {hasNewCredentials ? _("New credentials were configured") : _("Using existing credentials")}
+                    {hasNewCredentials ? _("New enrollment certificate will be requested") : _("Using existing enrollment certificate")}
                 </DescriptionListDescription>
             </DescriptionListGroup>
             {hasNewCredentials && (
@@ -510,6 +512,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
                         >
                             <EnrollmentCardBody
                                 enrollment={model.enrollment}
+                                detectedServerUrl={model.detectedServerUrl}
                                 defaultEndpoint={config?.flightctl?.defaultEndpoint}
                                 brandName={brandName}
                             />

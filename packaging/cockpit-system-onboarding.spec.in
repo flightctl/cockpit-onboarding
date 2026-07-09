@@ -89,6 +89,7 @@ install -m 755 packaging/systemd/scripts/check-network.sh %{buildroot}%{_libexec
 install -m 755 packaging/systemd/scripts/rollback-config.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/run-watchdog.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 install -m 755 packaging/systemd/scripts/mask-greenboot.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
+install -m 755 packaging/systemd/scripts/read-flightctl-config.sh %{buildroot}%{_libexecdir}/cockpit-system-onboarding/
 
 # Install sudoers configuration directly to /etc/sudoers.d
 mkdir -p %{buildroot}%{_sysconfdir}/sudoers.d
@@ -213,7 +214,7 @@ fi
 %dir %{_unitdir}/flightctl-agent.service.d
 %{_unitdir}/flightctl-agent.service.d/onboarding-gate.conf
 %{_libexecdir}/cockpit-system-onboarding/
-%config(noreplace) %attr(0440,root,root) %{_sysconfdir}/sudoers.d/cockpit-system-onboarding
+%config %attr(0440,root,root) %{_sysconfdir}/sudoers.d/cockpit-system-onboarding
 %{_sysconfdir}/polkit-1/rules.d/49-cockpit-system-onboarding.rules
 %dir %{_localstatedir}/lib/cockpit-system-onboarding
 

@@ -285,11 +285,10 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             ];
 
             if (shouldEnroll) {
-                const isUsingExisting = enrollment.useExisting ?? false;
                 initialSteps.push({
                     id: `enroll-${FLIGHTCTL_SERVICE_ID}`,
-                    name: isUsingExisting
-                        ? cockpit.format(_("Verifying connectivity to $0"), brandName)
+                    name: enrollment.useExisting
+                        ? cockpit.format(_("$0 enrollment"), brandName)
                         : cockpit.format(_("Enrolling into $0"), brandName),
                     status: "pending",
                     isBuiltIn: false,
@@ -355,7 +354,13 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                         const enrollment = model.enrollment;
 
                         if (enrollment.useExisting) {
-                            return { success: true, actions: [] };
+                            const { emit, getActions } = createActionEmitter(onAction);
+                            emit({
+                                id: "use-existing-creds",
+                                actionTitle: _("Using existing enrollment certificate — no new enrollment required"),
+                                result: "success",
+                            });
+                            return { success: true, actions: getActions() };
                         }
 
                         const params = buildEnrollmentParams(model, brandName);
