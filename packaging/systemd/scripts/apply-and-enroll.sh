@@ -21,6 +21,9 @@
 # }
 set -euo pipefail
 
+# shellcheck source=common.sh
+. /usr/libexec/cockpit-system-onboarding/common.sh
+
 # systemd-run transient units do not set HOME; child scripts and tools may need it.
 export HOME="${HOME:-/root}"
 
@@ -29,11 +32,9 @@ WATCHDOG_STATUS_FILE="/var/lib/cockpit-system-onboarding/.watchdog-status"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$LOG_FILE"; }
 
-write_app_failure_status() {
+disarm_and_write_failure_status() {
     local message="$1"
-    systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
-    systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
-    rm -f /var/lib/cockpit-system-onboarding/.watchdog-active 2>/dev/null || true
+    disarm_watchdog
     local timestamp
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     mkdir -p "$(dirname "$WATCHDOG_STATUS_FILE")"
@@ -101,9 +102,7 @@ ROLLBACK_SCRIPT="/usr/libexec/cockpit-system-onboarding/rollback-config.sh"
 
 rollback() {
     log "Rolling back applied configuration..."
-    systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
-    systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
-    rm -f /var/lib/cockpit-system-onboarding/.watchdog-active 2>/dev/null || true
+    disarm_watchdog
     local rollback_params
     rollback_params=$(mktemp /tmp/.rollback-params-XXXXXX)
     chmod 600 "$rollback_params"
@@ -222,7 +221,7 @@ if [ "$SCRIPT_COUNT" -gt 0 ]; then
         if ! enroll_output=$("$SCRIPT_PATH" "$SCRIPT_PARAMS" 2>&1); then
             log "ERROR: Enrollment script failed: $SCRIPT_PATH"
             log "$enroll_output"
-            write_app_failure_status "$enroll_output"
+            disarm_and_write_failure_status "$enroll_output"
             rm -f "$SCRIPT_PARAMS"
             exit 1
         fi

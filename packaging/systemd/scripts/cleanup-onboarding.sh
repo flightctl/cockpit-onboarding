@@ -18,10 +18,7 @@ HIDE_MODULES=$(load_config '.hideModules' 'true')
 
 echo "Cleanup configuration: runOnce=$RUN_ONCE, keepCockpit=$KEEP_COCKPIT, hideModules=$HIDE_MODULES"
 
-# Disarm the connectivity watchdog (transient timer + service) if active
-systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
-systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
-rm -f "${ONBOARDING_MARKER_DIR}/.watchdog-active" 2>/dev/null || true
+disarm_watchdog
 rm -f "${ONBOARDING_MARKER_DIR}/.watchdog-status" 2>/dev/null || true
 
 # Remove attempted marker file
