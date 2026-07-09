@@ -28,7 +28,6 @@ import {
     validateLabelValue,
 } from "../validation";
 import { CustomLabelRow, type DeviceLabelEntry } from "./CustomLabelRow";
-import WithTooltip from "../components/WithTooltip";
 
 const _ = cockpit.gettext;
 
@@ -234,7 +233,9 @@ export const LabelsPage = () => {
         validateSystemHostname(model.hostname.value)
     );
     const [aliasValidationError, setAliasValidationError] = React.useState<string | null>(null);
-    const isHostnameAsAliasDisabled = validateLabelValue(model.hostname.value) !== null;
+    const hostnameAsAliasError = aliasMode === AliasMode.HOSTNAME
+        ? validateLabelValue(model.hostname.value)
+        : null;
 
     React.useEffect(() => {
         if (!isInitialized || hasSyncedModelLabels.current) {
@@ -264,11 +265,6 @@ export const LabelsPage = () => {
         const error = validateSystemHostname(value);
         setHostnameValidationError(error);
         updateModel("hostname", { value });
-        // If the alias is set to match the hostname, but after the changes it would be an invalid label value,
-        // the "hostname" AliasMode becomes disabled, so we change selection to CUSTOM.
-        if (aliasMode === AliasMode.HOSTNAME && validateLabelValue(value) !== null) {
-            setAliasMode(AliasMode.CUSTOM);
-        }
     };
 
     const setAliasEnabled = (enabled: boolean) => {
@@ -393,19 +389,16 @@ export const LabelsPage = () => {
                             >
                                 <Stack hasGutter>
                                     <StackItem>
-                                        <WithTooltip
-                                            showTooltip={isHostnameAsAliasDisabled}
-                                            content={_("Hostname is not a valid alias")}
-                                        >
-                                            <Radio
-                                                id="alias-mode-hostname"
-                                                name="alias-mode"
-                                                label={_("Use hostname as alias")}
-                                                isChecked={aliasMode === AliasMode.HOSTNAME}
-                                                isDisabled={isHostnameAsAliasDisabled}
-                                                onChange={() => setAliasMode(AliasMode.HOSTNAME)}
-                                            />
-                                        </WithTooltip>
+                                        <Radio
+                                            id="alias-mode-hostname"
+                                            name="alias-mode"
+                                            label={_("Use hostname as alias")}
+                                            isChecked={aliasMode === AliasMode.HOSTNAME}
+                                            onChange={() => setAliasMode(AliasMode.HOSTNAME)}
+                                        />
+                                        {hostnameAsAliasError && (
+                                            <FormHelperText content={hostnameAsAliasError} variant="error" />
+                                        )}
                                     </StackItem>
                                     <StackItem>
                                         <Radio

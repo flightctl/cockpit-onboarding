@@ -69,20 +69,23 @@ const validateHostname = (hostname: string, required = true): string | null => {
 /**
  * Validate a system hostname that will be applied via hostnamectl.
  *
- * Applies RFC 1123 rules plus Linux's 64-character static hostname limit.
+ * hostnamectl accepts up to 64 characters of [a-zA-Z0-9.-], silently
+ * stripping anything else. We reject what would be silently mangled so the
+ * user sees exactly what will be stored.
  */
 export const validateSystemHostname = (hostname: string, required = true): string | null => {
-    const error = validateHostname(hostname, required);
-    if (error) {
-        return error;
+    const trimmed = hostname.trim();
+
+    if (!trimmed) {
+        return required ? "Hostname is required" : null;
     }
 
-    if (!hostname) {
-        return null;
-    }
-
-    if (hostname.length > LINUX_HOSTNAME_MAX_LENGTH) {
+    if (trimmed.length > LINUX_HOSTNAME_MAX_LENGTH) {
         return "Hostname must be 64 characters or less";
+    }
+
+    if (!/^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$/.test(trimmed) || trimmed.includes("..")) {
+        return "Hostname must start and end with an alphanumeric character, and contain only letters, numbers, hyphens, and dots";
     }
 
     return null;
