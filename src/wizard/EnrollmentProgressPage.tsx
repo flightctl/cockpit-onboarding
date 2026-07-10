@@ -357,7 +357,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                             const { emit, getActions } = createActionEmitter(onAction);
                             emit({
                                 id: "use-existing-creds",
-                                actionTitle: _("Using existing enrollment certificate — no new enrollment required"),
+                                actionTitle: _("Using existing enrollment certificate"),
                                 result: "success",
                             });
                             return { success: true, actions: getActions() };
