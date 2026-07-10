@@ -40,7 +40,6 @@ AP_CHANNEL=$(load_config '.network.wifiAp.channel' '6')
 
 compute_dhcp_range "$AP_ADDRESS" "$AP_SUBNET_PREFIX" "$AP_DHCP_RANGE_SIZE"
 
-# Determine WiFi interface: use configured value or auto-detect
 WIFI_AP_IFACE=$(load_config '.network.wifiAp.interface' '')
 if [ -n "$WIFI_AP_IFACE" ]; then
     if ! nmcli -t -f DEVICE,TYPE device | grep -q "^${WIFI_AP_IFACE}:wifi$"; then
@@ -50,7 +49,9 @@ if [ -n "$WIFI_AP_IFACE" ]; then
     WIFI_INTERFACE="$WIFI_AP_IFACE"
     echo "Using configured WiFi interface: $WIFI_INTERFACE"
 else
-    WIFI_INTERFACE=$(nmcli -t -f DEVICE,TYPE device | grep ':wifi$' | head -n 1 | cut -d: -f1)
+    if ! WIFI_INTERFACE=$(detect_interface wifi); then
+        WIFI_INTERFACE=""
+    fi
 fi
 
 if [ -z "$WIFI_INTERFACE" ]; then

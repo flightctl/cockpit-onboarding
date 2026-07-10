@@ -31,12 +31,8 @@ DHCP_RANGE_SIZE=$(load_config '.network.ethernet.dhcpRangeSize' '40')
 
 compute_dhcp_range "$STATIC_IP" "$SUBNET_PREFIX" "$DHCP_RANGE_SIZE"
 
-# If no interface specified, try to find first Ethernet interface
 if [ -z "$ETHERNET_INTERFACE" ]; then
-    # Find first wired Ethernet interface (not loopback, not wireless)
-    ETHERNET_INTERFACE=$(nmcli -t -f DEVICE,TYPE device | grep ':ethernet$' | head -n 1 | cut -d: -f1)
-
-    if [ -z "$ETHERNET_INTERFACE" ]; then
+    if ! ETHERNET_INTERFACE=$(detect_interface ethernet); then
         echo "No Ethernet interface found and none specified in configuration"
         exit 0
     fi
