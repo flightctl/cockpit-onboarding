@@ -119,10 +119,12 @@ const ReviewLabelGroup = ({ labels, compareKeys, emptyLabel }: ReviewLabelGroupP
 
 const EnrollmentCardBody = ({
     enrollment,
+    detectedServerUrl,
     defaultEndpoint,
     brandName,
 }: {
     enrollment: ServiceEnrollmentConfig;
+    detectedServerUrl: string;
     defaultEndpoint: string | undefined;
     brandName: string;
 }) => {
@@ -131,14 +133,14 @@ const EnrollmentCardBody = ({
         return <span>{_("Enrollment skipped")}</span>;
     }
 
-    const enrollmentEndpoint = enrollment.endpoint ?? defaultEndpoint;
+    const enrollmentEndpoint = (useExisting && detectedServerUrl) ? detectedServerUrl : (enrollment.endpoint ?? defaultEndpoint);
     const hasNewCredentials = selected && !useExisting;
     return (
         <>
             <DescriptionListGroup>
-                <DescriptionListTerm>{_("Credentials")}</DescriptionListTerm>
+                <DescriptionListTerm>{_("Enrollment certificate")}</DescriptionListTerm>
                 <DescriptionListDescription>
-                    {hasNewCredentials ? _("New credentials were configured") : _("Using existing credentials")}
+                    {hasNewCredentials ? _("New enrollment certificate will be requested") : _("Using existing enrollment certificate")}
                 </DescriptionListDescription>
             </DescriptionListGroup>
             {hasNewCredentials && (
@@ -244,7 +246,9 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
         const enrollment = model.enrollment;
         if (enrollment.selected) {
             let endpoint = enrollment.endpoint;
-            if (!endpoint && !enrollment.useExisting) {
+            if (enrollment.useExisting && model.detectedServerUrl) {
+                endpoint = model.detectedServerUrl;
+            } else if (!endpoint && !enrollment.useExisting) {
                 endpoint = defaultEndpoint;
             }
             if (endpoint) {
@@ -261,7 +265,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
         const configHost = config?.connectivityTest?.host || "cockpit-project.org";
         updateModel("connectivityTestHost", configHost);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [model.enrollment, defaultEndpoint]);
+    }, [model.enrollment, model.detectedServerUrl, defaultEndpoint]);
 
     const setConnectivityTestHost = (value: string) => {
         updateModel("connectivityTestHostEdited", true);
@@ -508,6 +512,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
                         >
                             <EnrollmentCardBody
                                 enrollment={model.enrollment}
+                                detectedServerUrl={model.detectedServerUrl}
                                 defaultEndpoint={config?.flightctl?.defaultEndpoint}
                                 brandName={brandName}
                             />

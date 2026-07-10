@@ -61,6 +61,7 @@ export interface Model {
     networkServices: NetworkServicesState;
     enrollment: ServiceEnrollmentConfig;
     labels: LabelsState;
+    detectedServerUrl: string;
     connectivityTestHost: string;
     connectivityTestHostEdited: boolean;
     enrollmentProgress: {
@@ -157,6 +158,7 @@ const initialModel: Model = {
         deviceLabels: [],
         systemInfoMappings: [],
     },
+    detectedServerUrl: "",
     connectivityTestHost: "",
     connectivityTestHostEdited: false,
     enrollmentProgress: {
@@ -511,13 +513,14 @@ export const ModelProvider: React.FunctionComponent<{
 
             const flightctlEndpoint = config?.flightctl?.defaultEndpoint || flightctlConfig.serverUrl || "";
 
+            const connectivityEndpoint = flightctlConfig.serverUrl || flightctlEndpoint;
             let connectivityHost = config?.connectivityTest?.host || "cockpit-project.org";
-            if (flightctlEndpoint) {
+            if (connectivityEndpoint) {
                 try {
-                    const url = new URL(flightctlEndpoint);
+                    const url = new URL(connectivityEndpoint);
                     connectivityHost = url.hostname;
                 } catch {
-                    connectivityHost = flightctlEndpoint;
+                    connectivityHost = connectivityEndpoint;
                 }
             }
 
@@ -555,6 +558,7 @@ export const ModelProvider: React.FunctionComponent<{
                         }),
                     },
                 },
+                detectedServerUrl: flightctlConfig.serverUrl || "",
                 enrollment: patchEnrollment(prev.enrollment, {
                     ...(flightctlConfig.exists && flightctlConfig.hasCredentials && { useExisting: true }),
                     ...(flightctlEndpoint && { endpoint: flightctlEndpoint }),

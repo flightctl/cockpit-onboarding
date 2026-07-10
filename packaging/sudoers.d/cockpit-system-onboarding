@@ -41,6 +41,9 @@ onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/apply-and-
 # Stop WiFi AP when applying network config on the same interface
 onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop cockpit-system-onboarding-wifi-ap@*.service
 
+# Read flightctl agent config (server URL and credential presence only)
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/read-flightctl-config.sh
+
 # Connectivity watchdog (arm via restricted wrapper, disarm via systemctl)
 onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/run-watchdog.sh *
 onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop cockpit-system-onboarding-watchdog.timer

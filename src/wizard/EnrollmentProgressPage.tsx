@@ -35,7 +35,7 @@ import { writeAttemptedMarker } from "../attempted-marker";
 import { SCRIPT_RUN_APPLY_ENROLL, MARKER_COMPLETE } from "../paths";
 import { SubtleHeading } from "../components/Headings.js";
 import { armWatchdog, disarmWatchdog, readWatchdogStatus } from "../services/watchdog";
-import { testNetworkConnectivity, verifyServiceConnectivity, CancellationSignal } from "../services/connectivity";
+import { testNetworkConnectivity, CancellationSignal } from "../services/connectivity";
 import { buildEnrollmentParams, executeEnrollmentScript, finalizeEnrollment } from "../services/enrollment";
 import { createSecureTempFile } from "../services/spawn-helpers";
 import { FLIGHTCTL_SCRIPT_PATH, FLIGHTCTL_SERVICE_ID, getBrandName } from "../flightctl-enrollment";
@@ -285,11 +285,10 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             ];
 
             if (shouldEnroll) {
-                const isUsingExisting = enrollment.useExisting ?? false;
                 initialSteps.push({
                     id: `enroll-${FLIGHTCTL_SERVICE_ID}`,
-                    name: isUsingExisting
-                        ? cockpit.format(_("Verifying connectivity to $0"), brandName)
+                    name: enrollment.useExisting
+                        ? cockpit.format(_("$0 enrollment"), brandName)
                         : cockpit.format(_("Enrolling into $0"), brandName),
                     status: "pending",
                     isBuiltIn: false,
@@ -353,17 +352,15 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 default:
                     if (stepId === `enroll-${FLIGHTCTL_SERVICE_ID}`) {
                         const enrollment = model.enrollment;
-                        const endpoint = enrollment.endpoint ?? "";
 
                         if (enrollment.useExisting) {
-                            return await verifyServiceConnectivity(
-                                endpoint,
-                                true,
-                                signalRef.current,
-                                onAction,
-                                enrollment.tlsMode,
-                                enrollment.caCertPem
-                            );
+                            const { emit, getActions } = createActionEmitter(onAction);
+                            emit({
+                                id: "use-existing-creds",
+                                actionTitle: _("Using existing enrollment certificate"),
+                                result: "success",
+                            });
+                            return { success: true, actions: getActions() };
                         }
 
                         const params = buildEnrollmentParams(model, brandName);

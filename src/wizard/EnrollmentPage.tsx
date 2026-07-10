@@ -149,14 +149,14 @@ export const EnrollmentPage = () => {
                 >
                     <Stack hasGutter>
                         <StackItem>
-                            <LabelHeading text={_("Credentials")} />
+                            <LabelHeading text={_("Enrollment certificate")} />
                         </StackItem>
                         <StackItem>
                             <Stack hasGutter>
                                 <StackItem>
                                     <WithTooltip
                                         showTooltip={!hasExistingCredentials}
-                                        content={_("No existing credentials found")}
+                                        content={_("No existing enrollment certificate found")}
                                     >
                                         <Radio
                                             id="use-existing-flightctl"
@@ -182,7 +182,7 @@ export const EnrollmentPage = () => {
                                     <Radio
                                         id="configure-new-flightctl"
                                         name="credential-mode-flightctl"
-                                        label={_("Add a new credential")}
+                                        label={_("Request new")}
                                         isChecked={!isUsingExisting}
                                         onChange={() => updateEnrollment({ useExisting: false })}
                                         body={
@@ -311,7 +311,7 @@ export const EnrollmentPage = () => {
                                                                 }
                                                                 {...(isEndpointFromExistingConfig && {
                                                                     helperText: _(
-                                                                        "Auto-detected from the selected credential."
+                                                                        "Auto-detected from the existing enrollment certificate."
                                                                     ),
                                                                 })}
                                                                 error={endpointTouched ? endpointError : undefined}
