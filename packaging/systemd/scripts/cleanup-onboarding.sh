@@ -10,6 +10,15 @@ set -e
 
 ONBOARDING_USER="onboarding"
 SERVICE_NAME="cockpit-system-onboarding-setup.service"
+MARKER_COMPLETE="${ONBOARDING_MARKER_DIR}/.onboarding-complete"
+
+# ExecStop fires on every shutdown/reboot while setup.service is active, not
+# only after successful onboarding. Skip destructive cleanup when onboarding
+# hasn't actually completed — the setup service will re-run on next boot.
+if [ ! -f "$MARKER_COMPLETE" ]; then
+    echo "Onboarding not yet complete (no $MARKER_COMPLETE) — skipping cleanup"
+    exit 0
+fi
 
 # Read configuration values
 RUN_ONCE=$(load_config '.runOnce' 'true')
@@ -61,6 +70,9 @@ fi
 
 # Clean up runtime files (hostapd configs, env files)
 rm -rf /run/cockpit-system-onboarding 2>/dev/null || true
+
+# Remove apply log file
+rm -f /var/log/cockpit-system-onboarding-apply.log 2>/dev/null || true
 
 # Remove SSH denial for onboarding user (no longer needed after cleanup)
 if [ -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf ]; then

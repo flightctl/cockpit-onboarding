@@ -393,7 +393,6 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             const result = await systemConfigurationService.applySystemConfiguration(networkManager, model);
 
             networkAppliedRef.current = true;
-            updateModel("networkInterface", { wifiPassword: null });
 
             const manifest: RollbackManifest = {};
             if (result.appliedItems.hostname && result.originalHostname) {
@@ -610,6 +609,8 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         }
 
         setSingleNic(true);
+        updateModel("networkInterface", { wifiPassword: null });
+        updateModel("enrollment", { credentials: null });
         updateModel("enrollmentProgress", {
             executionState: "success",
             overallProgress: 100,
@@ -735,6 +736,8 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             }
         }
 
+        updateModel("networkInterface", { wifiPassword: null });
+        updateModel("enrollment", { credentials: null });
         updateModel("enrollmentProgress", { executionState: "success" });
     };
 

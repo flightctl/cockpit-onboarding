@@ -62,23 +62,32 @@ write_status() {
     local timestamp
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-    cat > "$STATUS_FILE" <<EOF
-{
-  "status": "${status}",
-  "message": "${message}",
-  "timestamp": "${timestamp}",
-  "details": {
-    "carrierDetected": ${DIAG_CARRIER_DETECTED},
-    "carrierInterfaces": "${DIAG_CARRIER_INTERFACES}",
-    "dnsResolved": ${DIAG_DNS_RESOLVED},
-    "pingSucceeded": ${DIAG_PING_SUCCEEDED},
-    "testedHost": "${DIAG_TESTED_HOST}",
-    "activeConnections": "${DIAG_ACTIVE_CONNECTIONS}"
-  }
-}
-EOF
+    jq -n \
+        --arg status "$status" \
+        --arg message "$message" \
+        --arg timestamp "$timestamp" \
+        --argjson carrierDetected "$DIAG_CARRIER_DETECTED" \
+        --arg carrierInterfaces "$DIAG_CARRIER_INTERFACES" \
+        --argjson dnsResolved "$DIAG_DNS_RESOLVED" \
+        --argjson pingSucceeded "$DIAG_PING_SUCCEEDED" \
+        --arg testedHost "$DIAG_TESTED_HOST" \
+        --arg activeConnections "$DIAG_ACTIVE_CONNECTIONS" \
+        '{
+            status: $status,
+            message: $message,
+            timestamp: $timestamp,
+            details: {
+                carrierDetected: $carrierDetected,
+                carrierInterfaces: $carrierInterfaces,
+                dnsResolved: $dnsResolved,
+                pingSucceeded: $pingSucceeded,
+                testedHost: $testedHost,
+                activeConnections: $activeConnections
+            }
+        }' > "$STATUS_FILE"
+
     chown onboarding:onboarding "$STATUS_FILE"
-    chmod 0644 "$STATUS_FILE"
+    chmod 0600 "$STATUS_FILE"
 }
 
 rollback_network() {

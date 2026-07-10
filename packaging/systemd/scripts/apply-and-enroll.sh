@@ -28,6 +28,8 @@ set -euo pipefail
 export HOME="${HOME:-/root}"
 
 LOG_FILE="/var/log/cockpit-system-onboarding-apply.log"
+touch "$LOG_FILE"
+chmod 0600 "$LOG_FILE"
 WATCHDOG_STATUS_FILE="/var/lib/cockpit-system-onboarding/.watchdog-status"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$LOG_FILE"; }
@@ -44,13 +46,12 @@ disarm_and_write_failure_status() {
         --arg timestamp "$timestamp" \
         '{status: $status, message: $message, timestamp: $timestamp}' > "$WATCHDOG_STATUS_FILE"
     chown onboarding:onboarding "$WATCHDOG_STATUS_FILE"
-    chmod 0644 "$WATCHDOG_STATUS_FILE"
+    chmod 0600 "$WATCHDOG_STATUS_FILE"
 }
 
 # Allowed directories for enrollment scripts — must match sudoers entries
 ALLOWED_SCRIPT_DIRS=(
     "/usr/share/cockpit/system-onboarding/system-onboarding.d"
-    "/etc/cockpit/system-onboarding.d"
 )
 
 validate_script_path() {
@@ -97,6 +98,16 @@ EFFECTIVE_IFACE=$(jq -r '.effectiveIfaceName // .interfaceName // empty' "$PARAM
 HOSTNAME=$(jq -r '.hostname // empty' "$PARAMS_FILE")
 ORIGINAL_HOSTNAME=$(jq -r '.originalHostname // empty' "$PARAMS_FILE")
 CONNECTIVITY_TEST_HOST=$(jq -r '.connectivityTestHost // empty' "$PARAMS_FILE")
+
+validate_iface_name() {
+    local name="$1"
+    if [ -n "$name" ] && [[ ! "$name" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+        log "ERROR: Invalid interface name: $name"
+        exit 1
+    fi
+}
+validate_iface_name "$INTERFACE_NAME"
+validate_iface_name "$EFFECTIVE_IFACE"
 
 ROLLBACK_SCRIPT="/usr/libexec/cockpit-system-onboarding/rollback-config.sh"
 

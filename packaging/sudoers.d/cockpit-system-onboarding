@@ -29,10 +29,8 @@ onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/rollback-c
 # Cleanup script (executed after successful onboarding)
 onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh
 
-# Enrollment scripts
-# These paths allow enrollment scripts to run with elevated privileges
-onboarding ALL=(ALL) NOPASSWD: /usr/share/cockpit/system-onboarding/system-onboarding.d/*.sh
-onboarding ALL=(ALL) NOPASSWD: /etc/cockpit/system-onboarding.d/*.sh
+# Enrollment script (explicit allowlist — do not use wildcards)
+onboarding ALL=(ALL) NOPASSWD: /usr/share/cockpit/system-onboarding/system-onboarding.d/flightctl-enroll.sh *
 
 # Single-NIC apply via restricted wrapper (validates args, generates unit name)
 onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/run-apply-enroll.sh *

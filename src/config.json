@@ -9,7 +9,7 @@
       "enabled": true,
       "ssidPrefix": "flightctl-",
       "interface": "",
-      "password": "",
+      "password": "onboarding",
       "address": "10.42.0.1",
       "subnetPrefix": 24,
       "dhcpRangeSize": 40,
