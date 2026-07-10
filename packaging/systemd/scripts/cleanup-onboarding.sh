@@ -10,6 +10,15 @@ set -e
 
 ONBOARDING_USER="onboarding"
 SERVICE_NAME="cockpit-system-onboarding-setup.service"
+MARKER_COMPLETE="${ONBOARDING_MARKER_DIR}/.onboarding-complete"
+
+# ExecStop fires on every shutdown/reboot while setup.service is active, not
+# only after successful onboarding. Skip destructive cleanup when onboarding
+# hasn't actually completed — the setup service will re-run on next boot.
+if [ ! -f "$MARKER_COMPLETE" ]; then
+    echo "Onboarding not yet complete (no $MARKER_COMPLETE) — skipping cleanup"
+    exit 0
+fi
 
 # Read configuration values
 RUN_ONCE=$(load_config '.runOnce' 'true')
