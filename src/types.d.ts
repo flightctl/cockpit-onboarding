@@ -177,7 +177,7 @@ export type TlsMode = "system" | "customCa" | "insecure";
 export interface ServiceEnrollmentConfig {
     selected: boolean;
     endpoint?: string;
-    credentials?: FlightctlCredentials;
+    credentials?: FlightctlCredentials | null;
     useExisting?: boolean;
     tlsMode?: TlsMode;
     caCertPem?: string;

@@ -41,7 +41,7 @@ export function isFlightctlAuthMethod(value: unknown): value is FlightctlAuthMet
     return value === "token" || value === "password";
 }
 
-export function buildFlightctlCredentialsJson(credentials: FlightctlCredentials | undefined): string {
+export function buildFlightctlCredentialsJson(credentials: FlightctlCredentials | null | undefined): string {
     if (!credentials || credentials.authMethod === "token") {
         const token = credentials?.authMethod === "token" ? credentials.token : "";
         return JSON.stringify({ token });
@@ -52,7 +52,7 @@ export function buildFlightctlCredentialsJson(credentials: FlightctlCredentials 
     });
 }
 
-export function validateFlightctlCredentials(credentials: FlightctlCredentials | undefined): boolean {
+export function validateFlightctlCredentials(credentials: FlightctlCredentials | null | undefined): boolean {
     if (!credentials) {
         return false;
     }
