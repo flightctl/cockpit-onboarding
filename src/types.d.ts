@@ -21,6 +21,7 @@ export interface SystemOnboardingConfig {
     led?: LedConfig;
     defaults?: ConfigDefaults;
     connectivityTest?: ConnectivityTestConfig;
+    onboardingUser?: OnboardingUserConfig;
 }
 
 export interface ConnectivityTestConfig {
@@ -63,12 +64,22 @@ export interface WifiApConfig {
     ssidPrefix?: string;
     interface?: string;
     password?: string;
+    address?: string;
+    subnetPrefix?: number;
+    dhcpRangeSize?: number;
+    channel?: number;
 }
 
 export interface EthernetConfig {
     enabled?: boolean;
     interface?: string;
     staticIp?: string;
+    subnetPrefix?: number;
+    dhcpRangeSize?: number;
+}
+
+export interface OnboardingUserConfig {
+    password?: string;
 }
 
 export interface LedConfig {

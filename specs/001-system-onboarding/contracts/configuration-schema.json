@@ -51,7 +51,7 @@
             },
             "ssidPrefix": {
               "type": "string",
-              "default": "setup-",
+              "default": "flightctl-",
               "minLength": 1,
               "maxLength": 20,
               "pattern": "^[a-zA-Z0-9_-]+$",
@@ -63,10 +63,35 @@
             },
             "password": {
               "type": "string",
-              "minLength": 8,
               "maxLength": 63,
               "default": "onboarding",
-              "description": "WPA passphrase for the access point (8-63 characters)"
+              "description": "WPA passphrase for the access point (8-63 characters). Empty string means open network (no password)."
+            },
+            "address": {
+              "type": "string",
+              "format": "ipv4",
+              "default": "10.42.0.1",
+              "description": "Gateway IP address for the WiFi access point network"
+            },
+            "subnetPrefix": {
+              "type": "integer",
+              "default": 24,
+              "minimum": 1,
+              "maximum": 30,
+              "description": "CIDR subnet prefix for the WiFi AP network"
+            },
+            "dhcpRangeSize": {
+              "type": "integer",
+              "default": 40,
+              "minimum": 1,
+              "description": "Number of DHCP addresses in the pool (range starts at base address + 9)"
+            },
+            "channel": {
+              "type": "integer",
+              "default": 6,
+              "minimum": 1,
+              "maximum": 14,
+              "description": "WiFi channel for the access point"
             }
           }
         },
@@ -88,122 +113,115 @@
               "format": "ipv4",
               "default": "192.168.100.1",
               "description": "Well-known static IPv4 address for initial access"
+            },
+            "subnetPrefix": {
+              "type": "integer",
+              "default": 24,
+              "minimum": 1,
+              "maximum": 30,
+              "description": "CIDR subnet prefix for the static IP configuration"
+            },
+            "dhcpRangeSize": {
+              "type": "integer",
+              "default": 40,
+              "minimum": 1,
+              "description": "Number of DHCP addresses in the pool (range starts at base IP + 9)"
             }
           }
         }
       }
     },
-    "enrollmentServices": {
-      "type": "array",
-      "description": "List of management services available for device enrollment",
-      "items": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[a-z0-9-]+$",
-            "description": "Unique service identifier (lowercase alphanumeric and hyphens only)"
-          },
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100,
-            "description": "Display name for the service"
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 500,
-            "description": "User-facing description of the service"
-          },
-          "endpoint": {
-            "type": "object",
-            "description": "Service endpoint configuration",
-            "properties": {
-              "url": {
-                "type": "string",
-                "format": "uri",
-                "pattern": "^https?://",
-                "description": "Default service endpoint URL (must be http or https)"
-              },
-              "allowUserOverride": {
-                "type": "boolean",
-                "default": false,
-                "description": "Allow users to specify a custom endpoint URL at runtime"
-              }
-            },
-            "required": ["url"]
-          },
-          "credentialsSchema": {
-            "type": "object",
-            "description": "JSON Schema (react-jsonschema-form compatible) defining credential fields. Must be type 'object'. Supports username/password, token, and custom authentication patterns.",
-            "properties": {
-              "type": {
-                "const": "object"
-              },
-              "properties": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "object"
-                }
-              },
-              "required": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            "required": ["type", "properties"],
-            "examples": [
-              {
-                "type": "object",
-                "properties": {
-                  "username": {
-                    "type": "string",
-                    "title": "Username"
-                  },
-                  "password": {
-                    "type": "string",
-                    "title": "Password",
-                    "format": "password"
-                  }
-                },
-                "required": ["username", "password"]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "token": {
-                    "type": "string",
-                    "title": "API Token",
-                    "format": "password"
-                  }
-                },
-                "required": ["token"]
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "organizationId": {
-                    "type": "string",
-                    "title": "Organization ID"
-                  },
-                  "activationKey": {
-                    "type": "string",
-                    "title": "Activation Key",
-                    "format": "password"
-                  }
-                },
-                "required": ["organizationId", "activationKey"]
-              }
-            ]
-          },
-          "scriptPath": {
-            "type": "string",
-            "description": "Absolute path to the enrollment script executable (must be executable file)"
+    "flightctl": {
+      "type": "object",
+      "description": "Flight Control enrollment service configuration",
+      "properties": {
+        "defaultEndpoint": {
+          "type": "string",
+          "description": "Default Flight Control server endpoint URL. Pre-populates the enrollment endpoint field in the wizard.",
+          "pattern": "^(https?://.*)?$"
+        }
+      }
+    },
+    "connectivityTest": {
+      "type": "object",
+      "description": "Connectivity verification configuration",
+      "properties": {
+        "host": {
+          "type": "string",
+          "default": "cockpit-project.org",
+          "description": "Default host for network connectivity test (DNS + ping). Overridden by the enrollment endpoint hostname when enrollment is selected."
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Default values to pre-populate wizard form fields",
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "description": "Default hostname (used when system hostname is localhost)"
+        },
+        "proxy": {
+          "type": "object",
+          "description": "Default proxy settings",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "protocol": { "type": "string", "enum": ["http", "https", "socks5"] },
+            "applyForHttps": { "type": "boolean" },
+            "hostname": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "username": { "type": "string" },
+            "password": { "type": "string" },
+            "noProxy": { "type": "string" }
           }
         },
-        "required": ["id", "name", "endpoint", "credentialsSchema", "scriptPath"]
+        "labels": {
+          "type": "object",
+          "description": "Default device labels",
+          "properties": {
+            "deviceLabels": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": { "type": "string" },
+                  "value": { "type": "string" }
+                },
+                "required": ["key", "value"]
+              }
+            },
+            "systemInfoMappings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": { "type": "string" },
+                  "value": { "type": "string" }
+                },
+                "required": ["key", "value"]
+              }
+            }
+          }
+        },
+        "alias": {
+          "type": "object",
+          "description": "Default alias configuration",
+          "properties": {
+            "mode": { "type": "string", "enum": ["hostname", "custom", "none"] },
+            "customValue": { "type": "string" }
+          }
+        }
+      }
+    },
+    "onboardingUser": {
+      "type": "object",
+      "description": "Onboarding user account configuration",
+      "properties": {
+        "password": {
+          "type": "string",
+          "default": "",
+          "description": "Password for the temporary onboarding user. Empty string means passwordless login (default)."
+        }
       }
     },
     "led": {
@@ -280,45 +298,32 @@
       "network": {
         "wifiAp": {
           "enabled": true,
-          "ssidPrefix": "setup-",
-          "interface": "wlan0",
-          "password": "onboarding123"
+          "ssidPrefix": "flightctl-",
+          "interface": "",
+          "password": "",
+          "address": "10.42.0.1",
+          "subnetPrefix": 24,
+          "dhcpRangeSize": 40,
+          "channel": 6
         },
         "ethernet": {
           "enabled": true,
-          "interface": "eth0",
-          "staticIp": "192.168.100.1"
+          "staticIp": "192.168.100.1",
+          "subnetPrefix": 24,
+          "dhcpRangeSize": 40
         }
       },
-      "enrollmentServices": [
-        {
-          "id": "flightctl",
-          "name": "Flight Control",
-          "description": "Enroll this device into Flight Control fleet management",
-          "endpoint": {
-            "url": "https://flightctl.example.com",
-            "allowUserOverride": true
-          },
-          "credentialsSchema": {
-            "type": "object",
-            "properties": {
-              "username": {
-                "type": "string",
-                "title": "Username"
-              },
-              "password": {
-                "type": "string",
-                "title": "Password",
-                "format": "password"
-              }
-            },
-            "required": ["username", "password"]
-          },
-          "scriptPath": "/etc/cockpit/system-onboarding.d/flightctl-enroll.sh"
-        }
-      ],
+      "flightctl": {
+        "defaultEndpoint": "https://api.flightctl.example.com"
+      },
+      "connectivityTest": {
+        "host": "cockpit-project.org"
+      },
+      "onboardingUser": {
+        "password": ""
+      },
       "led": {
-        "enabled": true,
+        "enabled": false,
         "tool": "/usr/local/bin/led-control",
         "states": {
           "ready": "ready",

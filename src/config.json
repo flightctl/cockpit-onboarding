@@ -7,13 +7,19 @@
   "network": {
     "wifiAp": {
       "enabled": true,
-      "ssidPrefix": "cockpit-",
+      "ssidPrefix": "flightctl-",
       "interface": "",
-      "password": ""
+      "password": "",
+      "address": "10.42.0.1",
+      "subnetPrefix": 24,
+      "dhcpRangeSize": 40,
+      "channel": 6
     },
     "ethernet": {
-      "enabled": false,
-      "staticIp": "192.168.100.1"
+      "enabled": true,
+      "staticIp": "192.168.100.1",
+      "subnetPrefix": 24,
+      "dhcpRangeSize": 40
     }
   },
   "flightctl": {
@@ -21,6 +27,9 @@
   },
   "connectivityTest": {
     "host": "cockpit-project.org"
+  },
+  "onboardingUser": {
+    "password": ""
   },
   "led": {
     "enabled": false,

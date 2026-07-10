@@ -10,8 +10,15 @@ set -e
 # Create onboarding user with no password (pam_succeed_if allows login)
 if ! id onboarding >/dev/null 2>&1; then
     useradd -m -s /bin/bash -c "System Onboarding User" onboarding
-    passwd -d onboarding  # Remove password (required for Cockpit passwordless login)
-    echo "Created onboarding user"
+
+    ONBOARDING_PASSWORD=$(load_config '.onboardingUser.password' '')
+    if [ -n "$ONBOARDING_PASSWORD" ]; then
+        echo "onboarding:$ONBOARDING_PASSWORD" | chpasswd
+        echo "Set password for onboarding user"
+    else
+        passwd -d onboarding
+        echo "Created onboarding user with passwordless login"
+    fi
 else
     echo "Onboarding user already exists"
 fi

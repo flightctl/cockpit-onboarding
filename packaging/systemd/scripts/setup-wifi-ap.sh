@@ -8,8 +8,6 @@ set -e
 . /usr/libexec/cockpit-system-onboarding/common.sh
 
 RUNTIME_DIR="$ONBOARDING_RUNTIME_DIR"
-DEFAULT_AP_ADDRESS="10.42.0.1"
-DEFAULT_AP_NETMASK="24"
 
 # Check if either config file exists
 if [ ! -f "$ONBOARDING_USER_CONFIG" ] && [ ! -f "$ONBOARDING_DEFAULT_CONFIG" ]; then
@@ -35,6 +33,12 @@ fi
 # Get configuration values
 SSID_PREFIX=$(load_config '.network.wifiAp.ssidPrefix' 'flightctl-')
 PASSWORD=$(load_config '.network.wifiAp.password' '')
+AP_ADDRESS=$(load_config '.network.wifiAp.address' '10.42.0.1')
+AP_SUBNET_PREFIX=$(load_config '.network.wifiAp.subnetPrefix' '24')
+AP_DHCP_RANGE_SIZE=$(load_config '.network.wifiAp.dhcpRangeSize' '40')
+AP_CHANNEL=$(load_config '.network.wifiAp.channel' '6')
+
+compute_dhcp_range "$AP_ADDRESS" "$AP_SUBNET_PREFIX" "$AP_DHCP_RANGE_SIZE"
 
 # Determine WiFi interface: use configured value or auto-detect
 WIFI_AP_IFACE=$(load_config '.network.wifiAp.interface' '')
@@ -88,10 +92,10 @@ echo "WiFi AP SSID: $SSID"
 # Remove stale AP address from any other interface. A previous AP service
 # may have failed without cleaning up, leaving the address on a different
 # interface and causing a routing conflict.
-for iface in $(ip -o addr show to "${DEFAULT_AP_ADDRESS}/${DEFAULT_AP_NETMASK}" | awk '{print $2}'); do
+for iface in $(ip -o addr show to "${AP_ADDRESS}/${AP_SUBNET_PREFIX}" | awk '{print $2}'); do
     if [ "$iface" != "$WIFI_INTERFACE" ]; then
         echo "Removing stale AP address from $iface"
-        ip addr del "${DEFAULT_AP_ADDRESS}/${DEFAULT_AP_NETMASK}" dev "$iface" 2>/dev/null || true
+        ip addr del "${AP_ADDRESS}/${AP_SUBNET_PREFIX}" dev "$iface" 2>/dev/null || true
     fi
 done
 
@@ -105,7 +109,7 @@ interface=${WIFI_INTERFACE}
 driver=nl80211
 ssid=${SSID}
 hw_mode=g
-channel=6
+channel=${AP_CHANNEL}
 wmm_enabled=0
 macaddr_acl=0
 ieee80211n=1
@@ -135,12 +139,12 @@ DNSMASQ_CONF="$RUNTIME_DIR/dnsmasq-${WIFI_INTERFACE}.conf"
 cat > "$DNSMASQ_CONF" <<EOF
 interface=${WIFI_INTERFACE}
 bind-interfaces
-dhcp-range=10.42.0.10,10.42.0.50,255.255.255.0,1h
-dhcp-option=3,${DEFAULT_AP_ADDRESS}
-dhcp-option=6,${DEFAULT_AP_ADDRESS}
+dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_NETMASK},1h
+dhcp-option=3,${AP_ADDRESS}
+dhcp-option=6,${AP_ADDRESS}
 no-resolv
 no-hosts
-address=/#/${DEFAULT_AP_ADDRESS}
+address=/#/${AP_ADDRESS}
 dhcp-leasefile=/tmp/dnsmasq.leases
 pid-file=/tmp/dnsmasq.pid
 EOF
@@ -148,8 +152,8 @@ echo "Generated dnsmasq DHCP config"
 
 # Generate environment file for the systemd service
 cat > "$RUNTIME_DIR/wifi-ap.env" <<EOF
-WIFI_AP_ADDRESS=${DEFAULT_AP_ADDRESS}
-WIFI_AP_NETMASK=${DEFAULT_AP_NETMASK}
+WIFI_AP_ADDRESS=${AP_ADDRESS}
+WIFI_AP_NETMASK=${AP_SUBNET_PREFIX}
 WIFI_AP_INTERFACE=${WIFI_INTERFACE}
 EOF
 
@@ -179,4 +183,4 @@ systemctl enable "cockpit-system-onboarding-wifi-ap@${WIFI_INTERFACE}.service" 2
 systemctl start "cockpit-system-onboarding-wifi-ap@${WIFI_INTERFACE}.service"
 
 echo "WiFi AP started on $WIFI_INTERFACE"
-echo "AP accessible at: http://${DEFAULT_AP_ADDRESS}:9090"
+echo "AP accessible at: http://${AP_ADDRESS}:9090"

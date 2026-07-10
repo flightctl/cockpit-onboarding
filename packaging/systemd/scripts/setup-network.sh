@@ -8,11 +8,6 @@ set -e
 . /usr/libexec/cockpit-system-onboarding/common.sh
 
 RUNTIME_DIR="$ONBOARDING_RUNTIME_DIR"
-DEFAULT_IP="192.168.100.1"
-DEFAULT_PREFIX="24"
-DEFAULT_DHCP_RANGE_START="192.168.100.10"
-DEFAULT_DHCP_RANGE_END="192.168.100.50"
-DEFAULT_NETMASK="255.255.255.0"
 
 # Check if either config file exists
 if [ ! -f "$ONBOARDING_USER_CONFIG" ] && [ ! -f "$ONBOARDING_DEFAULT_CONFIG" ]; then
@@ -30,7 +25,11 @@ fi
 
 # Get configuration values
 ETHERNET_INTERFACE=$(load_config '.network.ethernet.interface' '')
-STATIC_IP=$(load_config '.network.ethernet.staticIp' "$DEFAULT_IP")
+STATIC_IP=$(load_config '.network.ethernet.staticIp' '192.168.100.1')
+SUBNET_PREFIX=$(load_config '.network.ethernet.subnetPrefix' '24')
+DHCP_RANGE_SIZE=$(load_config '.network.ethernet.dhcpRangeSize' '40')
+
+compute_dhcp_range "$STATIC_IP" "$SUBNET_PREFIX" "$DHCP_RANGE_SIZE"
 
 # If no interface specified, try to find first Ethernet interface
 if [ -z "$ETHERNET_INTERFACE" ]; then
@@ -64,7 +63,7 @@ nmcli connection add \
     con-name "$CONNECTION_NAME" \
     ifname "$ETHERNET_INTERFACE" \
     ipv4.method manual \
-    ipv4.addresses "$STATIC_IP/$DEFAULT_PREFIX" \
+    ipv4.addresses "$STATIC_IP/$SUBNET_PREFIX" \
     ipv6.method disabled \
     connection.autoconnect yes \
     connection.autoconnect-priority 100
@@ -82,7 +81,7 @@ if command -v dnsmasq >/dev/null 2>&1; then
     cat > "$DNSMASQ_CONF" <<EOF
 interface=${ETHERNET_INTERFACE}
 bind-interfaces
-dhcp-range=${DEFAULT_DHCP_RANGE_START},${DEFAULT_DHCP_RANGE_END},${DEFAULT_NETMASK},1h
+dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_NETMASK},1h
 dhcp-option=3,${STATIC_IP}
 dhcp-option=6,${STATIC_IP}
 no-resolv
@@ -94,7 +93,7 @@ EOF
 
     systemctl enable "cockpit-system-onboarding-dnsmasq@${ETHERNET_INTERFACE}.service" 2>/dev/null || true
     systemctl start "cockpit-system-onboarding-dnsmasq@${ETHERNET_INTERFACE}.service"
-    echo "DHCP server started on $ETHERNET_INTERFACE (range ${DEFAULT_DHCP_RANGE_START}-${DEFAULT_DHCP_RANGE_END})"
+    echo "DHCP server started on $ETHERNET_INTERFACE (range ${DHCP_RANGE_START}-${DHCP_RANGE_END})"
 else
     echo "dnsmasq is not installed, skipping DHCP server setup"
     echo "Technicians will need to manually configure a static IP to reach this device"
