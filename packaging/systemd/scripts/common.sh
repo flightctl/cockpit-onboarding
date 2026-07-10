@@ -112,7 +112,7 @@ compute_dhcp_range() {
 
     IFS='.' read -r a b c d <<< "$base_ip"
     local base_num=$(( (a << 24) + (b << 16) + (c << 8) + d ))
-    local start_num=$(( base_num + 9 ))
+    local start_num=$(( base_num + 1 ))
     local end_num=$(( start_num + range_size - 1 ))
 
     DHCP_RANGE_START=$(printf "%d.%d.%d.%d" \
