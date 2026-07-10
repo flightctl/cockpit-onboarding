@@ -36,6 +36,13 @@ if [ ! -x "$LED_TOOL" ]; then
     exit 0
 fi
 
+LED_OWNER=$(stat -c '%u' "$LED_TOOL")
+if [ "$LED_OWNER" != "0" ]; then
+    echo "LED tool is not owned by root: $LED_TOOL"
+    echo "Continuing without LED indicator (graceful degradation)"
+    exit 0
+fi
+
 # Execute LED tool with 'ready' state
 # Use timeout to prevent hanging if LED tool has issues
 if timeout 5s "$LED_TOOL" "$LED_READY_STATE" 2>&1; then

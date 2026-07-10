@@ -9,7 +9,7 @@
       "enabled": true,
       "ssidPrefix": "cockpit-",
       "interface": "",
-      "password": ""
+      "password": "onboarding"
     },
     "ethernet": {
       "enabled": false,
