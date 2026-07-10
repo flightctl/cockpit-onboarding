@@ -23,6 +23,8 @@ export function createStreamParser(
     let streamBuffer = "";
     let currentStepAction: StepAction | undefined;
 
+    let lastEmittedAction: StepAction | undefined;
+
     const processLine = (line: string) => {
         if (line.startsWith("STEP:")) {
             currentStepAction = {
@@ -30,25 +32,35 @@ export function createStreamParser(
                 actionTitle: line.slice(5).trim(),
                 result: "pending",
             };
+            lastEmittedAction = currentStepAction;
             emit(currentStepAction);
         } else if (line.startsWith("OK:")) {
             const title = line.slice(3).trim();
             if (currentStepAction) {
-                emit({ ...currentStepAction, actionTitle: title, result: "success" });
+                lastEmittedAction = { ...currentStepAction, actionTitle: title, result: "success" };
+                emit(lastEmittedAction);
                 currentStepAction = undefined;
             } else {
-                emit({ id: `${idPrefix}-${streamLineIndex++}`, actionTitle: title, result: "success" });
+                lastEmittedAction = { id: `${idPrefix}-${streamLineIndex++}`, actionTitle: title, result: "success" };
+                emit(lastEmittedAction);
             }
         } else if (line.startsWith("ERROR:")) {
             const title = line.slice(6).trim();
             if (currentStepAction) {
-                emit({ ...currentStepAction, actionTitle: title, result: "error" });
+                lastEmittedAction = { ...currentStepAction, actionTitle: title, result: "error" };
+                emit(lastEmittedAction);
                 currentStepAction = undefined;
             } else {
-                emit({ id: `${idPrefix}-${streamLineIndex++}`, actionTitle: title, result: "error" });
+                lastEmittedAction = { id: `${idPrefix}-${streamLineIndex++}`, actionTitle: title, result: "error" };
+                emit(lastEmittedAction);
             }
         } else if (line.startsWith("INFO:")) {
-            emit({ id: `${idPrefix}-${streamLineIndex++}`, actionTitle: line.slice(5).trim(), result: "info" });
+            lastEmittedAction = { id: `${idPrefix}-${streamLineIndex++}`, actionTitle: line.slice(5).trim(), result: "info" };
+            emit(lastEmittedAction);
+        } else if (lastEmittedAction) {
+            const existing = lastEmittedAction.detail ?? "";
+            lastEmittedAction = { ...lastEmittedAction, detail: existing ? `${existing}\n${line}` : line };
+            emit(lastEmittedAction);
         }
     };
 
