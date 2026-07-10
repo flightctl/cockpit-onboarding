@@ -2,7 +2,9 @@
 Description=Cockpit Onboarding WiFi AP on %i
 PartOf=cockpit-system-onboarding-setup.service
 Wants=cockpit-system-onboarding-dnsmasq@%i.service
+Before=cockpit-system-onboarding-dnsmasq@%i.service
 Wants=cockpit-system-onboarding-captive-portal@%i.service
+Before=cockpit-system-onboarding-captive-portal@%i.service
 
 [Service]
 Type=simple
