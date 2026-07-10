@@ -71,6 +71,9 @@ fi
 # Clean up runtime files (hostapd configs, env files)
 rm -rf /run/cockpit-system-onboarding 2>/dev/null || true
 
+# Remove apply log file
+rm -f /var/log/cockpit-system-onboarding-apply.log 2>/dev/null || true
+
 # Remove SSH denial for onboarding user (no longer needed after cleanup)
 if [ -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf ]; then
     rm -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf

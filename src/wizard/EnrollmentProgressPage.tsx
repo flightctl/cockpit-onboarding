@@ -364,6 +364,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                         }
 
                         const params = buildEnrollmentParams(model, brandName);
+                        updateModel("enrollment", { credentials: null });
                         return await executeEnrollmentScript(
                             FLIGHTCTL_SCRIPT_PATH,
                             params,
@@ -548,6 +549,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 enrollmentScriptEntries.push({ scriptPath: FLIGHTCTL_SCRIPT_PATH, paramsFile: pf });
             }
         }
+        updateModel("enrollment", { credentials: null });
 
         // -- Write master params JSON for apply-and-enroll.sh --
         const ifaceName = model.networkInterface.selectedInterface || "";

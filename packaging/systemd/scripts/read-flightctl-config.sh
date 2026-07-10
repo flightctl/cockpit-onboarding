@@ -9,7 +9,7 @@ set -euo pipefail
 AGENT_CONFIG="/etc/flightctl/config.yaml"
 
 if [ ! -f "$AGENT_CONFIG" ]; then
-    echo '{"exists":false,"serverUrl":null,"hasCredentials":false}'
+    jq -n '{exists: false, serverUrl: null, hasCredentials: false}'
     exit 0
 fi
 
@@ -19,7 +19,9 @@ server_url=$(echo "$content" | sed -n 's/^[[:space:]]*server:[[:space:]]*\(\S\+\
 has_creds=$(echo "$content" | grep -qE '^\s+client-certificate-data:\s+\S' && echo true || echo false)
 
 if [ -n "$server_url" ]; then
-    printf '{"exists":true,"serverUrl":"%s","hasCredentials":%s}\n' "$server_url" "$has_creds"
+    jq -n --arg url "$server_url" --argjson has "$has_creds" \
+        '{exists: true, serverUrl: $url, hasCredentials: $has}'
 else
-    printf '{"exists":true,"serverUrl":null,"hasCredentials":%s}\n' "$has_creds"
+    jq -n --argjson has "$has_creds" \
+        '{exists: true, serverUrl: null, hasCredentials: $has}'
 fi
