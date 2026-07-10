@@ -549,28 +549,27 @@ export async function applyNetworkConfiguration(
             console.warn("Failed to clean up previous onboarding profile:", cleanupError);
         }
 
-        // If the WiFi AP service is running on this interface, stop it first
-        // so NM can reclaim the device and hostapd releases the radio.
-        // Skip this when skipActivation is true (single-NIC path) because
-        // stopping the AP severs the browser connection. The apply-and-enroll.sh
-        // script handles stopping the AP before activation in that case.
+        // Stop onboarding network services on this interface before applying
+        // the production profile. Skip when skipActivation is true (single-NIC
+        // path) — apply-and-enroll.sh handles teardown in that case.
         if (!skipActivation) {
+            const dnsmasqUnit = `cockpit-system-onboarding-dnsmasq@${ifaceName}.service`;
             const wifiApUnit = `cockpit-system-onboarding-wifi-ap@${ifaceName}.service`;
-            try {
-                const isActive = await cockpit
-                    .spawn(["systemctl", "is-active", "--quiet", wifiApUnit], { err: "ignore" })
-                    .then(
-                        () => true,
-                        () => false
-                    );
+            for (const unit of [dnsmasqUnit, wifiApUnit]) {
+                try {
+                    const isActive = await cockpit
+                        .spawn(["systemctl", "is-active", "--quiet", unit], { err: "ignore" })
+                        .then(
+                            () => true,
+                            () => false
+                        );
 
-                if (isActive) {
-                    console.log(`Stopping WiFi AP on ${ifaceName} before applying network config`);
-                    await cockpit.spawn(["sudo", "systemctl", "stop", wifiApUnit], { err: "message" });
-                    pushNetworkAction(actions, `Stopped WiFi AP on ${ifaceName}`);
+                    if (isActive) {
+                        await cockpit.spawn(["sudo", "systemctl", "stop", unit], { err: "message" });
+                    }
+                } catch (err) {
+                    console.warn(`Failed to stop ${unit}:`, err);
                 }
-            } catch (apError) {
-                console.warn("Failed to stop WiFi AP service:", apError);
             }
         }
 
