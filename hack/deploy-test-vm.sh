@@ -221,6 +221,17 @@ provision_vm() {
     echo "Installing Flight Control agent and CLI..."
     "${SCRIPT_DIR}/install-flightctl-on-vm.sh" "${vm_ip}"
 
+    echo "Writing test VM config override (ethernet disabled to preserve VM networking)..."
+    run_ssh "${vm_ip}" "sudo mkdir -p /etc/cockpit/system-onboarding && sudo tee /etc/cockpit/system-onboarding/config.json > /dev/null" <<'CONFIG_EOF'
+{
+  "network": {
+    "ethernet": {
+      "enabled": false
+    }
+  }
+}
+CONFIG_EOF
+
     echo "Enabling and starting cockpit and onboarding setup..."
     run_ssh "${vm_ip}" "sudo systemctl enable --now cockpit.socket"
     run_ssh "${vm_ip}" "sudo systemctl enable --now cockpit-system-onboarding-setup.service"

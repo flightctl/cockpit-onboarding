@@ -1,7 +1,6 @@
 [Unit]
 Description=Cockpit Onboarding DHCP/DNS on %i
 PartOf=cockpit-system-onboarding-setup.service
-After=cockpit-system-onboarding-setup.service
 
 [Service]
 Type=simple

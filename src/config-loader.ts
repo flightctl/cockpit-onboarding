@@ -28,13 +28,22 @@ const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
         ethernet: {
             enabled: true,
             staticIp: "192.168.100.1",
+            subnetPrefix: 24,
+            dhcpRangeSize: 40,
         },
         wifiAp: {
-            enabled: false,
-            ssidPrefix: "setup-",
+            enabled: true,
+            ssidPrefix: "flightctl-",
             interface: "",
-            password: "onboarding",
+            password: "",
+            address: "10.42.0.1",
+            subnetPrefix: 24,
+            dhcpRangeSize: 40,
+            channel: 6,
         },
+    },
+    onboardingUser: {
+        password: "",
     },
     led: {
         enabled: false,
@@ -123,6 +132,11 @@ export async function loadConfig(): Promise<SystemOnboardingConfig> {
             ...BUILT_IN_DEFAULTS.connectivityTest,
             ...defaultConfig.connectivityTest,
             ...userConfig.connectivityTest,
+        },
+        onboardingUser: {
+            ...BUILT_IN_DEFAULTS.onboardingUser,
+            ...defaultConfig.onboardingUser,
+            ...userConfig.onboardingUser,
         },
     };
 
@@ -217,6 +231,54 @@ export function validateConfig(config: SystemOnboardingConfig): void {
             if (typeof staticIp !== "string" || !isValidIPv4(staticIp)) {
                 throw new Error(`Ethernet staticIp must be a valid IPv4 address, got '${staticIp}'`);
             }
+        }
+
+        if (config.network.ethernet?.subnetPrefix !== undefined) {
+            const prefix = config.network.ethernet.subnetPrefix;
+            if (typeof prefix !== "number" || prefix < 1 || prefix > 30) {
+                throw new Error("Ethernet subnetPrefix must be a number between 1 and 30");
+            }
+        }
+
+        if (config.network.ethernet?.dhcpRangeSize !== undefined) {
+            const size = config.network.ethernet.dhcpRangeSize;
+            if (typeof size !== "number" || size <= 0) {
+                throw new Error("Ethernet dhcpRangeSize must be a number greater than 0");
+            }
+        }
+
+        if (config.network.wifiAp?.address !== undefined) {
+            const addr = config.network.wifiAp.address;
+            if (typeof addr !== "string" || !isValidIPv4(addr)) {
+                throw new Error(`WiFi AP address must be a valid IPv4 address, got '${addr}'`);
+            }
+        }
+
+        if (config.network.wifiAp?.subnetPrefix !== undefined) {
+            const prefix = config.network.wifiAp.subnetPrefix;
+            if (typeof prefix !== "number" || prefix < 1 || prefix > 30) {
+                throw new Error("WiFi AP subnetPrefix must be a number between 1 and 30");
+            }
+        }
+
+        if (config.network.wifiAp?.dhcpRangeSize !== undefined) {
+            const size = config.network.wifiAp.dhcpRangeSize;
+            if (typeof size !== "number" || size <= 0) {
+                throw new Error("WiFi AP dhcpRangeSize must be a number greater than 0");
+            }
+        }
+
+        if (config.network.wifiAp?.channel !== undefined) {
+            const ch = config.network.wifiAp.channel;
+            if (typeof ch !== "number" || ch < 1 || ch > 14) {
+                throw new Error("WiFi AP channel must be a number between 1 and 14");
+            }
+        }
+    }
+
+    if (config.onboardingUser?.password !== undefined) {
+        if (typeof config.onboardingUser.password !== "string") {
+            throw new Error("onboardingUser.password must be a string");
         }
     }
 

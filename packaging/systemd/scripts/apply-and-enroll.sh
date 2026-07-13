@@ -135,9 +135,14 @@ rollback() {
 }
 trap rollback ERR
 
-# Step 0: If the WiFi AP is running on the target interface, stop it so NM
-# can reclaim the device and hostapd releases the radio.
+# Step 0: Stop onboarding network services on the target interface so NM
+# can reclaim the device cleanly.
 WIFI_AP_UNIT="cockpit-system-onboarding-wifi-ap@${INTERFACE_NAME}.service"
+DNSMASQ_UNIT="cockpit-system-onboarding-dnsmasq@${INTERFACE_NAME}.service"
+if [ -n "$INTERFACE_NAME" ] && systemctl is-active --quiet "$DNSMASQ_UNIT" 2>/dev/null; then
+    log "Stopping onboarding DHCP on $INTERFACE_NAME"
+    systemctl stop "$DNSMASQ_UNIT"
+fi
 if [ -n "$INTERFACE_NAME" ] && systemctl is-active --quiet "$WIFI_AP_UNIT" 2>/dev/null; then
     log "Stopping WiFi AP on $INTERFACE_NAME before activating connection"
     systemctl stop "$WIFI_AP_UNIT"

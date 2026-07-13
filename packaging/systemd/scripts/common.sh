@@ -44,3 +44,86 @@ disarm_watchdog() {
     systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
     rm -f "${ONBOARDING_MARKER_DIR}/.watchdog-active" 2>/dev/null || true
 }
+
+prefix_to_netmask() {
+    local prefix=$1
+    local mask=$((0xFFFFFFFF << (32 - prefix) & 0xFFFFFFFF))
+    printf "%d.%d.%d.%d\n" \
+        $(( (mask >> 24) & 0xFF )) \
+        $(( (mask >> 16) & 0xFF )) \
+        $(( (mask >> 8)  & 0xFF )) \
+        $(( mask         & 0xFF ))
+}
+
+# Auto-detect the best network interface of a given type.
+# Prefers disconnected interfaces over connected ones (avoids reconfiguring
+# a NIC that already has upstream connectivity). Sorts by name for
+# deterministic tiebreaking.
+# Usage: detect_interface "ethernet"   or   detect_interface "wifi"
+# Prints the chosen device name to stdout; returns 1 if none found.
+detect_interface() {
+    local type="$1"
+    local all disconnected chosen
+
+    all=$(nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null \
+        | grep ":${type}:" \
+        | cut -d: -f1 \
+        | sort)
+
+    if [ -z "$all" ]; then
+        return 1
+    fi
+
+    local count
+    count=$(echo "$all" | wc -l)
+
+    if [ "$count" -eq 1 ]; then
+        echo "$all"
+        return 0
+    fi
+
+    disconnected=$(nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null \
+        | grep ":${type}:disconnected$" \
+        | cut -d: -f1 \
+        | sort)
+
+    if [ -n "$disconnected" ]; then
+        chosen=$(echo "$disconnected" | head -n 1)
+        local disc_count
+        disc_count=$(echo "$disconnected" | wc -l)
+        if [ "$disc_count" -gt 1 ]; then
+            echo "WARNING: $disc_count disconnected ${type} interfaces found ($(echo "$disconnected" | tr '\n' ' '| sed 's/ $//')), selected $chosen" >&2
+        else
+            echo "INFO: $count ${type} interfaces found, selected disconnected interface $chosen over connected ones" >&2
+        fi
+    else
+        chosen=$(echo "$all" | head -n 1)
+        echo "WARNING: $count ${type} interfaces found, all connected — selected $chosen by name" >&2
+    fi
+
+    echo "$chosen"
+    return 0
+}
+
+compute_dhcp_range() {
+    local base_ip=$1
+    local prefix=$2
+    local range_size=$3
+
+    IFS='.' read -r a b c d <<< "$base_ip"
+    local base_num=$(( (a << 24) + (b << 16) + (c << 8) + d ))
+    local start_num=$(( base_num + 1 ))
+    local end_num=$(( start_num + range_size - 1 ))
+
+    DHCP_RANGE_START=$(printf "%d.%d.%d.%d" \
+        $(( (start_num >> 24) & 0xFF )) \
+        $(( (start_num >> 16) & 0xFF )) \
+        $(( (start_num >> 8)  & 0xFF )) \
+        $(( start_num         & 0xFF )))
+    DHCP_RANGE_END=$(printf "%d.%d.%d.%d" \
+        $(( (end_num >> 24) & 0xFF )) \
+        $(( (end_num >> 16) & 0xFF )) \
+        $(( (end_num >> 8)  & 0xFF )) \
+        $(( end_num         & 0xFF )))
+    DHCP_NETMASK=$(prefix_to_netmask "$prefix")
+}
