@@ -6,6 +6,7 @@ export interface StepAction {
     id: string;
     actionTitle: string;
     result: ActionResult;
+    detail?: string;
 }
 
 export const ENROLLMENT_ACTION_IDS = {

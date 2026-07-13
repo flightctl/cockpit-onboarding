@@ -44,10 +44,11 @@ if jq -e '.hostname' "$PARAMS_FILE" >/dev/null 2>&1; then
     ORIGINAL=$(jq -r '.hostname.original' "$PARAMS_FILE") || true
     if [ -n "$ORIGINAL" ]; then
         echo "STEP: Restoring hostname"
-        if hostnamectl set-hostname "$ORIGINAL" 2>/dev/null; then
+        if hostname_err=$(hostnamectl set-hostname "$ORIGINAL" 2>&1); then
             echo "OK: Hostname restored to $ORIGINAL"
         else
             echo "ERROR: Failed to restore hostname to $ORIGINAL"
+            echo "$hostname_err"
             EXIT_CODE=1
         fi
     fi

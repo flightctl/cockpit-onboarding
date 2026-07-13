@@ -96,9 +96,18 @@ const getActionResultIcon = (result: ActionResult) => {
 };
 
 const StepActionRow: React.FunctionComponent<{ action: StepAction }> = ({ action }) => (
-    <Flex alignItems={{ default: "alignItemsCenter" }} gap={{ default: "gapSm" }}>
-        <FlexItem>{action.actionTitle}</FlexItem>
-        <FlexItem>{getActionResultIcon(action.result)}</FlexItem>
+    <Flex direction={{ default: "column" }} gap={{ default: "gapNone" }}>
+        <Flex alignItems={{ default: "alignItemsCenter" }} gap={{ default: "gapSm" }}>
+            <FlexItem>{action.actionTitle}</FlexItem>
+            <FlexItem>{getActionResultIcon(action.result)}</FlexItem>
+        </Flex>
+        {action.detail && (
+            <FlexItem>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: "var(--pf-t--global--font--size--xs)" }}>
+                    {action.detail}
+                </pre>
+            </FlexItem>
+        )}
     </Flex>
 );
 

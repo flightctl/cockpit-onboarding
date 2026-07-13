@@ -21,7 +21,7 @@
 #   ERROR: The current step failed (UI shows error icon)
 #   INFO:  Informational message (UI shows info icon)
 #   DEVICE_URL: Device management URL (captured for "View in UI" link)
-#   (unprefixed lines are captured but not rendered)
+#   (unprefixed lines are attached as detail to the preceding action)
 #
 # See: specs/001-system-onboarding/contracts/enrollment-api.md
 set -euo pipefail
@@ -84,8 +84,9 @@ finalize_agent_config() {
     fi
 
     echo "STEP: Restarting flightctl-agent"
-    if ! systemctl restart flightctl-agent; then
+    if ! restart_output=$(systemctl restart flightctl-agent 2>&1); then
         echo "ERROR: Failed to restart flightctl-agent"
+        echo "$restart_output"
         exit 1
     fi
 
@@ -98,7 +99,7 @@ finalize_agent_config() {
     done
 
     echo "ERROR: flightctl-agent is not running after restart"
-    journalctl -u flightctl-agent -n 30 --no-pager >&2 || true
+    journalctl -u flightctl-agent -n 30 --no-pager || true
     exit 1
 }
 
@@ -163,9 +164,9 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
 
     # Step 1: Login to management service API
     echo "STEP: Logging into ${ENROLLMENT_SERVICE_NAME}"
-    if ! output=$(flightctl login "$ENROLLMENT_ENDPOINT" --credentials-file "$CREDS_FILE" --config-dir "$TMPDIR" "${TLS_ARGS[@]}" 2>&1); then
+    if ! error_output=$(flightctl login "$ENROLLMENT_ENDPOINT" --credentials-file "$CREDS_FILE" --config-dir "$TMPDIR" "${TLS_ARGS[@]}" 2>&1 1>/dev/null); then
         echo "ERROR: flightctl login failed"
-        echo "$output" >&2
+        echo "$error_output"
         exit 2
     fi
     rm -f "$CREDS_FILE"
@@ -180,7 +181,8 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
         --output=embedded \
         --config-dir "$TMPDIR" \
         -d "$TMPDIR" > "$TMPDIR/config.yaml" 2>"$TMPDIR/cert-request.log"; then
-        echo "ERROR: flightctl certificate request failed: $(cat "$TMPDIR/cert-request.log")"
+        echo "ERROR: flightctl certificate request failed"
+        cat "$TMPDIR/cert-request.log"
         exit 1
     fi
     echo "OK: Enrollment certificate received"
