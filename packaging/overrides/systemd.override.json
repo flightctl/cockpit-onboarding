@@ -1,6 +1,7 @@
 {
   "menu": {
-    "services": null
+    "services": null,
+    "logs": null
   },
 
   "tools": {

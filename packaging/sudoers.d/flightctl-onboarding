@@ -3,47 +3,47 @@
 # IMPORTANT: This file grants passwordless sudo for specific system configuration commands.
 # Remove this file after onboarding is complete if plugin is configured to run once.
 #
-# This file should be installed to /etc/sudoers.d/cockpit-system-onboarding with mode 0440.
+# This file should be installed to /etc/sudoers.d/flightctl-onboarding with mode 0440.
 
 # IP address conflict detection and gateway reachability (restricted wrapper)
-onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/check-network.sh *
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/check-network.sh *
 
 # Reboot after onboarding completes
 onboarding ALL=(ALL) NOPASSWD: /usr/sbin/shutdown -r now
 
 # NTP configuration helper
-onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/configure-ntp.sh *
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/configure-ntp.sh *
 
 # Proxy configuration helper
-onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/apply-proxy.sh *
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/apply-proxy.sh *
 
 # Labels configuration helper
-onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/apply-labels.sh *
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/apply-labels.sh *
 
 # Finalization script (writes completion marker)
-onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/finalize-onboarding.sh *
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/finalize-onboarding.sh *
 
 # Rollback script (reverts applied configuration on failure)
-onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/rollback-config.sh *
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/rollback-config.sh *
 
 # Cleanup script (executed after successful onboarding)
-onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/cleanup-onboarding.sh
 
 # Enrollment script (explicit allowlist — do not use wildcards)
 onboarding ALL=(ALL) NOPASSWD: /usr/share/cockpit/system-onboarding/system-onboarding.d/flightctl-enroll.sh *
 
 # Single-NIC apply via restricted wrapper (validates args, generates unit name)
-onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/run-apply-enroll.sh *
-onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/apply-and-enroll.sh *
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/run-apply-enroll.sh *
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/apply-and-enroll.sh *
 
 # Stop WiFi AP when applying network config on the same interface
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop cockpit-system-onboarding-wifi-ap@*.service
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop flightctl-onboarding-wifi-ap@*.service
 
 # Read flightctl agent config (server URL and credential presence only)
-onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/read-flightctl-config.sh
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/read-flightctl-config.sh
 
 # Connectivity watchdog (arm via restricted wrapper, disarm via systemctl)
-onboarding ALL=(ALL) NOPASSWD: /usr/libexec/cockpit-system-onboarding/run-watchdog.sh *
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop cockpit-system-onboarding-watchdog.timer
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop cockpit-system-onboarding-watchdog.service
-onboarding ALL=(ALL) NOPASSWD: /usr/bin/rm -f /var/lib/cockpit-system-onboarding/.watchdog-active
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/run-watchdog.sh *
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop flightctl-onboarding-watchdog.timer
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop flightctl-onboarding-watchdog.service
+onboarding ALL=(ALL) NOPASSWD: /usr/bin/rm -f /var/lib/flightctl-onboarding/.watchdog-active
