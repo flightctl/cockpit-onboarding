@@ -83,6 +83,9 @@ install -m 755 packaging/systemd/scripts/create-onboarding-user.sh %{buildroot}%
 install -m 755 packaging/systemd/scripts/setup-network.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/setup-led.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/setup-wifi-ap.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/wifi-ap-prepare.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/wifi-ap-activate.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/wifi-ap-teardown.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/cleanup-onboarding.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/configure-ntp.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/apply-labels.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/

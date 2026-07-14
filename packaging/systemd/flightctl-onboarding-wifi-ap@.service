@@ -8,31 +8,16 @@ Before=flightctl-onboarding-captive-portal@%i.service
 
 [Service]
 Type=simple
-EnvironmentFile=/run/flightctl-onboarding/wifi-ap.env
-ExecStartPre=-/usr/bin/nmcli device disconnect %i
-ExecStartPre=-/usr/bin/nmcli device set %i managed no
-# NM brings the interface down asynchronously after releasing it;
-# wait for that to settle before bringing it back up for hostapd.
-ExecStartPre=/bin/bash -c 'sleep 2 && /usr/sbin/ip link set %i up && for i in $(seq 10); do [ "$(cat /sys/class/net/%i/operstate)" != "down" ] && exit 0; sleep 0.5; done; echo "WARNING: %i did not come up"'
-# Copy hostapd config to /run/hostapd/ for correct SELinux labeling.
-# hostapd runs in hostapd_t domain (via hostapd_exec_t transition) which can
-# only read hostapd_var_run_t files. /var/run/hostapd(/.*)? has that label;
-# /run/flightctl-onboarding/ files get generic var_run_t and are denied.
-ExecStartPre=/bin/bash -c 'mkdir -p /run/hostapd && cp /run/flightctl-onboarding/hostapd-%i.conf /run/hostapd/ && restorecon /run/hostapd/hostapd-%i.conf'
+ExecStartPre=/usr/libexec/flightctl-onboarding/wifi-ap-prepare.sh %i
 ExecStart=/usr/sbin/hostapd /run/hostapd/hostapd-%i.conf
-ExecStartPost=/usr/sbin/ip addr add ${WIFI_AP_ADDRESS}/${WIFI_AP_NETMASK} dev %i
-ExecStartPost=-/usr/bin/firewall-cmd --zone=flightctl-onboarding-ap --add-interface=%i
-ExecStopPost=-/usr/bin/firewall-cmd --zone=flightctl-onboarding-ap --remove-interface=%i
-ExecStopPost=/usr/sbin/ip addr flush dev %i
-ExecStopPost=/usr/sbin/ip link set %i down
-ExecStopPost=-/usr/bin/nmcli device set %i managed yes
+ExecStartPost=/usr/libexec/flightctl-onboarding/wifi-ap-activate.sh %i
+ExecStopPost=/usr/libexec/flightctl-onboarding/wifi-ap-teardown.sh %i
 Restart=no
 
 # Hardening: hostapd needs raw network access but not /etc/ or /home/
 ProtectSystem=full
 ProtectHome=yes
 PrivateTmp=yes
-NoNewPrivileges=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
 RestrictSUIDSGID=yes
