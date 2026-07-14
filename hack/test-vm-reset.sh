@@ -42,14 +42,14 @@ ip -br link 2>/dev/null | awk '{print $1}' | grep '\.' | while read -r iface; do
 done
 
 echo "Clearing onboarding markers..."
-sudo rm -f /var/lib/cockpit-system-onboarding/.onboarding-complete
-sudo rm -f /var/lib/cockpit-system-onboarding/.onboarding-attempted
-sudo rm -f /var/lib/cockpit-system-onboarding/.watchdog-active
-sudo rm -f /var/lib/cockpit-system-onboarding/.watchdog-status
+sudo rm -f /var/lib/flightctl-onboarding/.onboarding-complete
+sudo rm -f /var/lib/flightctl-onboarding/.onboarding-attempted
+sudo rm -f /var/lib/flightctl-onboarding/.watchdog-active
+sudo rm -f /var/lib/flightctl-onboarding/.watchdog-status
 
 echo "Updating sudoers..."
-sudo cp /usr/share/cockpit/system-onboarding/sudoers.conf /etc/sudoers.d/cockpit-system-onboarding
-sudo chmod 440 /etc/sudoers.d/cockpit-system-onboarding
+sudo cp /usr/share/cockpit/system-onboarding/sudoers.conf /etc/sudoers.d/flightctl-onboarding
+sudo chmod 440 /etc/sudoers.d/flightctl-onboarding
 
 echo "Restarting cockpit..."
 sudo systemctl restart cockpit.socket 2>/dev/null || true

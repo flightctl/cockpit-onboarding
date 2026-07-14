@@ -12,14 +12,14 @@ export async function armWatchdog(testHost: string, timeoutSec: number): Promise
 
 export async function disarmWatchdog(): Promise<void> {
     try {
-        await cockpit.spawn(["sudo", "systemctl", "stop", "cockpit-system-onboarding-watchdog.timer"], {
+        await cockpit.spawn(["sudo", "systemctl", "stop", "flightctl-onboarding-watchdog.timer"], {
             err: "message",
         });
     } catch {
         // Timer may not exist if it already fired
     }
     try {
-        await cockpit.spawn(["sudo", "systemctl", "stop", "cockpit-system-onboarding-watchdog.service"], {
+        await cockpit.spawn(["sudo", "systemctl", "stop", "flightctl-onboarding-watchdog.service"], {
             err: "message",
         });
     } catch {

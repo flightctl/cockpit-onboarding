@@ -6,12 +6,12 @@
 set -euo pipefail
 
 # shellcheck source=common.sh
-. /usr/libexec/cockpit-system-onboarding/common.sh
+. /usr/libexec/flightctl-onboarding/common.sh
 
 MARKER_FILE="${ONBOARDING_MARKER_DIR}/.onboarding-complete"
 WATCHDOG_STATE_FILE="${ONBOARDING_MARKER_DIR}/.watchdog-active"
 STATUS_FILE="${ONBOARDING_MARKER_DIR}/.watchdog-status"
-SERVICE_NAME="cockpit-system-onboarding-setup.service"
+SERVICE_NAME="flightctl-onboarding-setup.service"
 
 DIAG_CARRIER_DETECTED="false"
 DIAG_CARRIER_INTERFACES=""
@@ -97,7 +97,7 @@ rollback_network() {
 
     # Check if the original setup used WiFi AP mode
     local wifi_ap_unit
-    wifi_ap_unit=$(systemctl list-units --plain --no-legend 'cockpit-system-onboarding-wifi-ap@*.service' 2>/dev/null | awk '{print $1}' | head -n 1)
+    wifi_ap_unit=$(systemctl list-units --plain --no-legend 'flightctl-onboarding-wifi-ap@*.service' 2>/dev/null | awk '{print $1}' | head -n 1)
     if [ -n "$wifi_ap_unit" ]; then
         log "WiFi AP service found ($wifi_ap_unit), re-enabling"
         systemctl enable "$wifi_ap_unit" 2>/dev/null || true
@@ -106,10 +106,10 @@ rollback_network() {
     else
         # Check for setup service — it may have already been stopped
         local setup_iface
-        setup_iface=$(systemctl list-units --plain --no-legend 'cockpit-system-onboarding-wifi-ap@*.service' --all 2>/dev/null | awk '{print $1}' | head -n 1 | sed 's/.*@//;s/\.service//')
+        setup_iface=$(systemctl list-units --plain --no-legend 'flightctl-onboarding-wifi-ap@*.service' --all 2>/dev/null | awk '{print $1}' | head -n 1 | sed 's/.*@//;s/\.service//')
         if [ -n "$setup_iface" ]; then
             log "Found inactive WiFi AP for $setup_iface, restarting setup"
-            systemctl start "cockpit-system-onboarding-wifi-ap@${setup_iface}.service" 2>/dev/null || true
+            systemctl start "flightctl-onboarding-wifi-ap@${setup_iface}.service" 2>/dev/null || true
             rollback_performed=true
         fi
     fi

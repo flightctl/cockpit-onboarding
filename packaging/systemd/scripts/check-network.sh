@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Restricted arping wrapper for cockpit-system-onboarding.
+# Restricted arping wrapper for flightctl-onboarding.
 # Only allows the two arping invocation patterns the UI actually needs,
 # preventing abuse of dangerous flags (-s, -U, etc.) via the sudoers wildcard.
 

@@ -1,0 +1,33 @@
+[Unit]
+Description=Flightctl Onboarding Setup
+Documentation=https://github.com/flightctl/cockpit-onboarding
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/var/lib/flightctl-onboarding/.onboarding-complete
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/usr/libexec/flightctl-onboarding/check-dependencies.sh
+ExecStart=/usr/libexec/flightctl-onboarding/create-onboarding-user.sh
+ExecStart=/usr/libexec/flightctl-onboarding/setup-network.sh
+ExecStart=/usr/libexec/flightctl-onboarding/setup-wifi-ap.sh
+ExecStart=/bin/systemctl enable --now cockpit.socket
+ExecStart=/usr/libexec/flightctl-onboarding/setup-led.sh
+ExecStop=/usr/libexec/flightctl-onboarding/cleanup-onboarding.sh
+StandardOutput=journal
+StandardError=journal
+
+# Hardening: limited directives only — this service creates users, writes to /etc/,
+# manages systemd services, and writes to /home/onboarding, so most filesystem and
+# privilege restrictions would break it.
+NoNewPrivileges=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ProtectClock=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

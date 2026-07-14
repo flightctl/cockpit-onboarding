@@ -44,7 +44,7 @@ jobs:
         run: |
           VERSION=$(make print-version)
           gh release create "$GITHUB_REF_NAME" \
-            --title "cockpit-system-onboarding $VERSION" \
+            --title "flightctl-onboarding $VERSION" \
             --generate-notes \
             *.rpm
 

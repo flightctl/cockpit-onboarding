@@ -58,7 +58,7 @@ fi
 echo "Installed flightctl packages from ${FLIGHTCTL_REPO_URL}"
 
 # Verify the agent package landed; the unit stays disabled until onboarding
-# completes (cockpit-system-onboarding installs a ConditionPathExists gate).
+# completes (flightctl-onboarding installs a ConditionPathExists gate).
 if [[ ! -f /usr/lib/systemd/system/flightctl-agent.service ]]; then
     echo "ERROR: flightctl-agent.service unit file missing after install" >&2
     exit 1

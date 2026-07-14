@@ -1,11 +1,11 @@
 #!/bin/bash
 # Initialize LED indicator to 'ready' state
-# Part of cockpit-system-onboarding first-boot setup
+# Part of flightctl-onboarding first-boot setup
 
 set -e
 
 # shellcheck source=common.sh
-. /usr/libexec/cockpit-system-onboarding/common.sh
+. /usr/libexec/flightctl-onboarding/common.sh
 
 # Check if LED control is enabled
 LED_ENABLED=$(load_config '.led.enabled' 'false')

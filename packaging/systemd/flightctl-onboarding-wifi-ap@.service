@@ -1,0 +1,27 @@
+[Unit]
+Description=Flightctl Onboarding WiFi AP on %i
+PartOf=flightctl-onboarding-setup.service
+Wants=flightctl-onboarding-dnsmasq@%i.service
+Before=flightctl-onboarding-dnsmasq@%i.service
+Wants=flightctl-onboarding-captive-portal@%i.service
+Before=flightctl-onboarding-captive-portal@%i.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/libexec/flightctl-onboarding/wifi-ap-prepare.sh %i
+ExecStart=/usr/sbin/hostapd /run/hostapd/hostapd-%i.conf
+ExecStartPost=/usr/libexec/flightctl-onboarding/wifi-ap-activate.sh %i
+ExecStopPost=/usr/libexec/flightctl-onboarding/wifi-ap-teardown.sh %i
+Restart=no
+
+# Hardening: hostapd needs raw network access but not /etc/ or /home/
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictRealtime=yes
+LockPersonality=yes

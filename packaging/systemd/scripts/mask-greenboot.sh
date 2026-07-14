@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Mask greenboot-healthcheck.service so onboarding is not rolled back.
-# Installed to: /usr/libexec/cockpit-system-onboarding/mask-greenboot.sh
+# Installed to: /usr/libexec/flightctl-onboarding/mask-greenboot.sh
 #
 # During onboarding the flightctl-agent is gated (not running), which causes
 # greenboot health checks to fail and eventually triggers an OS rollback.
@@ -11,7 +11,7 @@
 #
 set -euo pipefail
 
-LOGFILE="/var/log/cockpit-system-onboarding-mask-greenboot.log"
+LOGFILE="/var/log/flightctl-onboarding-mask-greenboot.log"
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "${LOGFILE}"
 }

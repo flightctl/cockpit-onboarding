@@ -1,9 +1,9 @@
-pkgname=cockpit-system-onboarding
+pkgname=flightctl-onboarding
 pkgver=VERSION
 pkgrel=1
-pkgdesc='Cockpit System Onboarding Module'
+pkgdesc='Flightctl Onboarding Module'
 arch=('x86_64')
-url='https://github.com/cockpit-project/system-onboarding'
+url='https://github.com/flightctl/cockpit-onboarding'
 license=(LGPL)
 source=("SOURCE")
 sha256sums=('SKIP')

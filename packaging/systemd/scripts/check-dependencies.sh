@@ -1,6 +1,6 @@
 #!/bin/bash
 # Verify required packages are installed
-# Part of cockpit-system-onboarding first-boot setup
+# Part of flightctl-onboarding first-boot setup
 
 set -e
 

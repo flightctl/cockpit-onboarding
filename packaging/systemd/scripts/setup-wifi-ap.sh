@@ -1,11 +1,11 @@
 #!/bin/bash
 # Configure WiFi Access Point for initial system access
-# Part of cockpit-system-onboarding first-boot setup
+# Part of flightctl-onboarding first-boot setup
 
 set -e
 
 # shellcheck source=common.sh
-. /usr/libexec/cockpit-system-onboarding/common.sh
+. /usr/libexec/flightctl-onboarding/common.sh
 
 RUNTIME_DIR="$ONBOARDING_RUNTIME_DIR"
 
@@ -161,7 +161,7 @@ EOF
 # Create a dedicated firewalld zone for the AP interface if firewalld is active.
 # The zone only permits DHCP, DNS, Cockpit (9090/tcp), and captive portal (80/tcp).
 # All other inbound traffic on the AP interface is rejected.
-ONBOARDING_FW_ZONE="cockpit-onboarding-ap"
+ONBOARDING_FW_ZONE="flightctl-onboarding-ap"
 if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
     if ! firewall-cmd --permanent --info-zone="$ONBOARDING_FW_ZONE" >/dev/null 2>&1; then
         firewall-cmd --permanent --new-zone="$ONBOARDING_FW_ZONE"
@@ -180,8 +180,8 @@ else
 fi
 
 # Enable and start the WiFi AP service for this interface
-systemctl enable "cockpit-system-onboarding-wifi-ap@${WIFI_INTERFACE}.service" 2>/dev/null || true
-systemctl start "cockpit-system-onboarding-wifi-ap@${WIFI_INTERFACE}.service"
+systemctl enable "flightctl-onboarding-wifi-ap@${WIFI_INTERFACE}.service" 2>/dev/null || true
+systemctl start "flightctl-onboarding-wifi-ap@${WIFI_INTERFACE}.service"
 
 echo "WiFi AP started on $WIFI_INTERFACE"
 echo "AP accessible at: http://${AP_ADDRESS}:9090"

@@ -3,7 +3,7 @@ import cockpit from 'cockpit';
 
 // Type definitions for Cockpit NetworkManager interfaces
 // This file provides TypeScript types for interfaces.js (from Cockpit project)
-// Created by cockpit-system-onboarding project
+// Created by flightctl-onboarding project
 
 export interface NetworkManagerEvents extends cockpit.EventMap {
     changed: () => void;

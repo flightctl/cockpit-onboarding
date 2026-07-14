@@ -1,11 +1,11 @@
 #!/bin/bash
 # Configure well-known Ethernet IP for initial system access
-# Part of cockpit-system-onboarding first-boot setup
+# Part of flightctl-onboarding first-boot setup
 
 set -e
 
 # shellcheck source=common.sh
-. /usr/libexec/cockpit-system-onboarding/common.sh
+. /usr/libexec/flightctl-onboarding/common.sh
 
 RUNTIME_DIR="$ONBOARDING_RUNTIME_DIR"
 
@@ -87,8 +87,8 @@ pid-file=/tmp/dnsmasq-${ETHERNET_INTERFACE}.pid
 EOF
     echo "Generated dnsmasq DHCP config for $ETHERNET_INTERFACE"
 
-    systemctl enable "cockpit-system-onboarding-dnsmasq@${ETHERNET_INTERFACE}.service" 2>/dev/null || true
-    systemctl start "cockpit-system-onboarding-dnsmasq@${ETHERNET_INTERFACE}.service"
+    systemctl enable "flightctl-onboarding-dnsmasq@${ETHERNET_INTERFACE}.service" 2>/dev/null || true
+    systemctl start "flightctl-onboarding-dnsmasq@${ETHERNET_INTERFACE}.service"
     echo "DHCP server started on $ETHERNET_INTERFACE (range ${DHCP_RANGE_START}-${DHCP_RANGE_END})"
 else
     echo "dnsmasq is not installed, skipping DHCP server setup"

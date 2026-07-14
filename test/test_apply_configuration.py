@@ -85,7 +85,7 @@ class TestApplyConfiguration(testlib.MachineCase):
         b.wait_attr_contains(".pf-v5-c-progress__bar", "aria-valuenow", "100")
 
         # Verify marker file was created
-        m.execute("test -f /var/lib/cockpit-system-onboarding/.onboarding-complete")
+        m.execute("test -f /var/lib/flightctl-onboarding/.onboarding-complete")
 
     def testProgressShowsRebootPrompt(self):
         """Test that manual reboot prompt is shown when autoReboot=false"""
@@ -141,8 +141,8 @@ class TestApplyConfiguration(testlib.MachineCase):
         m = self.machine
 
         # Create marker file manually
-        m.execute("mkdir -p /var/lib/cockpit-system-onboarding")
-        m.write("/var/lib/cockpit-system-onboarding/.onboarding-complete",
+        m.execute("mkdir -p /var/lib/flightctl-onboarding")
+        m.write("/var/lib/flightctl-onboarding/.onboarding-complete",
                 '{"completedAt": "2025-01-01T00:00:00Z"}')
 
         self.login_and_go("/system-onboarding")

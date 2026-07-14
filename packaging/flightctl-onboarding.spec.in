@@ -1,0 +1,231 @@
+Name: flightctl-onboarding
+Version: %{VERSION}
+Release: 1%{?dist}
+Summary: Flightctl Onboarding Module
+License: LGPL-2.1-or-later
+
+Source0: https://github.com/flightctl/cockpit-onboarding/releases/download/v%{version}/%{name}-%{version}.tar.xz
+Source1: https://github.com/flightctl/cockpit-onboarding/releases/download/v%{version}/%{name}-node-%{version}.tar.xz
+BuildArch: noarch
+%if ! 0%{?suse_version}
+ExclusiveArch: %{nodejs_arches} noarch
+%endif
+%if ! 0%{?rhel} || 0%{?rhel} >= 10
+BuildRequires: nodejs >= 18
+%endif
+BuildRequires: make
+%if 0%{?suse_version}
+# Suse's package has a different name
+BuildRequires: appstream-glib
+%else
+BuildRequires: libappstream-glib
+%endif
+BuildRequires: gettext
+BuildRequires: systemd-rpm-macros
+%if 0%{?rhel} && 0%{?rhel} <= 8
+BuildRequires: libappstream-glib-devel
+%endif
+
+Requires: cockpit
+Requires: cockpit-ws
+Requires: cockpit-bridge
+Requires: jq
+Requires: NetworkManager
+Requires: python3
+Requires: sudo
+
+Recommends: hostapd
+Recommends: dnsmasq
+Recommends: firewalld
+Recommends: policycoreutils
+
+Suggests: flightctl-cli
+
+%{NPM_PROVIDES}
+
+%description
+Flightctl Onboarding Module
+
+%prep
+%autosetup -n %{name} -a 1
+# ignore pre-built bundle in release tarball and rebuild it
+# but keep it in RHEL/CentOS-8/9, as that has a too old nodejs
+%if ! 0%{?rhel} || 0%{?rhel} >= 10
+rm -rf dist
+%endif
+
+%build
+NODE_ENV=production BRAND_NAME="%{!?brand_name:Flight Control}%{?brand_name}" make
+
+%install
+%make_install PREFIX=/usr
+
+# drop source maps, they are large and just for debugging
+find %{buildroot}%{_datadir}/cockpit/ -name '*.map' | xargs --no-run-if-empty rm --verbose
+
+# Install systemd unit file
+mkdir -p %{buildroot}%{_unitdir}
+install -m 644 packaging/systemd/flightctl-onboarding-setup.service %{buildroot}%{_unitdir}/
+install -m 644 packaging/systemd/flightctl-onboarding-wifi-ap@.service %{buildroot}%{_unitdir}/
+install -m 644 packaging/systemd/flightctl-onboarding-dnsmasq@.service %{buildroot}%{_unitdir}/
+install -m 644 packaging/systemd/flightctl-onboarding-captive-portal@.service %{buildroot}%{_unitdir}/
+install -m 644 packaging/systemd/flightctl-onboarding-mask-greenboot.service %{buildroot}%{_unitdir}/
+
+# Install flightctl-agent startup gate drop-in
+mkdir -p %{buildroot}%{_unitdir}/flightctl-agent.service.d
+install -m 644 packaging/systemd/onboarding-gate.conf %{buildroot}%{_unitdir}/flightctl-agent.service.d/
+
+# Install setup scripts
+mkdir -p %{buildroot}%{_libexecdir}/flightctl-onboarding
+install -m 644 packaging/systemd/scripts/common.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/check-dependencies.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/create-onboarding-user.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/setup-network.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/setup-led.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/setup-wifi-ap.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/wifi-ap-prepare.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/wifi-ap-activate.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/wifi-ap-teardown.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/cleanup-onboarding.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/configure-ntp.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/apply-labels.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/captive-portal.py %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/apply-and-enroll.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/run-apply-enroll.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/apply-proxy.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/finalize-onboarding.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/watchdog-rollback.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/check-network.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/rollback-config.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/run-watchdog.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/mask-greenboot.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/read-flightctl-config.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+
+# Install sudoers configuration directly to /etc/sudoers.d
+mkdir -p %{buildroot}%{_sysconfdir}/sudoers.d
+install -m 0440 packaging/sudoers.d/flightctl-onboarding %{buildroot}%{_sysconfdir}/sudoers.d/flightctl-onboarding
+
+# Install module override files (for hiding other Cockpit modules)
+mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/overrides
+install -m 644 packaging/overrides/*.override.json %{buildroot}%{_datadir}/cockpit/system-onboarding/overrides/
+
+# Install polkit rules directly to /etc/polkit-1/rules.d
+mkdir -p %{buildroot}%{_sysconfdir}/polkit-1/rules.d
+install -m 644 packaging/polkit/49-flightctl-onboarding.rules %{buildroot}%{_sysconfdir}/polkit-1/rules.d/
+
+# Install example enrollment scripts
+mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d
+install -m 755 packaging/system-onboarding.d/*.sh %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d/
+
+# Create state directory
+mkdir -p %{buildroot}%{_localstatedir}/lib/flightctl-onboarding
+
+%check
+appstream-util validate-relax --nonet %{buildroot}/%{_datadir}/metainfo/*
+
+# this can't be meaningfully tested during package build; tests happen through
+# FMF (see plans/all.fmf) during package gating
+
+%post
+# Enable the onboarding setup service on first boot
+%systemd_post flightctl-onboarding-setup.service
+
+# Reload systemd to pick up the flightctl-agent gate drop-in
+systemctl daemon-reload >/dev/null 2>&1 || :
+
+# Only enable if not already run (marker file doesn't exist)
+if [ ! -f /var/lib/flightctl-onboarding/.onboarding-complete ]; then
+    systemctl enable flightctl-onboarding-setup.service >/dev/null 2>&1 || :
+    systemctl enable flightctl-onboarding-mask-greenboot.service >/dev/null 2>&1 || :
+    /usr/libexec/flightctl-onboarding/mask-greenboot.sh 2>/dev/null || :
+fi
+
+%preun
+%systemd_preun flightctl-onboarding-setup.service
+
+# Remove the flightctl-agent gate drop-in on package removal
+if [ $1 -eq 0 ]; then
+    systemctl unmask greenboot-healthcheck.service 2>/dev/null || :
+    systemctl disable flightctl-onboarding-mask-greenboot.service 2>/dev/null || :
+    rm -f %{_unitdir}/flightctl-agent.service.d/onboarding-gate.conf || :
+    rmdir %{_unitdir}/flightctl-agent.service.d 2>/dev/null || :
+    systemctl daemon-reload >/dev/null 2>&1 || :
+fi
+
+%postun
+%systemd_postun flightctl-onboarding-setup.service
+
+# Full cleanup when the package is being removed (not upgraded)
+if [ $1 -eq 0 ]; then
+    # Stop and disable WiFi AP, dnsmasq, and captive portal template instances
+    for pattern in 'flightctl-onboarding-wifi-ap@*.service' \
+                   'flightctl-onboarding-dnsmasq@*.service' \
+                   'flightctl-onboarding-captive-portal@*.service'; do
+        for unit in $(systemctl list-units --plain --no-legend "$pattern" 2>/dev/null | awk '{print $1}'); do
+            systemctl stop "$unit" 2>/dev/null || :
+            systemctl disable "$unit" 2>/dev/null || :
+        done
+    done
+
+    systemctl unmask greenboot-healthcheck.service 2>/dev/null || :
+
+    # Stop the connectivity watchdog
+    systemctl stop flightctl-onboarding-watchdog.timer 2>/dev/null || :
+    systemctl stop flightctl-onboarding-watchdog.service 2>/dev/null || :
+
+    # Remove the dedicated firewalld zone
+    if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
+        if firewall-cmd --permanent --info-zone=flightctl-onboarding-ap >/dev/null 2>&1; then
+            firewall-cmd --permanent --delete-zone=flightctl-onboarding-ap 2>/dev/null || :
+            firewall-cmd --reload 2>/dev/null || :
+        fi
+    fi
+
+    # Remove SSH denial for onboarding user
+    if [ -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf ]; then
+        rm -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf || :
+        systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null || :
+    fi
+
+    # Remove onboarding user
+    if id onboarding >/dev/null 2>&1; then
+        userdel -r onboarding >/dev/null 2>&1 || :
+    fi
+
+    # Remove sudoers file and polkit rules
+    rm -f /etc/sudoers.d/flightctl-onboarding || :
+    rm -f /etc/polkit-1/rules.d/49-flightctl-onboarding.rules || :
+
+    # Clean up Cockpit configuration changes made during setup
+    if [ -f /etc/cockpit/cockpit.conf ]; then
+        sed -i '/^AllowUnencrypted = true$/d' /etc/cockpit/cockpit.conf 2>/dev/null || :
+        sed -i '/^LoginTo = false$/d' /etc/cockpit/cockpit.conf 2>/dev/null || :
+        if ! grep -qE '^[^[\s]' /etc/cockpit/cockpit.conf 2>/dev/null; then
+            rm -f /etc/cockpit/cockpit.conf || :
+        fi
+    fi
+    rm -rf /etc/cockpit/system-onboarding || :
+
+    # Remove runtime and state files
+    rm -rf /run/flightctl-onboarding || :
+    rm -rf /var/lib/flightctl-onboarding || :
+fi
+
+%files
+%doc README.md
+%license LICENSE dist/index.js.LEGAL.txt
+%{_datadir}/cockpit/*
+%{_datadir}/metainfo/*
+%{_unitdir}/flightctl-onboarding-setup.service
+%{_unitdir}/flightctl-onboarding-wifi-ap@.service
+%{_unitdir}/flightctl-onboarding-dnsmasq@.service
+%{_unitdir}/flightctl-onboarding-captive-portal@.service
+%{_unitdir}/flightctl-onboarding-mask-greenboot.service
+%dir %{_unitdir}/flightctl-agent.service.d
+%{_unitdir}/flightctl-agent.service.d/onboarding-gate.conf
+%{_libexecdir}/flightctl-onboarding/
+%config %attr(0440,root,root) %{_sysconfdir}/sudoers.d/flightctl-onboarding
+%{_sysconfdir}/polkit-1/rules.d/49-flightctl-onboarding.rules
+%dir %{_localstatedir}/lib/flightctl-onboarding
+
+%changelog

@@ -19,7 +19,7 @@ set -uo pipefail
 
 PARAMS_FILE="${1:?Usage: rollback-config.sh <params-json-file>}"
 EXIT_CODE=0
-PROXY_MARKER="# cockpit-system-onboarding proxy"
+PROXY_MARKER="# flightctl-onboarding proxy"
 
 if [ ! -f "$PARAMS_FILE" ]; then
     echo "ERROR: Params file not found: $PARAMS_FILE"
@@ -65,7 +65,7 @@ fi
 # Proxy rollback
 if jq -e '.proxy' "$PARAMS_FILE" >/dev/null 2>&1; then
     echo "STEP: Removing proxy configuration"
-    rm -f /etc/systemd/system.conf.d/50-cockpit-onboarding-proxy.conf 2>/dev/null || true
+    rm -f /etc/systemd/system.conf.d/50-flightctl-onboarding-proxy.conf 2>/dev/null || true
     if [ -f /etc/environment ]; then
         sed -i "/${PROXY_MARKER}/,+3d" /etc/environment 2>/dev/null || true
     fi

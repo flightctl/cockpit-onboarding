@@ -22,15 +22,15 @@
 set -euo pipefail
 
 # shellcheck source=common.sh
-. /usr/libexec/cockpit-system-onboarding/common.sh
+. /usr/libexec/flightctl-onboarding/common.sh
 
 # systemd-run transient units do not set HOME; child scripts and tools may need it.
 export HOME="${HOME:-/root}"
 
-LOG_FILE="/var/log/cockpit-system-onboarding-apply.log"
+LOG_FILE="/var/log/flightctl-onboarding-apply.log"
 touch "$LOG_FILE"
 chmod 0600 "$LOG_FILE"
-WATCHDOG_STATUS_FILE="/var/lib/cockpit-system-onboarding/.watchdog-status"
+WATCHDOG_STATUS_FILE="/var/lib/flightctl-onboarding/.watchdog-status"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$LOG_FILE"; }
 
@@ -109,7 +109,7 @@ validate_iface_name() {
 validate_iface_name "$INTERFACE_NAME"
 validate_iface_name "$EFFECTIVE_IFACE"
 
-ROLLBACK_SCRIPT="/usr/libexec/cockpit-system-onboarding/rollback-config.sh"
+ROLLBACK_SCRIPT="/usr/libexec/flightctl-onboarding/rollback-config.sh"
 
 rollback() {
     log "Rolling back applied configuration..."
@@ -137,8 +137,8 @@ trap rollback ERR
 
 # Step 0: Stop onboarding network services on the target interface so NM
 # can reclaim the device cleanly.
-WIFI_AP_UNIT="cockpit-system-onboarding-wifi-ap@${INTERFACE_NAME}.service"
-DNSMASQ_UNIT="cockpit-system-onboarding-dnsmasq@${INTERFACE_NAME}.service"
+WIFI_AP_UNIT="flightctl-onboarding-wifi-ap@${INTERFACE_NAME}.service"
+DNSMASQ_UNIT="flightctl-onboarding-dnsmasq@${INTERFACE_NAME}.service"
 if [ -n "$INTERFACE_NAME" ] && systemctl is-active --quiet "$DNSMASQ_UNIT" 2>/dev/null; then
     log "Stopping onboarding DHCP on $INTERFACE_NAME"
     systemctl stop "$DNSMASQ_UNIT"
@@ -249,7 +249,7 @@ else
 fi
 
 # Step 4: Write the onboarding completion marker
-FINALIZE_SCRIPT="/usr/libexec/cockpit-system-onboarding/finalize-onboarding.sh"
+FINALIZE_SCRIPT="/usr/libexec/flightctl-onboarding/finalize-onboarding.sh"
 if [ -x "$FINALIZE_SCRIPT" ]; then
     log "Running finalize..."
     "$FINALIZE_SCRIPT" "$HOSTNAME"
@@ -259,7 +259,7 @@ else
 fi
 
 # Step 5: Run cleanup (removes onboarding user, stops WiFi AP, starts agent)
-CLEANUP_SCRIPT="/usr/libexec/cockpit-system-onboarding/cleanup-onboarding.sh"
+CLEANUP_SCRIPT="/usr/libexec/flightctl-onboarding/cleanup-onboarding.sh"
 if [ -x "$CLEANUP_SCRIPT" ]; then
     log "Running cleanup..."
     "$CLEANUP_SCRIPT"

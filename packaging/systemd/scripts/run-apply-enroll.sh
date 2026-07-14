@@ -9,7 +9,7 @@
 # Usage: run-apply-enroll.sh <params-json-file>
 set -euo pipefail
 
-APPLY_SCRIPT="/usr/libexec/cockpit-system-onboarding/apply-and-enroll.sh"
+APPLY_SCRIPT="/usr/libexec/flightctl-onboarding/apply-and-enroll.sh"
 
 if [ $# -ne 1 ]; then
     echo "Usage: run-apply-enroll.sh <params-json-file>" >&2

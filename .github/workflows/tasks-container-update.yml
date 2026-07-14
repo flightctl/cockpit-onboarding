@@ -2,7 +2,7 @@ name: tasks-container-update
 on:
   schedule:
     - cron: '0 2 * * 1'
-  # can be run manually on https://github.com/cockpit-project/system-onboarding/actions
+  # can be run manually on https://github.com/flightctl/cockpit-onboarding/actions
   workflow_dispatch:
 jobs:
   tasks-container-update:
