@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python3 -cimport os, sys; os.execv(os.path.dirname(sys.argv[1]) + "/common/pywrap", sys.argv)
 
 """
 Integration test for the Device Labels wizard step

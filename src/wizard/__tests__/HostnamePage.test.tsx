@@ -2,10 +2,15 @@
  * Unit tests for system hostname validation logic
  *
  * These tests verify that validateSystemHostname correctly implements
- * RFC 1123 hostname rules and Linux's static hostname length limit.
+ * hostnamectl's static hostname rules: up to 64 characters of
+ * [a-zA-Z0-9.-], starting and ending with an alphanumeric character,
+ * with no consecutive dots.
  */
 
 import { LINUX_HOSTNAME_MAX_LENGTH, validateSystemHostname } from "../../validation";
+
+const FORMAT_ERROR =
+    "Hostname must start and end with an alphanumeric character, and contain only letters, numbers, hyphens, and dots";
 
 describe("validateSystemHostname", () => {
     describe("Required field validation", () => {
@@ -17,22 +22,32 @@ describe("validateSystemHostname", () => {
             expect(validateSystemHostname("   ")).toBe("Hostname is required");
             expect(validateSystemHostname("\t")).toBe("Hostname is required");
         });
+
+        test("returns null for empty string when not required", () => {
+            expect(validateSystemHostname("", false)).toBeNull();
+            expect(validateSystemHostname("   ", false)).toBeNull();
+        });
     });
 
     describe("Linux total length validation (max 64 characters)", () => {
         test("accepts hostname at Linux maximum length", () => {
-            const hostname = `${"a".repeat(30)}.${"b".repeat(33)}`;
+            const hostname = "a".repeat(LINUX_HOSTNAME_MAX_LENGTH);
             expect(validateSystemHostname(hostname)).toBeNull();
-            expect(hostname.length).toBe(LINUX_HOSTNAME_MAX_LENGTH);
         });
 
         test("rejects hostname over Linux maximum length", () => {
-            const hostname = `${"a".repeat(30)}.${"b".repeat(34)}`;
+            const hostname = "a".repeat(LINUX_HOSTNAME_MAX_LENGTH + 1);
             expect(validateSystemHostname(hostname)).toBe("Hostname must be 64 characters or less");
         });
 
-        test("rejects long FQDN that would be valid under RFC 1123 alone", () => {
-            const hostname = "thishostnameisnotavalidalias.becauseitislongerthanwhatspossibleforalabelvalue";
+        test("accepts FQDN at exactly 64 characters", () => {
+            const hostname = `${"a".repeat(30)}.${"b".repeat(33)}`;
+            expect(hostname.length).toBe(LINUX_HOSTNAME_MAX_LENGTH);
+            expect(validateSystemHostname(hostname)).toBeNull();
+        });
+
+        test("rejects FQDN over 64 characters", () => {
+            const hostname = `${"a".repeat(30)}.${"b".repeat(34)}`;
             expect(validateSystemHostname(hostname)).toBe("Hostname must be 64 characters or less");
         });
 
@@ -41,152 +56,74 @@ describe("validateSystemHostname", () => {
         });
     });
 
-    describe("Label length validation (max 63 characters per label)", () => {
-        test("accepts label at 63 characters (max)", () => {
-            const label = "a".repeat(63);
-            expect(validateSystemHostname(label)).toBeNull();
-        });
-
-        test("rejects label over 63 characters", () => {
-            const label = "a".repeat(64);
-            expect(validateSystemHostname(label)).toBe("Each hostname label must be 63 characters or less");
-        });
-
-        test("rejects hostname with empty label (consecutive dots)", () => {
-            expect(validateSystemHostname("server..example.com")).toBe("Hostname cannot have empty labels");
-        });
-
-        test("rejects hostname ending with dot", () => {
-            expect(validateSystemHostname("server.example.com.")).toBe("Hostname cannot have empty labels");
-        });
-
-        test("rejects hostname starting with dot", () => {
-            expect(validateSystemHostname(".server.example.com")).toBe("Hostname cannot have empty labels");
-        });
-
-        test("validates each label in FQDN", () => {
-            expect(validateSystemHostname("server.example.com")).toBeNull();
-
-            const label64 = "a".repeat(64);
-            expect(validateSystemHostname(`${label64}.example.com`)).toBe(
-                "Each hostname label must be 63 characters or less"
-            );
-        });
-
-        test("rejects FQDN within label limits but over Linux total length", () => {
-            const label63 = "a".repeat(63);
-            expect(validateSystemHostname(`${label63}.example.com`)).toBe("Hostname must be 64 characters or less");
-        });
-    });
-
-    describe("Character restrictions", () => {
+    describe("Format validation", () => {
         test("accepts alphanumeric characters", () => {
             expect(validateSystemHostname("server123")).toBeNull();
             expect(validateSystemHostname("SERVER123")).toBeNull();
             expect(validateSystemHostname("Server123")).toBeNull();
         });
 
-        test("accepts hyphens in middle of label", () => {
+        test("accepts hyphens in middle", () => {
             expect(validateSystemHostname("my-server")).toBeNull();
             expect(validateSystemHostname("web-server-01")).toBeNull();
         });
 
-        test("rejects label starting with hyphen", () => {
-            expect(validateSystemHostname("-server")).toBe(
-                "Each hostname label must start with an alphanumeric character"
-            );
-            expect(validateSystemHostname("web.-server.com")).toBe(
-                "Each hostname label must start with an alphanumeric character"
-            );
-        });
-
-        test("rejects label ending with hyphen", () => {
-            expect(validateSystemHostname("server-")).toBe(
-                "Each hostname label must end with an alphanumeric character"
-            );
-            expect(validateSystemHostname("server-.example.com")).toBe(
-                "Each hostname label must end with an alphanumeric character"
-            );
-        });
-
-        test("rejects special characters", () => {
-            expect(validateSystemHostname("server_01")).toBe("Hostname can only contain letters, numbers, and hyphens");
-            expect(validateSystemHostname("server@example.com")).toBe(
-                "Hostname can only contain letters, numbers, and hyphens"
-            );
-            expect(validateSystemHostname("server#1")).toBe("Hostname can only contain letters, numbers, and hyphens");
-            expect(validateSystemHostname("server$")).toBe("Hostname can only contain letters, numbers, and hyphens");
-        });
-
-        test("rejects spaces", () => {
-            expect(validateSystemHostname("my server")).toBe("Hostname can only contain letters, numbers, and hyphens");
-        });
-    });
-
-    describe("FQDN rules - all-numeric labels", () => {
-        test("accepts FQDN with multiple labels", () => {
+        test("accepts dots in FQDN", () => {
             expect(validateSystemHostname("server.example.com")).toBeNull();
             expect(validateSystemHostname("web01.prod.example.com")).toBeNull();
         });
 
-        test("accepts single label hostname", () => {
-            expect(validateSystemHostname("localhost")).toBeNull();
-            expect(validateSystemHostname("server")).toBeNull();
+        test("rejects hostname starting with hyphen", () => {
+            expect(validateSystemHostname("-server")).toBe(FORMAT_ERROR);
         });
 
-        test("rejects all-numeric labels in FQDN (IPv4-like)", () => {
-            expect(validateSystemHostname("192.168.1.1")).toBe("Hostname labels cannot be all numeric in a FQDN");
-            expect(validateSystemHostname("1.2.3.4")).toBe("Hostname labels cannot be all numeric in a FQDN");
+        test("rejects hostname ending with hyphen", () => {
+            expect(validateSystemHostname("server-")).toBe(FORMAT_ERROR);
         });
 
-        test("accepts FQDN with some numeric labels", () => {
-            expect(validateSystemHostname("server.123.com")).toBeNull();
-            expect(validateSystemHostname("1.ntp.org")).toBeNull();
-            expect(validateSystemHostname("0.pool.ntp.org")).toBeNull();
+        test("rejects hostname starting with dot", () => {
+            expect(validateSystemHostname(".server.com")).toBe(FORMAT_ERROR);
         });
 
-        test("accepts all-numeric single label (not FQDN)", () => {
-            expect(validateSystemHostname("12345")).toBeNull();
-            expect(validateSystemHostname("1")).toBeNull();
+        test("rejects hostname ending with dot", () => {
+            expect(validateSystemHostname("server.com.")).toBe(FORMAT_ERROR);
         });
 
-        test("accepts numeric characters mixed with letters in FQDN", () => {
-            expect(validateSystemHostname("web01.example.com")).toBeNull();
-            expect(validateSystemHostname("server1.prod2.example3.com")).toBeNull();
-            expect(validateSystemHostname("1server.example.com")).toBeNull();
+        test("rejects consecutive dots", () => {
+            expect(validateSystemHostname("server..example.com")).toBe(FORMAT_ERROR);
+        });
+
+        test("rejects special characters", () => {
+            expect(validateSystemHostname("server_01")).toBe(FORMAT_ERROR);
+            expect(validateSystemHostname("server@example.com")).toBe(FORMAT_ERROR);
+            expect(validateSystemHostname("server#1")).toBe(FORMAT_ERROR);
+            expect(validateSystemHostname("server$")).toBe(FORMAT_ERROR);
+        });
+
+        test("rejects spaces", () => {
+            expect(validateSystemHostname("my server")).toBe(FORMAT_ERROR);
         });
     });
 
-    describe("Real-world hostname examples", () => {
+    describe("Valid hostnames", () => {
         test("accepts common valid hostnames", () => {
             expect(validateSystemHostname("localhost")).toBeNull();
             expect(validateSystemHostname("web-server-01")).toBeNull();
             expect(validateSystemHostname("db.example.com")).toBeNull();
-            expect(validateSystemHostname("api-gateway.prod.example.com")).toBeNull();
             expect(validateSystemHostname("server01")).toBeNull();
             expect(validateSystemHostname("my-system.example.com")).toBeNull();
         });
 
-        test("rejects common invalid hostnames", () => {
-            expect(validateSystemHostname("")).not.toBeNull();
-            expect(validateSystemHostname("server_01")).not.toBeNull();
-            expect(validateSystemHostname("-server")).not.toBeNull();
-            expect(validateSystemHostname("server-")).not.toBeNull();
-            expect(validateSystemHostname("192.168.1.1")).not.toBeNull();
-            expect(validateSystemHostname("server..example.com")).not.toBeNull();
-        });
-    });
-
-    describe("Edge cases", () => {
         test("accepts single character hostname", () => {
             expect(validateSystemHostname("a")).toBeNull();
             expect(validateSystemHostname("1")).toBeNull();
             expect(validateSystemHostname("Z")).toBeNull();
         });
 
-        test("accepts hostname with numbers only (single label)", () => {
+        test("accepts all-numeric hostnames", () => {
             expect(validateSystemHostname("123")).toBeNull();
-            expect(validateSystemHostname("999")).toBeNull();
+            expect(validateSystemHostname("12345")).toBeNull();
+            expect(validateSystemHostname("192.168.1.1")).toBeNull();
         });
 
         test("accepts mixed case", () => {
@@ -195,21 +132,9 @@ describe("validateSystemHostname", () => {
             expect(validateSystemHostname("Web.Server.Com")).toBeNull();
         });
 
-        test("handles label exactly at boundary (63 chars)", () => {
-            const label63 = "a".repeat(63);
-            expect(validateSystemHostname(label63)).toBeNull();
-        });
-
-        test("handles label just over boundary (64 chars)", () => {
-            const label64 = "a".repeat(64);
-            expect(validateSystemHostname(label64)).toBe("Each hostname label must be 63 characters or less");
-        });
-
-        test("accepts hostname with multiple labels within Linux length limit", () => {
-            const parts = Array(10).fill("label");
-            const hostname = parts.join(".");
-            expect(hostname.length).toBeLessThanOrEqual(LINUX_HOSTNAME_MAX_LENGTH);
-            expect(validateSystemHostname(hostname)).toBeNull();
+        test("accepts NTP-style hostnames", () => {
+            expect(validateSystemHostname("0.pool.ntp.org")).toBeNull();
+            expect(validateSystemHostname("1.ntp.org")).toBeNull();
         });
     });
 
@@ -224,7 +149,8 @@ describe("validateSystemHostname", () => {
             "web-server-01",
             "server.example.com",
             "web01.prod.example.com",
-            "api-gateway.staging.example.com",
+            "192.168.1.1",
+            "0.pool.ntp.org",
             `${"a".repeat(30)}.${"b".repeat(33)}`,
         ];
 
@@ -232,14 +158,12 @@ describe("validateSystemHostname", () => {
             { hostname: "", error: "Hostname is required" },
             { hostname: "   ", error: "Hostname is required" },
             { hostname: `${"a".repeat(30)}.${"b".repeat(34)}`, error: "Hostname must be 64 characters or less" },
-            { hostname: "a".repeat(64), error: "Each hostname label must be 63 characters or less" },
-            { hostname: "-server", error: "Each hostname label must start with an alphanumeric character" },
-            { hostname: "server-", error: "Each hostname label must end with an alphanumeric character" },
-            { hostname: "server_01", error: "Hostname can only contain letters, numbers, and hyphens" },
-            { hostname: "192.168.1.1", error: "Hostname labels cannot be all numeric in a FQDN" },
-            { hostname: "server..example.com", error: "Hostname cannot have empty labels" },
-            { hostname: ".server.com", error: "Hostname cannot have empty labels" },
-            { hostname: "server.com.", error: "Hostname cannot have empty labels" },
+            { hostname: "-server", error: FORMAT_ERROR },
+            { hostname: "server-", error: FORMAT_ERROR },
+            { hostname: "server_01", error: FORMAT_ERROR },
+            { hostname: "server..example.com", error: FORMAT_ERROR },
+            { hostname: ".server.com", error: FORMAT_ERROR },
+            { hostname: "server.com.", error: FORMAT_ERROR },
             {
                 hostname: "thishostnameisnotavalidalias.becauseitislongerthanwhatspossibleforalabelvalue",
                 error: "Hostname must be 64 characters or less",

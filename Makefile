@@ -200,6 +200,8 @@ check: prepare-check
 
 codecheck: test/common $(NODE_MODULES_STAMP)
 	test/common/static-code
+	npm test
+	sh test/test-network-helpers.sh
 
 # checkout Cockpit's bots for standard test VM images and API to launch them
 bots: $(COCKPIT_REPO_STAMP)
