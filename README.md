@@ -13,11 +13,12 @@ Flightctl Onboarding runs inside [Cockpit](https://cockpit-project.org/) on the 
 ### Features
 
 - **Hostname configuration** — set the system hostname
-- **Network interface selection** — choose the onboarding network interface
-- **Network addressing** — configure IPv4/IPv6 addresses and DNS
-- **Network services** — set NTP server and network proxy
-- **Enrollment** — enroll into [Flight Control](https://github.com/flightctl/flightctl) via pluggable scripts
-- **WiFi AP provisioning** — optionally expose a temporary WiFi access point for initial connectivity
+- **Device labels** — assign key/value labels for Flight Control fleet management
+- **Network interface selection** — choose ethernet or WiFi, with VLAN support
+- **Network addressing** — configure IPv4/IPv6 addresses, DNS, with inline validation and duplicate IP detection
+- **Network services** — set NTP servers and HTTP proxy (with credential support)
+- **Enrollment** — enroll into [Flight Control](https://github.com/flightctl/flightctl) with token or username/password authentication
+- **WiFi AP provisioning** — optionally expose a temporary WiFi access point with captive portal for initial connectivity
 - **Self-disabling** — once onboarding completes, the wizard and its services become inert
 
 ## Installing
@@ -49,163 +50,111 @@ If provisioning over WiFi, install the additional dependencies:
 sudo dnf install -y hostapd dnsmasq
 ```
 
-Access the wizard at `https://<device-ip>:9090` in your browser. Log in as user `onboarding` without password.
-
 ### From source
 
 See [DEVELOPERS.md](DEVELOPERS.md) for build instructions and development setup.
 
+## Connecting to the Device
+
+There are three ways to reach the onboarding wizard, depending on your setup.
+
+### WiFi access point
+
+If `hostapd` and `dnsmasq` are installed and WiFi is enabled in the config, the device creates a temporary WiFi access point on first boot.
+
+- **SSID**: `flightctl-<suffix>` where `<suffix>` is the last 8 characters of the device's DMI serial number (or last 6 hex digits of the WiFi MAC address if serial is unavailable)
+- **Password**: configured via `network.wifiAp.password` in `config.json` (default: `onboarding`). Set to empty string for an open network.
+- **Captive portal**: after connecting, most devices will automatically open a sign-in page that redirects to the wizard. If the captive portal prompt does not appear, open `http://10.42.0.1:9090` manually.
+
+Log in as user `onboarding` (no password by default, or the password set in `onboardingUser.password`).
+
+### Ethernet (static IP)
+
+If Ethernet is enabled in the config, the device creates a temporary NetworkManager connection with a static IP on the first available Ethernet interface.
+
+1. Connect your laptop directly to the device's Ethernet port (or through a switch on the same L2 segment)
+2. Configure your laptop with a static IP on the same subnet — e.g. `192.168.100.2/24` if using the default
+3. Open `http://192.168.100.1:9090` in your browser (the device's default static IP)
+4. Log in as user `onboarding`
+
+If `dnsmasq` is installed, the device also runs a DHCP server on the setup interface, so you can skip step 2 and use DHCP instead.
+
+The static IP, subnet prefix, and DHCP range are all configurable — see [Configuration](#configuration) below.
+
+### Local console
+
+If you have a keyboard and monitor connected to the device, open `http://localhost:9090` in a browser and log in as `onboarding`.
+
 ## How It Works
 
-On first boot the setup service creates a temporary `onboarding` user, optionally starts a WiFi access point, and enables the Cockpit web console. The operator connects to Cockpit, steps through the wizard pages (hostname, network, enrollment), and clicks "Apply". Once complete, the cleanup script removes the temporary user, tears down the WiFi AP, and marks onboarding as finished — the service will not run again.
+On first boot the setup service creates a temporary `onboarding` user, optionally starts a WiFi access point, and enables the Cockpit web console. The operator connects to Cockpit, steps through the wizard pages (hostname, labels, network, NTP/proxy, enrollment), and clicks "Apply".
 
-Enrollment is handled by drop-in shell scripts in `/usr/share/cockpit/system-onboarding/system-onboarding.d/`. The package ships an example script for Flight Control; add your own to support other management platforms.
+The wizard supports two operational flows depending on network topology — see [AGENTS.md](AGENTS.md) for a detailed description of each:
 
-## Testing WiFi Interfaces
+- **Inline (multi-NIC)**: the operator connects via one interface and configures a different one. All apply steps run in the browser session. On success, the operator clicks "Finish" to trigger cleanup.
+- **Single-NIC (background delegation)**: the operator connects and configures the same interface. The wizard delegates network activation, enrollment, and cleanup to a `systemd-run` transient unit that survives the browser disconnect.
 
-The `mac80211_hwsim` kernel module creates virtual WiFi radios that NetworkManager recognizes as proper `wifi` devices. This requires several userspace packages that are not included in minimal/cloud images:
+Once complete, the cleanup script removes the temporary user, tears down the WiFi AP, and marks onboarding as finished — the service will not run again.
 
-```sh
-sudo dnf install -y kernel-modules-internal kernel-modules-extra \
-    NetworkManager-wifi wpa_supplicant iw wireless-regdb hostapd
-sudo systemctl restart NetworkManager
-sudo modprobe mac80211_hwsim radios=2
+Enrollment is handled by drop-in shell scripts in `/usr/share/cockpit/system-onboarding/system-onboarding.d/`. The package ships a script for Flight Control; add your own to support other management platforms.
+
+## Configuration
+
+The plugin reads configuration from JSON files at two paths:
+
+| Priority | Path | Purpose |
+|----------|------|---------|
+| 1 (highest) | `/etc/cockpit/system-onboarding/config.json` | Operator override — survives package upgrades |
+| 2 | `/usr/share/cockpit/system-onboarding/config.json` | Package default — shipped with the RPM |
+
+The override file does not need to contain all keys — only the values you want to change. Unset keys fall back to the package default.
+
+### Configuration reference
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `version` | string | `"1.0"` | Config schema version |
+| `runOnce` | bool | `true` | Disable the onboarding service after completion |
+| `keepCockpit` | bool | `false` | Keep Cockpit running post-onboarding (expires the onboarding user's password instead of deleting the user) |
+| `hideModules` | bool | `true` | Hide other Cockpit modules during onboarding |
+| `autoReboot` | bool | `false` | Reboot the device after onboarding completes |
+| `network.wifiAp.enabled` | bool | `true` | Enable WiFi AP provisioning |
+| `network.wifiAp.ssidPrefix` | string | `"flightctl-"` | SSID prefix; suffix is auto-generated from DMI serial or MAC |
+| `network.wifiAp.interface` | string | `""` | WiFi interface for the AP; empty = auto-detect |
+| `network.wifiAp.password` | string | `"onboarding"` | WPA2 password; empty = open network |
+| `network.wifiAp.address` | string | `"10.42.0.1"` | AP IP address |
+| `network.wifiAp.subnetPrefix` | int | `24` | AP subnet prefix length |
+| `network.wifiAp.dhcpRangeSize` | int | `40` | Number of DHCP leases to offer |
+| `network.wifiAp.channel` | int | `6` | WiFi channel |
+| `network.ethernet.enabled` | bool | `true` | Enable Ethernet setup interface |
+| `network.ethernet.staticIp` | string | `"192.168.100.1"` | Static IP for the onboarding Ethernet interface |
+| `network.ethernet.subnetPrefix` | int | `24` | Ethernet subnet prefix length |
+| `network.ethernet.dhcpRangeSize` | int | `40` | Number of DHCP leases (requires dnsmasq) |
+| `flightctl.defaultEndpoint` | string | `""` | Pre-populated Flight Control server URL in the enrollment form |
+| `connectivityTest.host` | string | `"cockpit-project.org"` | Host used for DNS/ping connectivity checks after network apply |
+| `onboardingUser.password` | string | `""` | Password for the `onboarding` Cockpit user; empty = passwordless login |
+| `led.enabled` | bool | `false` | Enable LED state signaling during onboarding phases |
+
+### Example override
+
+To change the setup Ethernet IP and pre-populate the Flight Control endpoint, create `/etc/cockpit/system-onboarding/config.json`:
+
+```json
+{
+  "network": {
+    "ethernet": {
+      "staticIp": "10.0.0.1"
+    }
+  },
+  "flightctl": {
+    "defaultEndpoint": "https://api.flightctl.example.com:7443"
+  }
+}
 ```
-
-After loading, `nmcli -t -f DEVICE,TYPE device` should show `wlan0:wifi` and `wlan1:wifi`. The onboarding setup service will detect these and start a WiFi AP on the first one.
-
-> [!NOTE]
-> The `kernel-modules-internal` package must match the running kernel version. If installing on a fresh cloud image, run `sudo dnf update -y` and reboot before installing the module packages.
-
-### Enabling internet connectivity through virtual WiFi
-
-The virtual radios can only communicate with each other — they have no access to real RF hardware. Unicast IP traffic between interfaces on the same host is intercepted by the kernel's local routing table before reaching the wireless stack. To make AP-to-client connectivity work, the AP's phy must be placed in a **separate network namespace**:
-
-```sh
-# Move the AP phy into its own namespace
-ip netns add wifi_ap
-iw phy phy1 set netns name wifi_ap
-
-# Configure inside the namespace
-ip netns exec wifi_ap ip link set lo up
-ip netns exec wifi_ap ip link set wlan1 up
-ip netns exec wifi_ap ip addr add 10.43.0.1/24 dev wlan1
-ip netns exec wifi_ap hostapd -B /path/to/hostapd.conf
-
-# Bridge namespace to host via veth pair for NAT
-ip link add veth-host type veth peer name veth-ap
-ip link set veth-ap netns wifi_ap
-ip addr add 10.43.1.1/30 dev veth-host && ip link set veth-host up
-ip netns exec wifi_ap ip addr add 10.43.1.2/30 dev veth-ap
-ip netns exec wifi_ap ip link set veth-ap up
-ip netns exec wifi_ap ip route add default via 10.43.1.1
-
-# NAT chain: WiFi clients -> namespace veth -> host -> internet
-ip netns exec wifi_ap iptables -t nat -A POSTROUTING -s 10.43.0.0/24 -o veth-ap -j MASQUERADE
-iptables -t nat -A POSTROUTING -s 10.43.1.0/30 -o enp1s0 -j MASQUERADE
-```
-
-The `make deploy-test-vm` target sets this up automatically. It creates a namespaced infrastructure AP (SSID: `test-infra-wifi`) with full NAT so that clients connected to it can reach the internet.
-
-### USB WiFi passthrough
-
-To test with a physical WiFi adapter instead of virtual radios, plug a USB WiFi dongle into the host and pass it through to the VM using libvirt USB passthrough:
-
-```sh
-# Find the adapter's vendor:product ID on the host
-lsusb | grep -i wireless   # e.g. "0bda:c811 Realtek Semiconductor Corp. 802.11ac NIC"
-
-# Attach to the VM (this detaches it from the host)
-virsh attach-device cockpit-onboarding-test --live /dev/stdin <<EOF
-<hostdev mode='subsystem' type='usb' managed='yes'>
-  <source>
-    <vendor id='0x0bda'/>
-    <product id='0xc811'/>
-  </source>
-</hostdev>
-EOF
-
-# If the adapter doesn't appear as a WiFi interface, reload its driver
-# inside the VM so it picks up the installed firmware
-ssh fedora@<vm-ip> 'sudo dmesg | tail -20'          # check for firmware errors
-ssh fedora@<vm-ip> 'sudo modprobe -r rtw88_8821cu && sudo modprobe rtw88_8821cu'
-```
-
-The adapter will appear as a new WiFi interface (e.g. `wlp3s0u1`) alongside the virtual radios. `linux-firmware` is pre-installed in the test VM, which provides firmware for most common USB WiFi chipsets.
-
-To detach the adapter and return it to the host:
-
-```sh
-virsh detach-device cockpit-onboarding-test --live /dev/stdin <<EOF
-<hostdev mode='subsystem' type='usb' managed='yes'>
-  <source>
-    <vendor id='0x0bda'/>
-    <product id='0xc811'/>
-  </source>
-</hostdev>
-EOF
-```
-
-## Testing VLAN Interfaces
-
-The wizard supports creating VLAN-tagged network profiles. To verify this end-to-end, the test scripts set up an isolated VLAN trunk between the host and the VM.
-
-### Architecture
-
-```
-  Host                                          VM
-  ────                                          ──
-  br-vlantest (bridge, vlan_filtering=1)  ←→  enp8s0 (raw trunk)
-    └─ br-vlantest.100 (VLAN 100)               └─ enp8s0.100 (VLAN 100)
-       10.100.0.1/24                                10.100.0.2/24
-```
-
-The host bridge carries tagged VLAN 100 frames. The VM sees a raw trunk port (`enp8s0`) and must create the VLAN subinterface — exactly what the wizard does.
-
-For internet access from the VLAN subnet, the setup script runs:
-- A standalone **nftables** table (`vlan_nat`) to masquerade 10.100.0.0/24 traffic. Raw `iptables` rules don't survive firewalld zone changes on Fedora, so a separate nftables table is used instead.
-- **firewalld direct rules** to allow forwarding through `br-vlantest.100`
-- **dnsmasq** on 10.100.0.1 as a DNS forwarder, since external DNS servers (e.g. 8.8.8.8) are typically unreachable directly over the VLAN
-
-### Setup and teardown
-
-```sh
-# Prerequisites: test VM running, dnsmasq installed on host
-sudo dnf install -y dnsmasq
-
-# Create VLAN bridge, attach NIC, configure NAT, start DNS forwarder
-hack/test-vlan-setup.sh
-
-# Teardown (stops dnsmasq, removes NAT, detaches NIC, deletes bridge)
-hack/test-vlan-teardown.sh
-```
-
-### Wizard configuration
-
-In the wizard, select the new NIC (`enp8s0`), enable VLAN, and configure:
-
-| Field   | Value         |
-|---------|---------------|
-| VLAN ID | 100           |
-| IPv4    | Static        |
-| Address | 10.100.0.2    |
-| Netmask | 255.255.255.0 |
-| Gateway | 10.100.0.1    |
-| DNS     | 10.100.0.1    |
-
-**Negative tests:** Using VLAN 101 (not trunked) or no VLAN (no DHCP on the raw bridge) should both fail at the connectivity test.
-
-### Resetting between tests
-
-```sh
-hack/test-vm-reset.sh [vm-ip]
-```
-
-Removes all onboarding profiles, cleans up VLAN subinterfaces, clears completion markers, and restarts Cockpit.
 
 ## Captive Portal Detection
 
-The WiFi AP includes a captive portal handler on port 80 that works with the wildcard DNS (`address=/#/<AP_IP>`) to trigger the native sign-in prompt on client devices. Each OS uses a different detection mechanism:
+The WiFi AP includes a captive portal handler on port 80 that works with wildcard DNS (`address=/#/<AP_IP>`) to trigger the native sign-in prompt on client devices. Each OS uses a different detection mechanism:
 
 | OS | Probe URL | Expected behavior |
 |----|-----------|-------------------|
@@ -231,6 +180,13 @@ When a proxy with authentication is configured, credentials are stored in two pl
 - **`/etc/environment`** — contains the proxy URL **without credentials**. This file must be world-readable (mode `0644`) because `pam_env.so` reads it during login for all users. To prevent credential leakage to non-root users, only the host and port are written here. Interactive tools that need authenticated proxy access must run as root or obtain credentials through other means.
 
 This separation is intentional: the full credentialed URL is only stored in root-owned, root-readable files. The world-readable `/etc/environment` provides proxy discovery (where the proxy is) without exposing authentication details.
+
+## Testing
+
+For detailed test environment setup guides, see:
+
+- [Testing WiFi Interfaces](docs/testing-wifi.md) — virtual radios, network namespaces, USB passthrough
+- [Testing VLAN Interfaces](docs/testing-vlan.md) — VLAN trunk setup, wizard configuration, reset scripts
 
 ## License
 
