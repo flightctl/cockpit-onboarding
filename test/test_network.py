@@ -1,0 +1,347 @@
+#!/usr/bin/python3
+
+# This file is part of Cockpit.
+#
+# Copyright (C) 2025 Red Hat, Inc.
+#
+# Cockpit is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 2.1 of the License, or
+# (at your option) any later version.
+#
+# Cockpit is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
+
+import testlib
+
+IFACE_TABLE = "table[aria-label='Network interface selector']"
+HELPER_TEXT_ERROR = ".pf-v6-c-form__helper-text .pf-m-error"
+
+
+@testlib.nondestructive
+class TestNetworkInterface(testlib.MachineCase):
+    """Test network interface selection on the Network wizard step"""
+
+    def setUp(self):
+        super().setUp()
+        self.login_and_go("/system-onboarding")
+        self.browser.wait_visible("#networkStep")
+        self.browser.wait_visible(IFACE_TABLE)
+
+    def testInterfaceList(self):
+        """Test that network interfaces are listed correctly"""
+        b = self.browser
+        m = self.machine
+
+        b.wait_text("th:nth-child(2)", "Name")
+        b.wait_text("th:nth-child(3)", "Type")
+        b.wait_text("th:nth-child(4)", "MAC address")
+
+        cmd = "ip -o link show | grep -v 'lo:' | awk '{print $2}' | sed 's/:$//'"
+        interfaces = m.execute(cmd).strip().split('\n')
+        self.assertGreater(len(interfaces), 0, "No network interfaces found")
+
+        for interface in interfaces:
+            if interface and interface != 'lo':
+                try:
+                    b.wait_text("td[data-label='Name']", interface, timeout=5)
+                    break
+                except RuntimeError:
+                    continue
+
+    def testInterfaceSelection(self):
+        """Test that user can select a network interface"""
+        b = self.browser
+
+        b.wait_visible(f"{IFACE_TABLE} input[type='radio']:checked")
+
+        radios = f"{IFACE_TABLE} input[type='radio']"
+        interfaces_count = b.call_js_func("ph_count", radios)
+        if interfaces_count > 1:
+            b.click(f"{IFACE_TABLE} input[type='radio']:not(:checked)")
+            b.wait_visible(f"{IFACE_TABLE} input[type='radio']:checked")
+
+    def testVlanConfiguration(self):
+        """Test that VLAN ID can be configured via FeatureSwitch"""
+        b = self.browser
+
+        b.wait_visible("input[type='checkbox']#vlan-id")
+        self.assertFalse(b.is_present("input[type='checkbox']#vlan-id:checked"))
+        b.wait_not_present("input[type='text']#vlan-id")
+
+        b.click("label[for='vlan-id']")
+        b.wait_visible("input[type='checkbox']#vlan-id:checked")
+        b.wait_visible("input[type='text']#vlan-id")
+
+        b.set_input_text("input[type='text']#vlan-id", "100")
+        self.assertEqual(b.val("input[type='text']#vlan-id"), "100")
+
+        b.click("label[for='vlan-id']")
+        b.wait_not_present("input[type='text']#vlan-id")
+
+    def testVlanValidation(self):
+        """Test that VLAN ID validation works (1-4094)"""
+        b = self.browser
+
+        b.click("label[for='vlan-id']")
+        vlan_input = "input[type='text']#vlan-id"
+        b.wait_visible(vlan_input)
+
+        b.set_input_text(vlan_input, "1")
+        self.assertEqual(b.val(vlan_input), "1")
+
+        b.set_input_text(vlan_input, "4094")
+        self.assertEqual(b.val(vlan_input), "4094")
+
+        b.set_input_text(vlan_input, "0")
+        b.wait_in_text(HELPER_TEXT_ERROR, "VLAN ID must be a number between 1 and 4094")
+
+        b.set_input_text(vlan_input, "4095")
+        b.wait_in_text(HELPER_TEXT_ERROR, "VLAN ID must be a number between 1 and 4094")
+
+
+@testlib.nondestructive
+class TestSingleNic(testlib.MachineCase):
+    """Test single-NIC detection warning on the Network wizard step"""
+
+    def setUp(self):
+        super().setUp()
+        m = self.machine
+        addr = m.address
+        try:
+            self.setup_iface = m.execute(
+                f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
+            ).strip().split('\n')[0]
+        except Exception:
+            self.setup_iface = None
+
+    def testSingleNicWarningOnNetworkStep(self):
+        """Test that a warning appears when the setup interface is selected"""
+        if not self.setup_iface:
+            self.skipTest("Could not determine setup interface")
+
+        b = self.browser
+        self.login_and_go("/system-onboarding")
+        b.wait_visible("#networkStep")
+        b.wait_visible(IFACE_TABLE)
+
+        iface_radio = f"{IFACE_TABLE} tr:contains('{self.setup_iface}') input[type='radio']"
+        if not b.is_present(f"{iface_radio}:checked"):
+            b.click(iface_radio)
+
+        b.wait_in_text(
+            ".pf-v6-c-alert.pf-m-warning",
+            "You are currently connected through this interface"
+        )
+
+
+@testlib.nondestructive
+class TestIPConfiguration(testlib.MachineCase):
+    """Test IP address configuration on the Network wizard step"""
+
+    def setUp(self):
+        super().setUp()
+        self.login_and_go("/system-onboarding")
+        self.browser.wait_visible("#networkStep")
+        self.browser.wait_visible(IFACE_TABLE)
+
+    def testIPv4StaticValidation(self):
+        """Test that IPv4 static configuration validates correctly"""
+        b = self.browser
+
+        b.wait_visible("#ipv4-method:checked")
+        b.wait_visible("#dhcpv4-radio:checked")
+
+        b.click("#static-ip-radio")
+        b.wait_visible("#ipv4-address")
+
+        b.set_input_text("#ipv4-address", "")
+        b.focus("#subnet-mask")
+        b.wait_in_text(HELPER_TEXT_ERROR, "IPv4 address is required")
+
+        b.set_input_text("#ipv4-address", "192.168.1")
+        b.focus("#subnet-mask")
+        b.wait_in_text(HELPER_TEXT_ERROR, "Invalid IPv4 address format")
+
+        b.set_input_text("#ipv4-address", "256.1.1.1")
+        b.focus("#subnet-mask")
+        b.wait_in_text(HELPER_TEXT_ERROR, "IPv4 octets must be between 0 and 255")
+
+        b.set_input_text("#ipv4-address", "192.168.1.100")
+
+        b.set_input_text("#subnet-mask", "255.0.255.0")
+        b.focus("#gateway-ip")
+        b.wait_in_text(HELPER_TEXT_ERROR, "must have consecutive 1s followed by 0s")
+
+        b.set_input_text("#subnet-mask", "255.255.255.0")
+        b.set_input_text("#gateway-ip", "192.168.1.1")
+
+    def testIPv4DNSValidation(self):
+        """Test that IPv4 DNS configuration works"""
+        b = self.browser
+
+        b.wait_visible("#ipv4-method:checked")
+
+        b.click("#manual-dns-ipv4-radio")
+        b.wait_visible("#primary-dns-ipv4")
+
+        b.set_input_text("#primary-dns-ipv4", "8.8.8.8")
+        b.set_input_text("#secondary-dns-ipv4", "8.8.4.4")
+
+    def testIPv6StaticValidation(self):
+        """Test that IPv6 static configuration validates correctly"""
+        b = self.browser
+
+        b.wait_visible("#ipv6-method:checked")
+
+        b.click("#static-ipv6-radio")
+        b.wait_visible("#ipv6-address")
+
+        b.set_input_text("#ipv6-address", "")
+        b.focus("#gateway-ipv6")
+        b.wait_in_text(HELPER_TEXT_ERROR, "IPv6 address is required")
+
+        b.set_input_text("#ipv6-address", "gggg::")
+        b.focus("#gateway-ipv6")
+        b.wait_in_text(HELPER_TEXT_ERROR, "Invalid IPv6 address format")
+
+        b.set_input_text("#ipv6-address", "2001:db8::1/129")
+        b.focus("#gateway-ipv6")
+        b.wait_in_text(HELPER_TEXT_ERROR, "IPv6 prefix must be between 0 and 128")
+
+        b.set_input_text("#ipv6-address", "2001:db8::1/64")
+
+    def testIPv6GatewayValidation(self):
+        """Test that IPv6 gateway rejects link-local addresses"""
+        b = self.browser
+
+        b.wait_visible("#ipv6-method:checked")
+        b.click("#static-ipv6-radio")
+        b.wait_visible("#gateway-ipv6")
+
+        b.set_input_text("#ipv6-address", "2001:db8::1/64")
+
+        b.set_input_text("#gateway-ipv6", "fe80::1")
+        b.focus("#ipv6-address")
+        b.wait_in_text(HELPER_TEXT_ERROR, "Gateway cannot be a link-local address")
+
+        b.set_input_text("#gateway-ipv6", "2001:db8::ffff")
+
+    def testIPv4DisableEnable(self):
+        """Test disabling and re-enabling IPv4 via FeatureSwitch"""
+        b = self.browser
+
+        b.wait_visible("#ipv4-method:checked")
+        b.wait_visible("#dhcpv4-radio")
+
+        b.click("label[for='ipv4-method']")
+        b.wait_not_present("#dhcpv4-radio")
+
+        b.click("label[for='ipv4-method']")
+        b.wait_visible("#dhcpv4-radio")
+
+    def testFullStaticIPConfiguration(self):
+        """Test a complete static IP configuration for both IPv4 and IPv6"""
+        b = self.browser
+
+        b.click("#static-ip-radio")
+        b.wait_visible("#ipv4-address")
+        b.set_input_text("#ipv4-address", "192.168.1.100")
+        b.set_input_text("#subnet-mask", "255.255.255.0")
+        b.set_input_text("#gateway-ip", "192.168.1.1")
+
+        b.click("#manual-dns-ipv4-radio")
+        b.wait_visible("#primary-dns-ipv4")
+        b.set_input_text("#primary-dns-ipv4", "8.8.8.8")
+        b.set_input_text("#secondary-dns-ipv4", "8.8.4.4")
+
+        b.click("#static-ipv6-radio")
+        b.wait_visible("#ipv6-address")
+        b.set_input_text("#ipv6-address", "2001:db8::1/64")
+        b.set_input_text("#gateway-ipv6", "2001:db8::ffff")
+
+        b.click("#manual-dns-ipv6-radio")
+        b.wait_visible("#primary-dns-ipv6")
+        b.set_input_text("#primary-dns-ipv6", "2001:4860:4860::8888")
+
+        self.assertEqual(b.val("#ipv4-address"), "192.168.1.100")
+        self.assertEqual(b.val("#subnet-mask"), "255.255.255.0")
+        self.assertEqual(b.val("#gateway-ip"), "192.168.1.1")
+
+
+@testlib.nondestructive
+class TestWifi(testlib.MachineCase):
+    """Test WiFi configuration on the Network wizard step"""
+
+    def setUp(self):
+        super().setUp()
+        m = self.machine
+        try:
+            wifi_interfaces = m.execute(
+                "nmcli -t -f DEVICE,TYPE device | grep ':wifi$' | cut -d: -f1"
+            ).strip()
+            self.has_wifi = bool(wifi_interfaces)
+            if self.has_wifi:
+                self.wifi_interface = wifi_interfaces.split('\n')[0]
+        except Exception:
+            self.has_wifi = False
+            self.wifi_interface = None
+
+    def testWifiInterfaceDetection(self):
+        """Test that WiFi interfaces are detected and shown in the interface list"""
+        if not self.has_wifi:
+            self.skipTest("No WiFi interface available")
+
+        b = self.browser
+        self.login_and_go("/system-onboarding")
+        b.wait_visible("#networkStep")
+        b.wait_visible(IFACE_TABLE)
+
+        b.wait_in_text(IFACE_TABLE, self.wifi_interface)
+
+    def testWifiScanUI(self):
+        """Test that WiFi configuration appears when a WiFi interface is selected"""
+        if not self.has_wifi:
+            self.skipTest("No WiFi interface available")
+
+        b = self.browser
+        self.login_and_go("/system-onboarding")
+        b.wait_visible("#networkStep")
+        b.wait_visible(IFACE_TABLE)
+
+        wifi_radio = f"{IFACE_TABLE} tr:contains('{self.wifi_interface}') input[type='radio']"
+        b.click(wifi_radio)
+
+        b.wait_visible("table[aria-label='WiFi network selector']")
+        b.wait_visible("#wifi-ssid")
+
+    def testWifiPasswordField(self):
+        """Test that WiFi password field appears based on security toggle"""
+        if not self.has_wifi:
+            self.skipTest("No WiFi interface available")
+
+        b = self.browser
+        self.login_and_go("/system-onboarding")
+        b.wait_visible("#networkStep")
+        b.wait_visible(IFACE_TABLE)
+
+        wifi_radio = f"{IFACE_TABLE} tr:contains('{self.wifi_interface}') input[type='radio']"
+        b.click(wifi_radio)
+
+        b.wait_visible("#wifi-ssid")
+
+        # wifi-security is a FeatureSwitch toggle for WPA
+        b.wait_visible("#wifi-security")
+        b.wait_visible("#wifi-password")
+
+        b.set_input_text("#wifi-password", "testpassword123")
+        self.assertEqual(b.val("#wifi-password"), "testpassword123")
+
+
+if __name__ == "__main__":
+    testlib.test_main()

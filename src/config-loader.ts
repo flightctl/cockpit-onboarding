@@ -50,6 +50,8 @@ const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
     },
     connectivityTest: {
         host: "cockpit-project.org",
+        carrierTimeoutSeconds: 300,
+        connectivityRetries: 30,
     },
 };
 

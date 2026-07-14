@@ -571,6 +571,8 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             hostname: model.hostname.value,
             originalHostname,
             connectivityTestHost: model.connectivityTestHost,
+            carrierTimeoutSeconds: config?.connectivityTest?.carrierTimeoutSeconds ?? 300,
+            connectivityRetries: config?.connectivityTest?.connectivityRetries ?? 30,
         };
         const masterParamsFile = await createSecureTempFile(JSON.stringify(masterParams), ".onboarding-apply-");
         tempFilesToCleanup.push(masterParamsFile);

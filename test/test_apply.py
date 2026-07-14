@@ -1,0 +1,273 @@
+#!/usr/bin/python3
+
+"""
+Integration test for the Apply / Enrollment Progress wizard step
+
+Tests the progress page UI elements that appear during configuration
+application. This test is NOT @nondestructive — it applies real
+configuration changes.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+
+import testlib
+
+from wizard_navigation import advance_past_optional_steps_to_review
+
+IFACE_TABLE = "table[aria-label='Network interface selector']"
+APPLY_LOG = "/var/log/cockpit-system-onboarding-apply.log"
+
+
+class TestApplyConfiguration(testlib.MachineCase):
+    """Test the enrollment progress page UI"""
+
+    def navigate_to_apply_step(self):
+        b = self.browser
+
+        advance_past_optional_steps_to_review(b, "apply-test-host")
+        b.wait_visible("#reviewStep")
+        b.click("button:contains('Apply')")
+        b.wait_visible("#progressStep")
+
+    def testProgressPageElements(self):
+        """Test that progress page shows overall progress and step list"""
+        b = self.browser
+
+        self.login_and_go("/system-onboarding")
+        self.navigate_to_apply_step()
+
+        b.wait_in_text("#progressStep", "Overall progress")
+        b.wait_in_text("#progressStep", "Steps")
+
+        b.wait_visible(".pf-v6-c-progress")
+        b.wait_visible(".pf-v6-c-list")
+
+    def testProgressStepNames(self):
+        """Test that the expected built-in steps are listed"""
+        b = self.browser
+
+        self.login_and_go("/system-onboarding")
+        self.navigate_to_apply_step()
+
+        b.wait_in_text(".pf-v6-c-list", "Applying configuration changes")
+        b.wait_in_text(".pf-v6-c-list", "Testing network connectivity")
+        b.wait_in_text(".pf-v6-c-list", "Finalizing configuration")
+
+    def testProgressCompletion(self):
+        """Test that progress reaches 100% and shows success alert"""
+        b = self.browser
+
+        self.login_and_go("/system-onboarding")
+        self.navigate_to_apply_step()
+
+        b.wait_in_text(
+            ".pf-v6-c-alert.pf-m-success",
+            "Configuration completed successfully",
+            timeout=120
+        )
+
+
+class TestApplySingleNic(testlib.MachineCase):
+    """Test apply behavior when configuring the same NIC serving the browser"""
+
+    def setUp(self):
+        super().setUp()
+        m = self.machine
+        addr = m.address
+        try:
+            self.setup_iface = m.execute(
+                f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
+            ).strip().split('\n')[0]
+        except Exception:
+            self.setup_iface = None
+
+    def select_setup_interface_and_navigate_to_review(self, hostname):
+        b = self.browser
+
+        b.wait_visible("#networkStep")
+        b.wait_visible(IFACE_TABLE)
+
+        iface_radio = (
+            f"{IFACE_TABLE} tr:contains('{self.setup_iface}') input[type='radio']"
+        )
+        if not b.is_present(f"{iface_radio}:checked"):
+            b.click(iface_radio)
+
+        b.click("button:contains('Next')")
+        b.wait_visible("#networkServicesStep")
+        b.click("button:contains('Next')")
+        b.wait_visible("#enrollmentStep")
+        b.click("button:contains('Next')")
+        b.wait_visible("#labelsStep")
+        b.set_input_text("#hostname-input", hostname)
+        b.click("button:contains('Next')")
+        b.wait_visible("#reviewStep")
+
+    def testSingleNicDelegation(self):
+        """Test that single-NIC apply delegates to background and shows info alert"""
+        if not self.setup_iface:
+            self.skipTest("Could not determine setup interface")
+
+        b = self.browser
+        self.login_and_go("/system-onboarding")
+        self.select_setup_interface_and_navigate_to_review("single-nic-apply")
+
+        b.wait_in_text(
+            ".pf-v6-c-alert.pf-m-warning",
+            "Connection will be interrupted"
+        )
+
+        b.click("button:contains('Apply')")
+        b.wait_visible("#progressStep")
+
+        b.wait_in_text(".pf-v6-c-list", "Applying configuration changes")
+
+        b.wait_in_text(
+            ".pf-v6-c-alert.pf-m-info",
+            "Onboarding continues in the background",
+            timeout=120
+        )
+
+    def testSingleNicStepsDelegated(self):
+        """Test that remaining steps show 'Delegated to background service' status"""
+        if not self.setup_iface:
+            self.skipTest("Could not determine setup interface")
+
+        b = self.browser
+        self.login_and_go("/system-onboarding")
+        self.select_setup_interface_and_navigate_to_review("single-nic-delegated")
+
+        b.click("button:contains('Apply')")
+        b.wait_visible("#progressStep")
+
+        b.wait_in_text(
+            "#progressStep",
+            "Delegated to background service",
+            timeout=120
+        )
+
+
+class TestApplySingleNicRollback(testlib.MachineCase):
+    """Test that single-NIC apply rolls back when connectivity fails.
+
+    Forces a connectivity failure by setting connectivityTest.host to an
+    unresolvable hostname. The apply-and-enroll.sh background script will
+    activate the NM profile (DHCP, so the IP stays the same and SSH
+    remains reachable), fail DNS resolution, and trigger its rollback
+    trap — deleting the onboarding NM profiles and restoring the
+    previous hostname.
+    """
+
+    def setUp(self):
+        super().setUp()
+        m = self.machine
+        addr = m.address
+        try:
+            self.setup_iface = m.execute(
+                f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
+            ).strip().split('\n')[0]
+        except Exception:
+            self.setup_iface = None
+
+        self.config = {
+            "version": "1.0",
+            "runOnce": False,
+            "hideModules": False,
+            "connectivityTest": {
+                "host": "nonexistent.invalid.test",
+                "carrierTimeoutSeconds": 5,
+                "connectivityRetries": 2,
+            }
+        }
+        m.write(
+            "/etc/cockpit/system-onboarding/config.json",
+            json.dumps(self.config)
+        )
+
+    def testSingleNicRollbackOnConnectivityFailure(self):
+        """Test that failed connectivity triggers rollback of NM profiles"""
+        if not self.setup_iface:
+            self.skipTest("Could not determine setup interface")
+
+        m = self.machine
+        b = self.browser
+
+        m.execute(f"rm -f {APPLY_LOG}")
+
+        original_hostname = m.execute("hostnamectl --static").strip()
+
+        self.login_and_go("/system-onboarding")
+        b.wait_visible("#networkStep")
+        b.wait_visible(IFACE_TABLE)
+
+        iface_radio = (
+            f"{IFACE_TABLE} tr:contains('{self.setup_iface}') input[type='radio']"
+        )
+        if not b.is_present(f"{iface_radio}:checked"):
+            b.click(iface_radio)
+
+        b.click("button:contains('Next')")
+        b.wait_visible("#networkServicesStep")
+        b.click("button:contains('Next')")
+        b.wait_visible("#enrollmentStep")
+        b.click("button:contains('Next')")
+        b.wait_visible("#labelsStep")
+        b.set_input_text("#hostname-input", "rollback-test-host")
+        b.click("button:contains('Next')")
+        b.wait_visible("#reviewStep")
+
+        b.wait_in_text(
+            ".pf-v6-c-alert.pf-m-warning",
+            "Connection will be interrupted"
+        )
+
+        b.click("button:contains('Apply')")
+        b.wait_visible("#progressStep")
+
+        b.wait_in_text(
+            ".pf-v6-c-alert.pf-m-info",
+            "Onboarding continues in the background",
+            timeout=120
+        )
+
+        # With connectivityRetries=2 at 2s intervals, the script fails in ~4s
+        # then rolls back. Wait up to 30s for the log to confirm.
+        deadline = time.time() + 30
+        rollback_confirmed = False
+        while time.time() < deadline:
+            try:
+                log_contents = m.execute(f"cat {APPLY_LOG} 2>/dev/null || true")
+                if "Rollback complete" in log_contents:
+                    rollback_confirmed = True
+                    break
+            except Exception:
+                pass
+            time.sleep(5)
+
+        self.assertTrue(
+            rollback_confirmed,
+            f"Rollback did not complete within timeout. Log:\n"
+            f"{m.execute(f'cat {APPLY_LOG} 2>/dev/null || echo (no log)')}"
+        )
+
+        log_contents = m.execute(f"cat {APPLY_LOG}")
+        self.assertIn("Network connectivity not available", log_contents)
+        self.assertIn("Rolling back", log_contents)
+
+        # Verify the onboarding NM profile was cleaned up
+        nm_connections = m.execute("nmcli -t -f NAME connection show")
+        self.assertNotIn(
+            f"flightctl-onboarding-{self.setup_iface}",
+            nm_connections
+        )
+
+        # Verify hostname was restored
+        restored_hostname = m.execute("hostnamectl --static").strip()
+        self.assertEqual(restored_hostname, original_hostname)
+
+
+if __name__ == "__main__":
+    testlib.test_main()
