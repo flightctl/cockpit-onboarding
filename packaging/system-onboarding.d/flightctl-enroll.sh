@@ -1,7 +1,7 @@
 #!/bin/bash
 # flightctl-enroll.sh - Enroll device with Flight Control
 #
-# Cockpit System Onboarding enrollment script.
+# Flightctl Onboarding enrollment script.
 # Reads credentials from ENROLLMENT_CREDENTIALS_JSON and endpoint from
 # ENROLLMENT_ENDPOINT environment variables.
 #
@@ -57,7 +57,7 @@ fi
 
 AGENT_CONFIG="/etc/flightctl/config.yaml"
 AGENT_CERTS_DIR="/etc/flightctl/certs"
-ONBOARDING_GATE_FILE="/var/lib/cockpit-system-onboarding/.onboarding-confirmed"
+ONBOARDING_GATE_FILE="/var/lib/flightctl-onboarding/.onboarding-confirmed"
 
 install_agent_certs() {
     local source_dir="$1"
@@ -75,7 +75,7 @@ finalize_agent_config() {
         restorecon -Rv /etc/flightctl >/dev/null 2>&1 || true
     fi
 
-    # cockpit-system-onboarding installs a systemd drop-in that blocks flightctl-agent
+    # flightctl-onboarding installs a systemd drop-in that blocks flightctl-agent
     # until onboarding cleanup creates .onboarding-confirmed.
     if [ ! -f "$ONBOARDING_GATE_FILE" ]; then
         echo "INFO: Onboarding gate active — deferring flightctl-agent start until onboarding completes"

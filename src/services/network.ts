@@ -553,8 +553,8 @@ export async function applyNetworkConfiguration(
         // the production profile. Skip when skipActivation is true (single-NIC
         // path) — apply-and-enroll.sh handles teardown in that case.
         if (!skipActivation) {
-            const dnsmasqUnit = `cockpit-system-onboarding-dnsmasq@${ifaceName}.service`;
-            const wifiApUnit = `cockpit-system-onboarding-wifi-ap@${ifaceName}.service`;
+            const dnsmasqUnit = `flightctl-onboarding-dnsmasq@${ifaceName}.service`;
+            const wifiApUnit = `flightctl-onboarding-wifi-ap@${ifaceName}.service`;
             for (const unit of [dnsmasqUnit, wifiApUnit]) {
                 try {
                     const isActive = await cockpit

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="addon">
-  <id>org.cockpit_project.system_onboarding</id>
+  <id>io.flightctl.onboarding</id>
   <metadata_license>CC0-1.0</metadata_license>
   <name>System Onboarding</name>
   <summary>System onboarding wizard</summary>
@@ -11,10 +11,9 @@
   </description>
   <extends>org.cockpit_project.cockpit</extends>
   <launchable type="cockpit-manifest">system-onboarding</launchable>
-  <url type="homepage">https://github.com/cockpit-project/system-onboarding</url>
-  <url type="bugtracker">https://github.com/cockpit-project/system-onboarding/issues</url>
-  <update_contact>cockpit-devel_AT_lists.fedorahosted.org</update_contact>
-  <developer id="org.cockpit-project">
-    <name>Cockpit Project</name>
+  <url type="homepage">https://github.com/flightctl/cockpit-onboarding</url>
+  <url type="bugtracker">https://github.com/flightctl/cockpit-onboarding/issues</url>
+  <developer id="io.flightctl">
+    <name>Flight Control</name>
   </developer>
 </component>

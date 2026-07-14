@@ -39,5 +39,5 @@ jobs:
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cockpit-system-onboarding-rpm
+          name: flightctl-onboarding-rpm
           path: "*.rpm"

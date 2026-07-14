@@ -20,7 +20,7 @@
 /*.whl
 /bots
 /cockpit-*.tar.xz
-/cockpit-system-onboarding.spec
+/flightctl-onboarding.spec
 /coverage/
 /dist/
 /pkg/*

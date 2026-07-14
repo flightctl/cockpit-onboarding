@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # shellcheck source=common.sh
-. /usr/libexec/cockpit-system-onboarding/common.sh
+. /usr/libexec/flightctl-onboarding/common.sh
 
 MARKER_PATH="${ONBOARDING_MARKER_DIR}/.onboarding-complete"
 

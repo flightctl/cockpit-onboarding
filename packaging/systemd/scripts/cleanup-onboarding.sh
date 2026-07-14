@@ -1,15 +1,15 @@
 #!/bin/bash
 # Post-onboarding cleanup script
 # Runs after successful onboarding to remove temporary access and clean up
-# Part of cockpit-system-onboarding
+# Part of flightctl-onboarding
 
 set -e
 
 # shellcheck source=common.sh
-. /usr/libexec/cockpit-system-onboarding/common.sh
+. /usr/libexec/flightctl-onboarding/common.sh
 
 ONBOARDING_USER="onboarding"
-SERVICE_NAME="cockpit-system-onboarding-setup.service"
+SERVICE_NAME="flightctl-onboarding-setup.service"
 MARKER_COMPLETE="${ONBOARDING_MARKER_DIR}/.onboarding-complete"
 
 # ExecStop fires on every shutdown/reboot while setup.service is active, not
@@ -49,9 +49,9 @@ fi
 
 # Stop and disable all WiFi AP, dnsmasq, and captive portal template instances.
 # These are always cleaned up regardless of runOnce — the AP is only needed during onboarding.
-for pattern in 'cockpit-system-onboarding-wifi-ap@*.service' \
-               'cockpit-system-onboarding-dnsmasq@*.service' \
-               'cockpit-system-onboarding-captive-portal@*.service'; do
+for pattern in 'flightctl-onboarding-wifi-ap@*.service' \
+               'flightctl-onboarding-dnsmasq@*.service' \
+               'flightctl-onboarding-captive-portal@*.service'; do
     for unit in $(systemctl list-units --plain --no-legend "$pattern" 2>/dev/null | awk '{print $1}'); do
         systemctl stop "$unit" 2>/dev/null || true
         systemctl disable "$unit" 2>/dev/null || true
@@ -61,18 +61,18 @@ done
 
 # Remove the dedicated firewalld zone if it exists
 if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
-    if firewall-cmd --permanent --info-zone=cockpit-onboarding-ap >/dev/null 2>&1; then
-        firewall-cmd --permanent --delete-zone=cockpit-onboarding-ap
+    if firewall-cmd --permanent --info-zone=flightctl-onboarding-ap >/dev/null 2>&1; then
+        firewall-cmd --permanent --delete-zone=flightctl-onboarding-ap
         firewall-cmd --reload
-        echo "Removed firewalld zone 'cockpit-onboarding-ap'"
+        echo "Removed firewalld zone 'flightctl-onboarding-ap'"
     fi
 fi
 
 # Clean up runtime files (hostapd configs, env files)
-rm -rf /run/cockpit-system-onboarding 2>/dev/null || true
+rm -rf /run/flightctl-onboarding 2>/dev/null || true
 
 # Remove apply log file
-rm -f /var/log/cockpit-system-onboarding-apply.log 2>/dev/null || true
+rm -f /var/log/flightctl-onboarding-apply.log 2>/dev/null || true
 
 # Remove SSH denial for onboarding user (no longer needed after cleanup)
 if [ -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf ]; then
@@ -136,8 +136,8 @@ touch "${ONBOARDING_MARKER_DIR}/.onboarding-confirmed"
 echo "Created agent startup gate file"
 
 systemctl unmask greenboot-healthcheck.service 2>/dev/null || true
-systemctl stop cockpit-system-onboarding-mask-greenboot.service 2>/dev/null || true
-systemctl disable cockpit-system-onboarding-mask-greenboot.service 2>/dev/null || true
+systemctl stop flightctl-onboarding-mask-greenboot.service 2>/dev/null || true
+systemctl disable flightctl-onboarding-mask-greenboot.service 2>/dev/null || true
 systemctl daemon-reload 2>/dev/null || true
 systemctl start greenboot-healthcheck.service 2>/dev/null || true
 echo "Restored greenboot-healthcheck.service"

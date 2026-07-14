@@ -1,10 +1,10 @@
-export const MARKER_DIR = "/var/lib/cockpit-system-onboarding";
+export const MARKER_DIR = "/var/lib/flightctl-onboarding";
 export const MARKER_COMPLETE = `${MARKER_DIR}/.onboarding-complete`;
 export const MARKER_ATTEMPTED = `${MARKER_DIR}/.onboarding-attempted`;
 export const WATCHDOG_ACTIVE = `${MARKER_DIR}/.watchdog-active`;
 export const WATCHDOG_STATUS = `${MARKER_DIR}/.watchdog-status`;
 
-export const SCRIPTS_DIR = "/usr/libexec/cockpit-system-onboarding";
+export const SCRIPTS_DIR = "/usr/libexec/flightctl-onboarding";
 export const SCRIPT_CLEANUP = `${SCRIPTS_DIR}/cleanup-onboarding.sh`;
 export const SCRIPT_FINALIZE = `${SCRIPTS_DIR}/finalize-onboarding.sh`;
 export const SCRIPT_NTP = `${SCRIPTS_DIR}/configure-ntp.sh`;

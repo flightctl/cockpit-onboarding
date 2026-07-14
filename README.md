@@ -1,4 +1,4 @@
-# Cockpit System Onboarding
+# Flightctl Onboarding
 
 [![License](https://img.shields.io/badge/License-LGPL%202.1-blue.svg)](https://opensource.org/licenses/LGPL-2.1)
 
@@ -6,9 +6,9 @@ A [Cockpit](https://cockpit-project.org/) module that provides a guided setup wi
 
 ## Overview
 
-Headless devices — servers, edge nodes, embedded systems — often lack displays, keyboards, and pre-configured network access. Before they can onboard into management services like [Flight Control](https://flightctl.io/), they need network connectivity and credentials. The Cockpit System Onboarding plugin bridges that gap.
+Headless devices — servers, edge nodes, embedded systems — often lack displays, keyboards, and pre-configured network access. Before they can onboard into management services like [Flight Control](https://flightctl.io/), they need network connectivity and credentials. The Flightctl Onboarding plugin bridges that gap.
 
-Cockpit System Onboarding runs inside [Cockpit](https://cockpit-project.org/) on the device. You connect to it from a web browser on a remote machine and are presented with a step-by-step wizard that walks you through initial device setup. By default, the service disables itself once onboarding completes and is then inert.
+Flightctl Onboarding runs inside [Cockpit](https://cockpit-project.org/) on the device. You connect to it from a web browser on a remote machine and are presented with a step-by-step wizard that walks you through initial device setup. By default, the service disables itself once onboarding completes and is then inert.
 
 ### Features
 
@@ -36,11 +36,11 @@ BRAND_NAME="My Brand" NODE_ENV=production make rpm
 
 The default brand name is `Flight Control`. The value is baked into the shipped `config.json` as `brandName` and used for enrollment service labels. Runtime overrides via `/etc/cockpit/system-onboarding/config.json` can still change the brand name if needed.
 
-This produces `cockpit-system-onboarding-*.noarch.rpm` in the repository root. Install it on the target device:
+This produces `flightctl-onboarding-*.noarch.rpm` in the repository root. Install it on the target device:
 
 ```sh
-sudo dnf install -y ./cockpit-system-onboarding-*.rpm
-sudo systemctl enable --now cockpit-system-onboarding-setup.service
+sudo dnf install -y ./flightctl-onboarding-*.rpm
+sudo systemctl enable --now flightctl-onboarding-setup.service
 ```
 
 If provisioning over WiFi, install the additional dependencies:
@@ -226,7 +226,7 @@ Disconnecting the VPN before connecting to the AP resolves this.
 
 When a proxy with authentication is configured, credentials are stored in two places:
 
-- **Systemd drop-in** (`/etc/systemd/system.conf.d/50-cockpit-onboarding-proxy.conf`) — contains the full proxy URL including credentials. This file is mode `0600` (root-only) and is the authoritative source for systemd services (including `flightctl-agent`).
+- **Systemd drop-in** (`/etc/systemd/system.conf.d/50-flightctl-onboarding-proxy.conf`) — contains the full proxy URL including credentials. This file is mode `0600` (root-only) and is the authoritative source for systemd services (including `flightctl-agent`).
 
 - **`/etc/environment`** — contains the proxy URL **without credentials**. This file must be world-readable (mode `0644`) because `pam_env.so` reads it during login for all users. To prevent credential leakage to non-root users, only the host and port are written here. Interactive tools that need authenticated proxy access must run as root or obtain credentials through other means.
 

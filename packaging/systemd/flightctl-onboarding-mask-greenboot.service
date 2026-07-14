@@ -3,11 +3,11 @@ Description=Mask greenboot health checks during system onboarding
 Before=greenboot-healthcheck.service
 After=local-fs.target
 DefaultDependencies=no
-ConditionPathExists=!/var/lib/cockpit-system-onboarding/.onboarding-complete
+ConditionPathExists=!/var/lib/flightctl-onboarding/.onboarding-complete
 
 [Service]
 Type=oneshot
-ExecStart=/usr/libexec/cockpit-system-onboarding/mask-greenboot.sh
+ExecStart=/usr/libexec/flightctl-onboarding/mask-greenboot.sh
 RemainAfterExit=yes
 
 [Install]

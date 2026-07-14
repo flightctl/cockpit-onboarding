@@ -1,14 +1,14 @@
 [Unit]
-Description=Cockpit Onboarding WiFi AP on %i
-PartOf=cockpit-system-onboarding-setup.service
-Wants=cockpit-system-onboarding-dnsmasq@%i.service
-Before=cockpit-system-onboarding-dnsmasq@%i.service
-Wants=cockpit-system-onboarding-captive-portal@%i.service
-Before=cockpit-system-onboarding-captive-portal@%i.service
+Description=Flightctl Onboarding WiFi AP on %i
+PartOf=flightctl-onboarding-setup.service
+Wants=flightctl-onboarding-dnsmasq@%i.service
+Before=flightctl-onboarding-dnsmasq@%i.service
+Wants=flightctl-onboarding-captive-portal@%i.service
+Before=flightctl-onboarding-captive-portal@%i.service
 
 [Service]
 Type=simple
-EnvironmentFile=/run/cockpit-system-onboarding/wifi-ap.env
+EnvironmentFile=/run/flightctl-onboarding/wifi-ap.env
 ExecStartPre=-/usr/bin/nmcli device disconnect %i
 ExecStartPre=-/usr/bin/nmcli device set %i managed no
 # NM brings the interface down asynchronously after releasing it;
@@ -17,12 +17,12 @@ ExecStartPre=/bin/bash -c 'sleep 2 && /usr/sbin/ip link set %i up && for i in $(
 # Copy hostapd config to /run/hostapd/ for correct SELinux labeling.
 # hostapd runs in hostapd_t domain (via hostapd_exec_t transition) which can
 # only read hostapd_var_run_t files. /var/run/hostapd(/.*)? has that label;
-# /run/cockpit-system-onboarding/ files get generic var_run_t and are denied.
-ExecStartPre=/bin/bash -c 'mkdir -p /run/hostapd && cp /run/cockpit-system-onboarding/hostapd-%i.conf /run/hostapd/ && restorecon /run/hostapd/hostapd-%i.conf'
+# /run/flightctl-onboarding/ files get generic var_run_t and are denied.
+ExecStartPre=/bin/bash -c 'mkdir -p /run/hostapd && cp /run/flightctl-onboarding/hostapd-%i.conf /run/hostapd/ && restorecon /run/hostapd/hostapd-%i.conf'
 ExecStart=/usr/sbin/hostapd /run/hostapd/hostapd-%i.conf
 ExecStartPost=/usr/sbin/ip addr add ${WIFI_AP_ADDRESS}/${WIFI_AP_NETMASK} dev %i
-ExecStartPost=-/usr/bin/firewall-cmd --zone=cockpit-onboarding-ap --add-interface=%i
-ExecStopPost=-/usr/bin/firewall-cmd --zone=cockpit-onboarding-ap --remove-interface=%i
+ExecStartPost=-/usr/bin/firewall-cmd --zone=flightctl-onboarding-ap --add-interface=%i
+ExecStopPost=-/usr/bin/firewall-cmd --zone=flightctl-onboarding-ap --remove-interface=%i
 ExecStopPost=/usr/sbin/ip addr flush dev %i
 ExecStopPost=/usr/sbin/ip link set %i down
 ExecStopPost=-/usr/bin/nmcli device set %i managed yes

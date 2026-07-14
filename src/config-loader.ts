@@ -1,5 +1,5 @@
 /**
- * Configuration loader for Cockpit System Onboarding Plugin
+ * Configuration loader for Flightctl Onboarding Plugin
  *
  * Implements fallback hierarchy:
  * 1. User override: /etc/cockpit/system-onboarding/config.json (highest priority)

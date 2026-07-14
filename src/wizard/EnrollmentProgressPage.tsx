@@ -1066,7 +1066,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                                 className="pf-v6-u-mt-md"
                             >
                                 {_(
-                                    "Network activation and enrollment continue in the background. Your browser connection will be lost when the new network configuration is applied. You do not need to click Finish — onboarding completes automatically. Progress is logged to /var/log/cockpit-system-onboarding-apply.log."
+                                    "Network activation and enrollment continue in the background. Your browser connection will be lost when the new network configuration is applied. You do not need to click Finish — onboarding completes automatically. Progress is logged to /var/log/flightctl-onboarding-apply.log."
                                 )}
                             </Alert>
                         )}

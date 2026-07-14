@@ -1,5 +1,5 @@
 #!/bin/bash
-# Configure NTP servers for cockpit-system-onboarding
+# Configure NTP servers for flightctl-onboarding
 # Called via sudo by the onboarding user
 # Usage:
 #   configure-ntp.sh auto          - Clear custom servers, use system defaults

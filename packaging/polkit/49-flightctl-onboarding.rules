@@ -1,4 +1,4 @@
-// Polkit rules for cockpit-system-onboarding
+// Polkit rules for flightctl-onboarding
 // Allows the onboarding user to configure hostname, network, and time
 // without interactive authentication.
 

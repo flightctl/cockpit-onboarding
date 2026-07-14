@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Captive portal responder for cockpit-system-onboarding WiFi AP.
+"""Captive portal responder for flightctl-onboarding WiFi AP.
 
 Handles OS-specific captive portal detection probes to trigger the
 captive portal dialog on client devices, then redirects all other

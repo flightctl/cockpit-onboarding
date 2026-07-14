@@ -1,5 +1,5 @@
 #!/bin/bash
-# Apply system-wide proxy configuration for cockpit-system-onboarding
+# Apply system-wide proxy configuration for flightctl-onboarding
 # Called via sudo by the onboarding user
 # Usage: apply-proxy.sh <params-json-file>
 #
@@ -14,7 +14,7 @@
 # }
 #
 # Writes:
-#   /etc/systemd/system.conf.d/50-cockpit-onboarding-proxy.conf
+#   /etc/systemd/system.conf.d/50-flightctl-onboarding-proxy.conf
 #   Appends to /etc/environment
 # Then runs systemctl daemon-reexec to pick up the new DefaultEnvironment.
 
@@ -69,7 +69,7 @@ fi
 
 # Write systemd global default drop-in
 SYSTEMD_DROPIN_DIR="/etc/systemd/system.conf.d"
-SYSTEMD_DROPIN="${SYSTEMD_DROPIN_DIR}/50-cockpit-onboarding-proxy.conf"
+SYSTEMD_DROPIN="${SYSTEMD_DROPIN_DIR}/50-flightctl-onboarding-proxy.conf"
 
 mkdir -p "$SYSTEMD_DROPIN_DIR"
 
@@ -85,7 +85,7 @@ echo "Wrote systemd proxy drop-in: $SYSTEMD_DROPIN"
 
 # Append to /etc/environment (idempotent: remove any previous onboarding entries first)
 ENV_FILE="/etc/environment"
-MARKER="# cockpit-system-onboarding proxy"
+MARKER="# flightctl-onboarding proxy"
 if [ -f "$ENV_FILE" ]; then
     # Remove previous onboarding proxy block
     sed -i "/${MARKER}/,+3d" "$ENV_FILE"

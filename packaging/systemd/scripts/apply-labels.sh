@@ -1,5 +1,5 @@
 #!/bin/bash
-# Apply flightctl label configuration for cockpit-system-onboarding
+# Apply flightctl label configuration for flightctl-onboarding
 # Called via sudo by the onboarding user
 # Usage: apply-labels.sh <params-json-file>
 #

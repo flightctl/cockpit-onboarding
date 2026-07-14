@@ -1,5 +1,5 @@
 /**
- * TypeScript type definitions for Cockpit System Onboarding Plugin
+ * TypeScript type definitions for Flightctl Onboarding Plugin
  * Derived from data-model.md
  */
 

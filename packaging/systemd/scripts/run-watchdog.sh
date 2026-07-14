@@ -7,10 +7,10 @@
 set -euo pipefail
 
 # shellcheck source=common.sh
-. /usr/libexec/cockpit-system-onboarding/common.sh
+. /usr/libexec/flightctl-onboarding/common.sh
 
 WATCHDOG_STATE_FILE="${ONBOARDING_MARKER_DIR}/.watchdog-active"
-ROLLBACK_SCRIPT="/usr/libexec/cockpit-system-onboarding/watchdog-rollback.sh"
+ROLLBACK_SCRIPT="/usr/libexec/flightctl-onboarding/watchdog-rollback.sh"
 
 if [ $# -ne 2 ]; then
     echo "Usage: run-watchdog.sh <timeout-seconds> <test-host>" >&2
@@ -34,7 +34,7 @@ echo -n "$TEST_HOST" > "$WATCHDOG_STATE_FILE"
 
 exec systemd-run \
     --on-active="${TIMEOUT}s" \
-    --unit=cockpit-system-onboarding-watchdog \
+    --unit=flightctl-onboarding-watchdog \
     --description="Onboarding connectivity watchdog" \
     --property=ProtectHome=yes \
     --property=PrivateTmp=yes \

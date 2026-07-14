@@ -193,14 +193,14 @@ provision_vm() {
     echo "Installing RPM build dependencies..."
     run_ssh "${vm_ip}" "sudo dnf install -y make rpm-build nodejs npm gettext libappstream-glib"
 
-    echo "Building and installing cockpit-system-onboarding RPM..."
+    echo "Building and installing flightctl-onboarding RPM..."
     make -C "${PROJECT_DIR}" rpm \
         BRAND_NAME="${BRAND_NAME:-Flight Control}" \
         NODE_ENV="${NODE_ENV:-production}"
 
     local rpm_file
     shopt -s nullglob
-    local rpms=("${PROJECT_DIR}"/cockpit-system-onboarding-*.noarch.rpm)
+    local rpms=("${PROJECT_DIR}"/flightctl-onboarding-*.noarch.rpm)
     shopt -u nullglob
     if [[ ${#rpms[@]} -eq 0 ]]; then
         echo "ERROR: RPM build failed - no .rpm file found" >&2
@@ -234,13 +234,13 @@ CONFIG_EOF
 
     echo "Enabling and starting cockpit and onboarding setup..."
     run_ssh "${vm_ip}" "sudo systemctl enable --now cockpit.socket"
-    run_ssh "${vm_ip}" "sudo systemctl enable --now cockpit-system-onboarding-setup.service"
+    run_ssh "${vm_ip}" "sudo systemctl enable --now flightctl-onboarding-setup.service"
 
     # Wait for the onboarding setup service to claim its WiFi interface
     echo "Waiting for onboarding AP to start..."
     local ap_attempts=0
     while [[ ${ap_attempts} -lt 15 ]]; do
-        if run_ssh "${vm_ip}" "systemctl is-active cockpit-system-onboarding-wifi-ap@*.service 2>/dev/null | grep -q active" 2>/dev/null; then
+        if run_ssh "${vm_ip}" "systemctl is-active flightctl-onboarding-wifi-ap@*.service 2>/dev/null | grep -q active" 2>/dev/null; then
             echo "Onboarding AP is running"
             break
         fi
@@ -394,7 +394,7 @@ TEARDOWN_EOF
     run_ssh "${vm_ip}" "sudo tee /etc/systemd/system/test-infra-wifi-ap.service > /dev/null" <<'UNIT_EOF'
 [Unit]
 Description=Test Infrastructure WiFi AP with NAT (namespaced)
-After=network-online.target cockpit-system-onboarding-setup.service
+After=network-online.target flightctl-onboarding-setup.service
 Wants=network-online.target
 
 [Service]
@@ -446,8 +446,8 @@ main() {
     # Gather WiFi interface info for summary
     local onboarding_iface infra_iface free_iface onboarding_ssid
     infra_iface=$(run_ssh "${vm_ip}" "cat /run/test-infra-wifi-iface 2>/dev/null" 2>/dev/null || true)
-    onboarding_iface=$(run_ssh "${vm_ip}" "ls /run/cockpit-system-onboarding/hostapd-*.conf 2>/dev/null | head -1 | sed 's|.*/hostapd-||;s|\.conf||'" 2>/dev/null || true)
-    onboarding_ssid=$(run_ssh "${vm_ip}" "grep '^ssid=' /run/cockpit-system-onboarding/hostapd-*.conf 2>/dev/null | head -1 | cut -d= -f2" 2>/dev/null || true)
+    onboarding_iface=$(run_ssh "${vm_ip}" "ls /run/flightctl-onboarding/hostapd-*.conf 2>/dev/null | head -1 | sed 's|.*/hostapd-||;s|\.conf||'" 2>/dev/null || true)
+    onboarding_ssid=$(run_ssh "${vm_ip}" "grep '^ssid=' /run/flightctl-onboarding/hostapd-*.conf 2>/dev/null | head -1 | cut -d= -f2" 2>/dev/null || true)
     free_iface=$(run_ssh "${vm_ip}" "nmcli -t -f DEVICE,TYPE,STATE device | grep ':wifi:' | grep -v ':unmanaged' | grep -v 'p2p' | head -n 1 | cut -d: -f1" 2>/dev/null || true)
 
     echo ""

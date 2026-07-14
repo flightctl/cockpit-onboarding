@@ -1,11 +1,11 @@
 #!/bin/bash
 # Create temporary onboarding user for initial system access
-# Part of cockpit-system-onboarding first-boot setup
+# Part of flightctl-onboarding first-boot setup
 
 set -e
 
 # shellcheck source=common.sh
-. /usr/libexec/cockpit-system-onboarding/common.sh
+. /usr/libexec/flightctl-onboarding/common.sh
 
 # Create onboarding user with no password (pam_succeed_if allows login)
 if ! id onboarding >/dev/null 2>&1; then
@@ -33,9 +33,9 @@ systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null || true
 echo "Blocked SSH access for onboarding user"
 
 # Ensure state directory is writable by onboarding user (for completion marker)
-mkdir -p /var/lib/cockpit-system-onboarding
-chmod 0700 /var/lib/cockpit-system-onboarding
-chown onboarding:onboarding /var/lib/cockpit-system-onboarding
+mkdir -p /var/lib/flightctl-onboarding
+chmod 0700 /var/lib/flightctl-onboarding
+chown onboarding:onboarding /var/lib/flightctl-onboarding
 
 # Configure Cockpit to allow passwordless login for onboarding user
 mkdir -p /etc/cockpit

@@ -1,7 +1,7 @@
 summary:
     Run browser integration tests on the host
 require:
-  - cockpit-system-onboarding
+  - flightctl-onboarding
   - podman
   - cockpit-ws
   - cockpit-system

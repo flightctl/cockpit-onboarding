@@ -1,13 +1,13 @@
 #!/bin/bash
-# Shared constants and functions for cockpit-system-onboarding scripts
-# Source this file: . /usr/libexec/cockpit-system-onboarding/common.sh
+# Shared constants and functions for flightctl-onboarding scripts
+# Source this file: . /usr/libexec/flightctl-onboarding/common.sh
 
 ONBOARDING_USER_CONFIG="/etc/cockpit/system-onboarding/config.json"
 ONBOARDING_DEFAULT_CONFIG="/usr/share/cockpit/system-onboarding/config.json"
-ONBOARDING_MARKER_DIR="/var/lib/cockpit-system-onboarding"
-ONBOARDING_SCRIPTS_DIR="/usr/libexec/cockpit-system-onboarding"
-ONBOARDING_RUNTIME_DIR="/run/cockpit-system-onboarding"
-ONBOARDING_SETUP_CONNECTION="Cockpit-Onboarding-Ethernet"
+ONBOARDING_MARKER_DIR="/var/lib/flightctl-onboarding"
+ONBOARDING_SCRIPTS_DIR="/usr/libexec/flightctl-onboarding"
+ONBOARDING_RUNTIME_DIR="/run/flightctl-onboarding"
+ONBOARDING_SETUP_CONNECTION="flightctl-onboarding-ethernet"
 
 # Load a configuration value with fallback hierarchy:
 #   1. User override (/etc/cockpit/system-onboarding/config.json)
@@ -40,8 +40,8 @@ load_config() {
 # Disarm the connectivity watchdog so it cannot fire while the caller
 # writes a failure status or performs a rollback.
 disarm_watchdog() {
-    systemctl stop cockpit-system-onboarding-watchdog.timer 2>/dev/null || true
-    systemctl stop cockpit-system-onboarding-watchdog.service 2>/dev/null || true
+    systemctl stop flightctl-onboarding-watchdog.timer 2>/dev/null || true
+    systemctl stop flightctl-onboarding-watchdog.service 2>/dev/null || true
     rm -f "${ONBOARDING_MARKER_DIR}/.watchdog-active" 2>/dev/null || true
 }
 

@@ -1,6 +1,6 @@
 # extract name from package.json
 PACKAGE_NAME := $(shell awk '/"name":/ {gsub(/[",]/, "", $$2); print $$2}' package.json)
-RPM_NAME := cockpit-$(PACKAGE_NAME)
+RPM_NAME := flightctl-onboarding
 VERSION := $(shell T=$$(git describe --tags 2>/dev/null | sed 's/^v//'); [ -z "$$T" ] && T=0.0.1; echo $$T | tr '-' '.')
 ifeq ($(TEST_OS),)
 TEST_OS = centos-9-stream
@@ -12,7 +12,7 @@ SPEC=$(RPM_NAME).spec
 PREFIX ?= /usr/local
 BRAND_NAME ?= Flight Control
 export BRAND_NAME
-APPSTREAMFILE=org.cockpit_project.$(subst -,_,$(PACKAGE_NAME)).metainfo.xml
+APPSTREAMFILE=io.flightctl.onboarding.metainfo.xml
 VM_IMAGE=$(CURDIR)/test/images/$(TEST_OS)
 # stamp file to check for node_modules/
 NODE_MODULES_STAMP=node_modules/.install-stamp

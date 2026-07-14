@@ -1,12 +1,12 @@
 [Unit]
-Description=Cockpit Onboarding Captive Portal on %i
-BindsTo=cockpit-system-onboarding-wifi-ap@%i.service
-After=cockpit-system-onboarding-dnsmasq@%i.service
+Description=Flightctl Onboarding Captive Portal on %i
+BindsTo=flightctl-onboarding-wifi-ap@%i.service
+After=flightctl-onboarding-dnsmasq@%i.service
 
 [Service]
 Type=simple
-EnvironmentFile=/run/cockpit-system-onboarding/wifi-ap.env
-ExecStart=/usr/bin/python3 /usr/libexec/cockpit-system-onboarding/captive-portal.py ${WIFI_AP_ADDRESS} ${WIFI_AP_INTERFACE}
+EnvironmentFile=/run/flightctl-onboarding/wifi-ap.env
+ExecStart=/usr/bin/python3 /usr/libexec/flightctl-onboarding/captive-portal.py ${WIFI_AP_ADDRESS} ${WIFI_AP_INTERFACE}
 Restart=no
 
 # Hardening: this service only serves HTTP on port 80 and reads /sys/ for device info
