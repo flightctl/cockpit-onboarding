@@ -23,13 +23,26 @@ IFACE_TABLE = "table[aria-label='Network interface selector']"
 HELPER_TEXT_ERROR = ".pf-v6-c-form__helper-text .pf-m-error"
 
 
+def iface_row_selector(browser, table, interface):
+    """Return a CSS selector for the table row whose Name cell matches interface.
+
+    Avoids jQuery's :contains(), which isn't available on this app's pages.
+    """
+    names = browser.eval_js(
+        f"Array.from(document.querySelectorAll(\"{table} td[data-label='Name']\"))"
+        ".map(e => e.textContent)"
+    )
+    row = names.index(interface) + 1
+    return f"{table} tbody tr:nth-child({row})"
+
+
 @testlib.nondestructive
 class TestNetworkInterface(testlib.MachineCase):
     """Test network interface selection on the Network wizard step"""
 
     def setUp(self):
         super().setUp()
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.browser.wait_visible("#networkStep")
         self.browser.wait_visible(IFACE_TABLE)
 
@@ -43,16 +56,17 @@ class TestNetworkInterface(testlib.MachineCase):
         b.wait_text("th:nth-child(4)", "MAC address")
 
         cmd = "ip -o link show | grep -v 'lo:' | awk '{print $2}' | sed 's/:$//'"
-        interfaces = m.execute(cmd).strip().split('\n')
+        interfaces = [i for i in m.execute(cmd).strip().split('\n') if i and i != 'lo']
         self.assertGreater(len(interfaces), 0, "No network interfaces found")
 
-        for interface in interfaces:
-            if interface and interface != 'lo':
-                try:
-                    b.wait_text("td[data-label='Name']", interface, timeout=5)
-                    break
-                except RuntimeError:
-                    continue
+        def any_interface_listed():
+            names = b.eval_js(
+                "Array.from(document.querySelectorAll(\"td[data-label='Name']\"))"
+                ".map(e => e.textContent)"
+            )
+            return any(interface in names for interface in interfaces)
+
+        b.wait(any_interface_listed)
 
     def testInterfaceSelection(self):
         """Test that user can select a network interface"""
@@ -63,7 +77,11 @@ class TestNetworkInterface(testlib.MachineCase):
         radios = f"{IFACE_TABLE} input[type='radio']"
         interfaces_count = b.call_js_func("ph_count", radios)
         if interfaces_count > 1:
-            b.click(f"{IFACE_TABLE} input[type='radio']:not(:checked)")
+            for row in range(1, interfaces_count + 1):
+                row_radio = f"{IFACE_TABLE} tbody tr:nth-child({row}) input[type='radio']"
+                if not b.is_present(f"{row_radio}:checked"):
+                    b.click(f"{row_radio}:not(:checked)")
+                    break
             b.wait_visible(f"{IFACE_TABLE} input[type='radio']:checked")
 
     def testVlanConfiguration(self):
@@ -72,24 +90,24 @@ class TestNetworkInterface(testlib.MachineCase):
 
         b.wait_visible("input[type='checkbox']#vlan-id")
         self.assertFalse(b.is_present("input[type='checkbox']#vlan-id:checked"))
-        b.wait_not_present("input[type='text']#vlan-id")
+        b.wait_not_present("input[type='text']#vlan-id-input")
 
         b.click("label[for='vlan-id']")
         b.wait_visible("input[type='checkbox']#vlan-id:checked")
-        b.wait_visible("input[type='text']#vlan-id")
+        b.wait_visible("input[type='text']#vlan-id-input")
 
-        b.set_input_text("input[type='text']#vlan-id", "100")
-        self.assertEqual(b.val("input[type='text']#vlan-id"), "100")
+        b.set_input_text("input[type='text']#vlan-id-input", "100")
+        self.assertEqual(b.val("input[type='text']#vlan-id-input"), "100")
 
         b.click("label[for='vlan-id']")
-        b.wait_not_present("input[type='text']#vlan-id")
+        b.wait_not_present("input[type='text']#vlan-id-input")
 
     def testVlanValidation(self):
         """Test that VLAN ID validation works (1-4094)"""
         b = self.browser
 
         b.click("label[for='vlan-id']")
-        vlan_input = "input[type='text']#vlan-id"
+        vlan_input = "input[type='text']#vlan-id-input"
         b.wait_visible(vlan_input)
 
         b.set_input_text(vlan_input, "1")
@@ -112,7 +130,7 @@ class TestSingleNic(testlib.MachineCase):
     def setUp(self):
         super().setUp()
         m = self.machine
-        addr = m.address
+        addr = m.ssh_address
         try:
             self.setup_iface = m.execute(
                 f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
@@ -126,11 +144,11 @@ class TestSingleNic(testlib.MachineCase):
             self.skipTest("Could not determine setup interface")
 
         b = self.browser
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         b.wait_visible("#networkStep")
         b.wait_visible(IFACE_TABLE)
 
-        iface_radio = f"{IFACE_TABLE} tr:contains('{self.setup_iface}') input[type='radio']"
+        iface_radio = f"{iface_row_selector(b, IFACE_TABLE, self.setup_iface)} input[type='radio']"
         if not b.is_present(f"{iface_radio}:checked"):
             b.click(iface_radio)
 
@@ -146,7 +164,7 @@ class TestIPConfiguration(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.browser.wait_visible("#networkStep")
         self.browser.wait_visible(IFACE_TABLE)
 
@@ -160,6 +178,7 @@ class TestIPConfiguration(testlib.MachineCase):
         b.click("#static-ip-radio")
         b.wait_visible("#ipv4-address")
 
+        b.set_input_text("#ipv4-address", "1.1.1.1")
         b.set_input_text("#ipv4-address", "")
         b.focus("#subnet-mask")
         b.wait_in_text(HELPER_TEXT_ERROR, "IPv4 address is required")
@@ -202,11 +221,12 @@ class TestIPConfiguration(testlib.MachineCase):
         b.click("#static-ipv6-radio")
         b.wait_visible("#ipv6-address")
 
+        b.set_input_text("#ipv6-address", "2001:db8::1/64")
         b.set_input_text("#ipv6-address", "")
         b.focus("#gateway-ipv6")
         b.wait_in_text(HELPER_TEXT_ERROR, "IPv6 address is required")
 
-        b.set_input_text("#ipv6-address", "gggg::")
+        b.set_input_text("#ipv6-address", "gggg::/64")
         b.focus("#gateway-ipv6")
         b.wait_in_text(HELPER_TEXT_ERROR, "Invalid IPv6 address format")
 
@@ -274,68 +294,91 @@ class TestIPConfiguration(testlib.MachineCase):
         self.assertEqual(b.val("#gateway-ip"), "192.168.1.1")
 
 
-@testlib.nondestructive
+@testlib.onlyImage("WiFi requires mac80211_hwsim", "fedora-*")
 class TestWifi(testlib.MachineCase):
-    """Test WiFi configuration on the Network wizard step"""
+    """Test WiFi configuration on the Network wizard step
+
+    Requires a WiFi-enabled Fedora VM image built with test/vm-wifi.install.
+    Uses mac80211_hwsim to simulate 3 WiFi radios and an infrastructure AP
+    (SSID: test-infra-wifi) for scan testing.
+    """
+
+    INFRA_SSID = "test-infra-wifi"
+    WIFI_TABLE = "table[aria-label='WiFi network selector']"
 
     def setUp(self):
         super().setUp()
         m = self.machine
-        try:
-            wifi_interfaces = m.execute(
-                "nmcli -t -f DEVICE,TYPE device | grep ':wifi$' | cut -d: -f1"
-            ).strip()
-            self.has_wifi = bool(wifi_interfaces)
-            if self.has_wifi:
-                self.wifi_interface = wifi_interfaces.split('\n')[0]
-        except Exception:
-            self.has_wifi = False
-            self.wifi_interface = None
+
+        m.execute("modprobe mac80211_hwsim radios=3 2>/dev/null || true")
+
+        m.execute(
+            "for i in $(seq 30); do "
+            "  nmcli -t -f TYPE device | grep -q wifi && break; "
+            "  sleep 1; "
+            "done"
+        )
+
+        m.execute("/usr/local/bin/test-wifi-infra-setup.sh", timeout=60)
+        self.addCleanup(m.execute,
+                        "/usr/local/bin/test-wifi-infra-teardown.sh || true")
+
+        self.wifi_interface = m.execute(
+            "nmcli -t -f DEVICE,TYPE,STATE device"
+            " | grep ':wifi:'"
+            " | grep -v ':unmanaged'"
+            " | grep -v 'p2p'"
+            " | head -1"
+            " | cut -d: -f1"
+        ).strip()
+
+        if not self.wifi_interface:
+            self.skipTest("No free WiFi interface after infra AP setup")
 
     def testWifiInterfaceDetection(self):
         """Test that WiFi interfaces are detected and shown in the interface list"""
-        if not self.has_wifi:
-            self.skipTest("No WiFi interface available")
-
         b = self.browser
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         b.wait_visible("#networkStep")
         b.wait_visible(IFACE_TABLE)
 
         b.wait_in_text(IFACE_TABLE, self.wifi_interface)
 
     def testWifiScanUI(self):
-        """Test that WiFi configuration appears when a WiFi interface is selected"""
-        if not self.has_wifi:
-            self.skipTest("No WiFi interface available")
-
+        """Test that selecting WiFi shows scan results including the infra AP"""
         b = self.browser
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         b.wait_visible("#networkStep")
         b.wait_visible(IFACE_TABLE)
 
-        wifi_radio = f"{IFACE_TABLE} tr:contains('{self.wifi_interface}') input[type='radio']"
+        wifi_radio = f"{iface_row_selector(b, IFACE_TABLE, self.wifi_interface)} input[type='radio']"
         b.click(wifi_radio)
 
-        b.wait_visible("table[aria-label='WiFi network selector']")
+        b.wait_visible(self.WIFI_TABLE)
         b.wait_visible("#wifi-ssid")
+
+        # the initial scan can race with the infra AP still starting up;
+        # retry via the Rescan button until it shows up
+        b.wait_not_present("#wifi-rescan[disabled]")
+        for _ in range(10):
+            if self.INFRA_SSID in b.text(self.WIFI_TABLE):
+                break
+            b.click("#wifi-rescan")
+            b.wait_not_present("#wifi-rescan[disabled]")
+        b.wait_in_text(self.WIFI_TABLE, self.INFRA_SSID)
 
     def testWifiPasswordField(self):
         """Test that WiFi password field appears based on security toggle"""
-        if not self.has_wifi:
-            self.skipTest("No WiFi interface available")
-
         b = self.browser
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         b.wait_visible("#networkStep")
         b.wait_visible(IFACE_TABLE)
 
-        wifi_radio = f"{IFACE_TABLE} tr:contains('{self.wifi_interface}') input[type='radio']"
+        wifi_radio = f"{iface_row_selector(b, IFACE_TABLE, self.wifi_interface)} input[type='radio']"
         b.click(wifi_radio)
 
         b.wait_visible("#wifi-ssid")
-
-        # wifi-security is a FeatureSwitch toggle for WPA
+        b.set_input_text("#wifi-ssid", self.INFRA_SSID)
         b.wait_visible("#wifi-security")
         b.wait_visible("#wifi-password")
 

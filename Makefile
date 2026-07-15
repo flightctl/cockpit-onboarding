@@ -47,6 +47,10 @@ $(COCKPIT_REPO_STAMP): Makefile
 	git archive $(COCKPIT_REPO_TREE) -- $(COCKPIT_REPO_FILES) | tar x
 	# patch to exclude .md files from being considered scripts
 	sed -i -e "s#| sort -z | uniq -z#& | grep -z -v '\\\.md\$$'#" test/common/static-code
+	# newer Chromium/ChromeDriver report page-navigated-away as "Inspected target
+	# navigated or closed" instead of "Cannot find context"; without this,
+	# wait_js_cond() fails hard instead of retrying across the post-login reload
+	sed -i -e 's#"Cannot find context",#"Cannot find context",\n                    "Inspected target navigated or closed",#' test/common/testlib.py
 
 #
 # i18n
@@ -189,13 +193,43 @@ vm: $(VM_IMAGE)
 print-vm:
 	@echo $(VM_IMAGE)
 
+# WiFi-enabled Fedora test VM with mac80211_hwsim simulation
+WIFI_TEST_OS = fedora-43
+WIFI_IMAGE = $(CURDIR)/test/images/$(WIFI_TEST_OS)
+
+$(WIFI_IMAGE): $(TARFILE) $(NODE_CACHE) bots test/vm-wifi.install
+	bots/image-customize --fresh \
+		--upload $(NODE_CACHE):/var/tmp/ --build $(TARFILE) \
+		--script $(CURDIR)/test/vm-wifi.install $(WIFI_TEST_OS)
+
+vm-wifi: $(WIFI_IMAGE)
+	@echo $(WIFI_IMAGE)
+
+check-wifi: check-browser $(WIFI_IMAGE) test/common
+	TEST_OS=$(WIFI_TEST_OS) test/common/run-tests --test-glob 'check-network'
+
+# fail fast if the browser testlib needs isn't installed, instead of silently
+# timing out and retrying for ~30 minutes
+check-browser:
+	@if ! (command -v chromium-browser >/dev/null || command -v chromium >/dev/null \
+	    || [ -x /usr/lib64/chromium-browser/headless_shell ]); then \
+		echo "error: no chromium binary found (checked chromium-browser, chromium, headless_shell)" >&2; \
+		echo "install with: sudo dnf install chromium" >&2; \
+		exit 1; \
+	fi
+	@if ! command -v chromedriver >/dev/null; then \
+		echo "error: chromedriver not found in PATH" >&2; \
+		echo "install with: sudo dnf install chromedriver" >&2; \
+		exit 1; \
+	fi
+
 # convenience target to setup all the bits needed for the integration tests
 # without actually running them
 prepare-check: $(NODE_MODULES_STAMP) $(VM_IMAGE) test/common
 
 # run the browser integration tests
 # this will run all tests/check-* and format them as TAP
-check: prepare-check
+check: check-browser prepare-check
 	test/common/run-tests ${RUN_TESTS_OPTIONS}
 
 codecheck: test/common $(NODE_MODULES_STAMP)
@@ -206,6 +240,11 @@ codecheck: test/common $(NODE_MODULES_STAMP)
 # checkout Cockpit's bots for standard test VM images and API to launch them
 bots: $(COCKPIT_REPO_STAMP)
 	test/common/make-bots
+	sed -i 's/os\.path\.abspath(image)/os.path.realpath(image)/' bots/machine/machine_core/machine_virtual.py
+	grep -q 'self.image_file = os.path.realpath(self.image_file)' bots/machine/machine_core/machine_virtual.py || \
+		sed -i '/image, _extension = os.path.splitext/i\        self.image_file = os.path.realpath(self.image_file)' bots/machine/machine_core/machine_virtual.py
+	grep -q '<seclabel type="none"/>' bots/machine/machine_core/machine_virtual.py || \
+		sed -i '/<\/devices>/a\  <seclabel type="none"/>' bots/machine/machine_core/machine_virtual.py
 
 $(NODE_MODULES_STAMP): package.json package-lock.json
 	# unset NODE_ENV, skips devDependencies otherwise
@@ -247,6 +286,8 @@ help:
 	@echo "  check            Run browser integration tests"
 	@echo "  prepare-check    Set up test VM and dependencies without running tests"
 	@echo "  vm               Build a test VM image"
+	@echo "  vm-wifi          Build a WiFi-enabled Fedora test VM image"
+	@echo "  check-wifi       Run WiFi integration tests (Fedora only)"
 	@echo "  print-vm         Print the test VM image path"
 	@echo ""
 	@echo "VM targets:"
@@ -257,4 +298,4 @@ help:
 	@echo "i18n targets:"
 	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check vm print-vm deploy-test-vm install-flightctl-on-vm clean-test-vm help
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check check-browser vm print-vm vm-wifi check-wifi deploy-test-vm install-flightctl-on-vm clean-test-vm help

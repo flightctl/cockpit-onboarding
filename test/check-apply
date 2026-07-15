@@ -18,7 +18,7 @@ import testlib
 from wizard_navigation import advance_past_optional_steps_to_review
 
 IFACE_TABLE = "table[aria-label='Network interface selector']"
-APPLY_LOG = "/var/log/cockpit-system-onboarding-apply.log"
+APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 
 
 class TestApplyConfiguration(testlib.MachineCase):
@@ -36,7 +36,7 @@ class TestApplyConfiguration(testlib.MachineCase):
         """Test that progress page shows overall progress and step list"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.navigate_to_apply_step()
 
         b.wait_in_text("#progressStep", "Overall progress")
@@ -49,7 +49,7 @@ class TestApplyConfiguration(testlib.MachineCase):
         """Test that the expected built-in steps are listed"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.navigate_to_apply_step()
 
         b.wait_in_text(".pf-v6-c-list", "Applying configuration changes")
@@ -60,7 +60,7 @@ class TestApplyConfiguration(testlib.MachineCase):
         """Test that progress reaches 100% and shows success alert"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.navigate_to_apply_step()
 
         b.wait_in_text(
@@ -76,7 +76,7 @@ class TestApplySingleNic(testlib.MachineCase):
     def setUp(self):
         super().setUp()
         m = self.machine
-        addr = m.address
+        addr = m.ssh_address
         try:
             self.setup_iface = m.execute(
                 f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
@@ -112,7 +112,7 @@ class TestApplySingleNic(testlib.MachineCase):
             self.skipTest("Could not determine setup interface")
 
         b = self.browser
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.select_setup_interface_and_navigate_to_review("single-nic-apply")
 
         b.wait_in_text(
@@ -137,7 +137,7 @@ class TestApplySingleNic(testlib.MachineCase):
             self.skipTest("Could not determine setup interface")
 
         b = self.browser
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.select_setup_interface_and_navigate_to_review("single-nic-delegated")
 
         b.click("button:contains('Apply')")
@@ -164,7 +164,7 @@ class TestApplySingleNicRollback(testlib.MachineCase):
     def setUp(self):
         super().setUp()
         m = self.machine
-        addr = m.address
+        addr = m.ssh_address
         try:
             self.setup_iface = m.execute(
                 f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
@@ -199,7 +199,7 @@ class TestApplySingleNicRollback(testlib.MachineCase):
 
         original_hostname = m.execute("hostnamectl --static").strip()
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         b.wait_visible("#networkStep")
         b.wait_visible(IFACE_TABLE)
 

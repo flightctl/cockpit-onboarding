@@ -25,7 +25,7 @@ class TestReview(testlib.MachineCase):
         """Test that review page displays all configuration sections"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
 
         advance_past_optional_steps_to_review(b, "test-review-host")
 
@@ -38,7 +38,7 @@ class TestReview(testlib.MachineCase):
         """Test that users can navigate back from review page to edit settings"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
 
         advance_past_optional_steps_to_review(b, "initial-hostname")
         b.wait_in_text(DESC_LIST, "initial-hostname")
@@ -50,7 +50,7 @@ class TestReview(testlib.MachineCase):
         """Test that the Edit device labels button navigates to the labels step"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
 
         advance_past_optional_steps_to_review(b, "edit-test-host")
         b.wait_in_text(DESC_LIST, "edit-test-host")
@@ -63,7 +63,7 @@ class TestReview(testlib.MachineCase):
         """Test that the Edit network button navigates to the network step"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
 
         advance_past_optional_steps_to_review(b, "net-edit-host")
 
@@ -74,7 +74,7 @@ class TestReview(testlib.MachineCase):
         """Test that the Edit network services button navigates to the services step"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
 
         advance_past_optional_steps_to_review(b, "svc-edit-host")
 
@@ -85,7 +85,7 @@ class TestReview(testlib.MachineCase):
         """Test that the Edit enrollment button navigates to the enrollment step"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
 
         advance_past_optional_steps_to_review(b, "enroll-edit-host")
 
@@ -96,7 +96,7 @@ class TestReview(testlib.MachineCase):
         """Test that modifying a setting and returning to review updates the summary"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
 
         initial_hostname = "before-change"
         modified_hostname = "after-change"
@@ -116,7 +116,7 @@ class TestReview(testlib.MachineCase):
         """Test that review page shows IPv4 configuration correctly"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
 
         advance_past_optional_steps_to_review(b, "ipv4-test-host")
 
@@ -127,7 +127,7 @@ class TestReview(testlib.MachineCase):
         """Test that review page shows 'No proxy configured' by default"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
 
         advance_past_optional_steps_to_review(b, "proxy-test-host")
 
@@ -138,7 +138,7 @@ class TestReview(testlib.MachineCase):
         """Test that review page shows enrollment skipped when not selected"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
 
         advance_past_optional_steps_to_review(b, "no-enroll-host")
 
@@ -152,7 +152,7 @@ class TestReviewSingleNic(testlib.MachineCase):
     def setUp(self):
         super().setUp()
         m = self.machine
-        addr = m.address
+        addr = m.ssh_address
         try:
             self.setup_iface = m.execute(
                 f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
@@ -166,7 +166,7 @@ class TestReviewSingleNic(testlib.MachineCase):
             self.skipTest("Could not determine setup interface")
 
         b = self.browser
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         b.wait_visible("#networkStep")
         b.wait_visible(IFACE_TABLE)
 
