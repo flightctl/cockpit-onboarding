@@ -66,6 +66,8 @@ jobs:
 
       - name: Build WiFi test VM image
         run: make vm-wifi
+        env:
+          PYTHONUNBUFFERED: 1
 
       - name: Save Fedora base image cache
         if: github.ref == 'refs/heads/main' && steps.restore-image-cache.outputs.cache-hit != 'true'
@@ -76,6 +78,9 @@ jobs:
 
       - name: Run WiFi/network integration tests
         run: make check-wifi
+        env:
+          PYTHONUNBUFFERED: 1
+          RUN_TESTS_OPTIONS: -v
 
       - name: Upload test failure artifacts
         if: failure()

@@ -206,7 +206,7 @@ vm-wifi: $(WIFI_IMAGE)
 	@echo $(WIFI_IMAGE)
 
 check-wifi: check-browser $(WIFI_IMAGE) test/common
-	TEST_OS=$(WIFI_TEST_OS) test/common/run-tests --test-glob 'check-network'
+	TEST_OS=$(WIFI_TEST_OS) test/common/run-tests --test-glob 'check-network' ${RUN_TESTS_OPTIONS}
 
 # fail fast if the browser testlib needs isn't installed, instead of silently
 # timing out and retrying for ~30 minutes
