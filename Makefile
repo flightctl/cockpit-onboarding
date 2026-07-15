@@ -51,6 +51,9 @@ $(COCKPIT_REPO_STAMP): Makefile
 	# navigated or closed" instead of "Cannot find context"; without this,
 	# wait_js_cond() fails hard instead of retrying across the post-login reload
 	sed -i -e 's#"Cannot find context",#"Cannot find context",\n                    "Inspected target navigated or closed",#' test/common/testlib.py
+	# Chrome refuses to run as root (CI runners) without --no-sandbox
+	grep -q 'no-sandbox' test/common/webdriver_bidi.py || \
+		sed -i 's#"--disable-popup-blocking",#"--disable-popup-blocking",\n                        "--no-sandbox",#' test/common/webdriver_bidi.py
 
 #
 # i18n
