@@ -3,8 +3,18 @@
 # Extends the base vm.install with mac80211_hwsim WiFi simulation
 set -eux
 
-# ── Install the host-built RPM ────────────────────────────────────────
-rpm -U --force --verbose /var/tmp/flightctl-onboarding-*.noarch.rpm
+# ── Build and install RPM from uploaded tarball ───────────────────────
+dnf install -y rpm-build make gettext libappstream-glib systemd-rpm-macros nodejs
+
+SRCTARBALL=$(ls /var/tmp/flightctl-onboarding-[0-9]*.tar.xz)
+tar -xf "$SRCTARBALL" -C /var/tmp --strip-components=1 'flightctl-onboarding/flightctl-onboarding.spec'
+
+mkdir -p /var/tmp/build
+rpmbuild --define "_sourcedir /var/tmp" \
+         --define "_topdir /var/tmp/build" \
+         -bb /var/tmp/flightctl-onboarding.spec
+
+rpm -U --force --verbose /var/tmp/build/RPMS/noarch/flightctl-onboarding-*.noarch.rpm
 
 # ── Base cockpit setup (same as vm.install) ──────────────────────────
 mkdir -p /etc/cockpit

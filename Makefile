@@ -199,10 +199,10 @@ print-vm:
 # WiFi-enabled Fedora test VM with mac80211_hwsim simulation
 WIFI_TEST_OS = fedora-43
 WIFI_IMAGE = $(CURDIR)/test/images/$(WIFI_TEST_OS)
-$(WIFI_IMAGE): bots test/vm-wifi.install $(SPEC)
-	$(MAKE) rpm
+$(WIFI_IMAGE): $(TARFILE) $(NODE_CACHE) bots test/vm-wifi.install
 	bots/image-customize --fresh \
-		--upload $$(ls $(RPM_NAME)-*.noarch.rpm | head -1):/var/tmp/ \
+		--upload $(TARFILE):/var/tmp/ \
+		--upload $(NODE_CACHE):/var/tmp/ \
 		--script $(CURDIR)/test/vm-wifi.install $(WIFI_TEST_OS)
 
 vm-wifi: $(WIFI_IMAGE)
