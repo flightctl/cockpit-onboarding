@@ -10,7 +10,7 @@ const FormHelperText = ({ id, content, variant }: { id?: string; content: string
     return (
         <PFFormHelperText>
             <HelperText>
-                <HelperTextItem id={id} variant={variant || "default"}>{content}</HelperTextItem>
+                <HelperTextItem {...(id && { id })} variant={variant || "default"}>{content}</HelperTextItem>
             </HelperText>
         </PFFormHelperText>
     );

@@ -30,7 +30,7 @@ const ValidatedTextInput = ({ value, helperText, error, ...props }: ValidatedTex
         <>
             <TextInput value={value ?? ""} validated={validated} {...props} />
             {helperText && <FormHelperText content={helperText} />}
-            {error && <FormHelperText id={errorId} content={error} variant="error" />}
+            {error && <FormHelperText {...(errorId && { id: errorId })} content={error} variant="error" />}
         </>
     );
 };

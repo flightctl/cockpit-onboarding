@@ -175,6 +175,7 @@ rpm: $(SPEC)
 	  --define "_rpmdir `pwd`/output" \
 	  --define "_buildrootdir `pwd`/build" \
 	  --define "brand_name $(BRAND_NAME)" \
+	  --define "nodejs_arches noarch" \
 	  $(SPEC)
 	find `pwd`/output -name '*.rpm' -printf '%f\n' -exec mv {} . \;
 	rm -rf "`pwd`/rpmbuild"
