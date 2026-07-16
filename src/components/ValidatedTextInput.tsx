@@ -24,12 +24,13 @@ type ValidatedTextInputProps = TextInputProps & {
 
 const ValidatedTextInput = ({ value, helperText, error, ...props }: ValidatedTextInputProps) => {
     const validated = getValidatedState(Boolean(value), error);
+    const errorId = props.id ? `${props.id}-helper-error` : undefined;
 
     return (
         <>
             <TextInput value={value ?? ""} validated={validated} {...props} />
             {helperText && <FormHelperText content={helperText} />}
-            {error && <FormHelperText content={error} variant="error" />}
+            {error && <FormHelperText id={errorId} content={error} variant="error" />}
         </>
     );
 };

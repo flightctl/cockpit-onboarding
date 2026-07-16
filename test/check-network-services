@@ -19,9 +19,7 @@
 
 import testlib
 
-from wizard_navigation import navigate_to_network_services_step
-
-HELPER_TEXT_ERROR = ".pf-v6-c-form__helper-text .pf-m-error"
+from wizard_navigation import click_button_text, navigate_to_network_services_step
 
 
 @testlib.nondestructive
@@ -30,7 +28,7 @@ class TestNtp(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_network_services_step(self.browser)
 
     def testNtpAutoByDefault(self):
@@ -58,14 +56,14 @@ class TestNtp(testlib.MachineCase):
         self.assertEqual(b.val("#ntp-server-input"), "pool.ntp.org")
 
         # Add another server row
-        b.click("button:contains('Add another NTP server')")
+        click_button_text(b, "Add another NTP server")
         b.wait_visible("#ntp-server-input-1")
 
         b.set_input_text("#ntp-server-input-1", "time.google.com")
         self.assertEqual(b.val("#ntp-server-input-1"), "time.google.com")
 
         # Remove the second server
-        b.click("button[aria-label='Remove NTP server']:last")
+        b.eval_js("document.querySelectorAll(\"button[aria-label='Remove NTP server']\")[1].click()")
         b.wait_not_present("#ntp-server-input-1")
 
         # First server should still be there
@@ -78,17 +76,18 @@ class TestNtp(testlib.MachineCase):
         b.click("label[for='ntp-servers']")
         b.wait_visible("#ntp-server-input")
 
+        b.set_input_text("#ntp-server-input", "x")
         b.set_input_text("#ntp-server-input", "")
-        b.wait_in_text(HELPER_TEXT_ERROR, "Invalid hostname or IP address")
+        b.wait_in_text("#ntp-server-input-helper-error", "Hostname or IP address is required")
 
         b.set_input_text("#ntp-server-input", "time.nist.gov")
-        b.wait_not_present(HELPER_TEXT_ERROR)
+        b.wait_not_present("#ntp-server-input-helper-error")
 
         b.set_input_text("#ntp-server-input", "129.6.15.28")
-        b.wait_not_present(HELPER_TEXT_ERROR)
+        b.wait_not_present("#ntp-server-input-helper-error")
 
         b.set_input_text("#ntp-server-input", "2001:4860:4860::8888")
-        b.wait_not_present(HELPER_TEXT_ERROR)
+        b.wait_not_present("#ntp-server-input-helper-error")
 
     def testNtpToggleBackToAuto(self):
         """Test toggling back to auto NTP clears manual servers"""
@@ -111,7 +110,7 @@ class TestProxy(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_network_services_step(self.browser)
 
     def testProxyDisabledByDefault(self):
@@ -145,13 +144,13 @@ class TestProxy(testlib.MachineCase):
         b.wait_visible("#proxy-hostname-input")
 
         b.set_input_text("#proxy-hostname-input", "proxy.example.com")
-        b.wait_not_present(HELPER_TEXT_ERROR)
+        b.wait_not_present("#proxy-hostname-input-helper-error")
 
         b.set_input_text("#proxy-hostname-input", "192.168.1.100")
-        b.wait_not_present(HELPER_TEXT_ERROR)
+        b.wait_not_present("#proxy-hostname-input-helper-error")
 
         b.set_input_text("#proxy-hostname-input", "2001:db8::1")
-        b.wait_not_present(HELPER_TEXT_ERROR)
+        b.wait_not_present("#proxy-hostname-input-helper-error")
 
     def testProxyPortValidation(self):
         """Test proxy port number validation"""
@@ -161,13 +160,13 @@ class TestProxy(testlib.MachineCase):
         b.wait_visible("#proxy-port-input")
 
         b.set_input_text("#proxy-port-input", "8080")
-        b.wait_not_present(HELPER_TEXT_ERROR)
+        b.wait_not_present("#proxy-port-input-helper-error")
 
         b.set_input_text("#proxy-port-input", "0")
-        b.wait_in_text(HELPER_TEXT_ERROR, "Port must be between 1 and 65535")
+        b.wait_in_text("#proxy-port-input-helper-error", "Port must be between 1 and 65535")
 
         b.set_input_text("#proxy-port-input", "65536")
-        b.wait_in_text(HELPER_TEXT_ERROR, "Port must be between 1 and 65535")
+        b.wait_in_text("#proxy-port-input-helper-error", "Port must be between 1 and 65535")
 
     def testProxyFullConfiguration(self):
         """Test complete proxy configuration with authentication"""

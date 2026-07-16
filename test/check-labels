@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import testlib
 
-from wizard_navigation import navigate_to_labels_step
+from wizard_navigation import click_button_text, navigate_to_labels_step, wait_button_text
 
-HELPER_TEXT_ERROR = ".pf-v6-c-form__helper-text .pf-m-error"
+HOSTNAME_ERROR = "#hostname-input-helper-error"
 
 
 @testlib.nondestructive
@@ -21,7 +21,7 @@ class TestHostname(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_labels_step(self.browser)
 
     def testHostnameInputPresent(self):
@@ -37,28 +37,28 @@ class TestHostname(testlib.MachineCase):
         b = self.browser
 
         b.set_input_text("#hostname-input", "")
-        b.focus("label:contains('Hostname')")
-        b.wait_in_text(HELPER_TEXT_ERROR, "Hostname is required")
+        b.focus("h1")
+        b.wait_in_text(HOSTNAME_ERROR, "Hostname is required")
 
     def testHostnameInvalidCharacters(self):
         """Test that special characters are rejected"""
         b = self.browser
 
         b.set_input_text("#hostname-input", "host_name!")
-        b.focus("label:contains('Hostname')")
-        b.wait_in_text(HELPER_TEXT_ERROR, "contain only letters, numbers, hyphens, and dots")
+        b.focus("h1")
+        b.wait_in_text(HOSTNAME_ERROR, "contain only letters, numbers, hyphens, and dots")
 
     def testHostnameLabelStartEnd(self):
         """Test that hostname must start and end with alphanumeric characters"""
         b = self.browser
 
         b.set_input_text("#hostname-input", "-bad-start")
-        b.focus("label:contains('Hostname')")
-        b.wait_in_text(HELPER_TEXT_ERROR, "must start and end with an alphanumeric character")
+        b.focus("h1")
+        b.wait_in_text(HOSTNAME_ERROR, "must start and end with an alphanumeric character")
 
         b.set_input_text("#hostname-input", "bad-end-")
-        b.focus("label:contains('Hostname')")
-        b.wait_in_text(HELPER_TEXT_ERROR, "must start and end with an alphanumeric character")
+        b.focus("h1")
+        b.wait_in_text(HOSTNAME_ERROR, "must start and end with an alphanumeric character")
 
     def testHostnameMaxLength(self):
         """Test that hostname exceeding 64 chars is rejected for system hostname"""
@@ -66,30 +66,30 @@ class TestHostname(testlib.MachineCase):
 
         long_hostname = "a" * 65
         b.set_input_text("#hostname-input", long_hostname)
-        b.focus("label:contains('Hostname')")
-        b.wait_in_text(HELPER_TEXT_ERROR, "64 characters or less")
+        b.focus("h1")
+        b.wait_in_text(HOSTNAME_ERROR, "64 characters or less")
 
     def testHostnameConsecutiveDots(self):
         """Test that consecutive dots in hostname are rejected"""
         b = self.browser
 
         b.set_input_text("#hostname-input", "host..name")
-        b.focus("label:contains('Hostname')")
-        b.wait_in_text(HELPER_TEXT_ERROR, "must start and end with an alphanumeric character")
+        b.focus("h1")
+        b.wait_in_text(HOSTNAME_ERROR, "must start and end with an alphanumeric character")
 
     def testHostnameValidFqdn(self):
         """Test that valid FQDNs are accepted"""
         b = self.browser
 
         b.set_input_text("#hostname-input", "my-host.example.com")
-        b.wait_not_present(HELPER_TEXT_ERROR)
+        b.wait_not_present(HOSTNAME_ERROR)
 
     def testHostnameValidSimple(self):
         """Test that a valid simple hostname is accepted"""
         b = self.browser
 
         b.set_input_text("#hostname-input", "my-device-01")
-        b.wait_not_present(HELPER_TEXT_ERROR)
+        b.wait_not_present(HOSTNAME_ERROR)
 
 
 @testlib.nondestructive
@@ -98,7 +98,7 @@ class TestAlias(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_labels_step(self.browser)
 
     def testAliasToggle(self):
@@ -108,9 +108,6 @@ class TestAlias(testlib.MachineCase):
         toggle = "label[for='alias-enabled']"
         switch = "#alias-enabled"
 
-        b.wait_visible(switch)
-
-        b.click(toggle)
         b.wait_visible(f"{switch}:checked")
         b.wait_visible("#alias-mode-hostname")
         b.wait_visible("#alias-mode-custom")
@@ -119,22 +116,23 @@ class TestAlias(testlib.MachineCase):
         self.assertFalse(b.is_present(f"{switch}:checked"))
         b.wait_not_present("#alias-mode-hostname")
 
+        b.click(toggle)
+        b.wait_visible(f"{switch}:checked")
+        b.wait_visible("#alias-mode-hostname")
+
     def testAliasHostnameMode(self):
         """Test that 'Use hostname as alias' is the default mode when alias is enabled"""
         b = self.browser
 
         b.set_input_text("#hostname-input", "valid-host")
 
-        b.click("label[for='alias-enabled']")
         b.wait_visible("#alias-enabled:checked")
-
         b.wait_visible("#alias-mode-hostname:checked")
 
     def testAliasCustomMode(self):
         """Test switching to custom alias mode and entering a value"""
         b = self.browser
 
-        b.click("label[for='alias-enabled']")
         b.wait_visible("#alias-enabled:checked")
 
         b.click("#alias-mode-custom")
@@ -150,22 +148,22 @@ class TestCustomLabels(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_labels_step(self.browser)
 
     def testAddLabelButton(self):
         """Test that the 'Add another label' button is present"""
         b = self.browser
 
-        b.wait_visible("button:contains('Add another label')")
+        wait_button_text(b, "Add another label")
 
     def testAddAndRemoveLabel(self):
         """Test adding and removing custom label rows"""
         b = self.browser
 
-        b.click("button:contains('Add another label')")
+        click_button_text(b, "Add another label")
 
-        b.wait_visible("button[aria-label='Remove label']")
+        b.wait_js_cond("ph_count(\"button[aria-label='Remove label']\") >= 2")
 
 
 if __name__ == "__main__":
