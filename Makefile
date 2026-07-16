@@ -199,17 +199,17 @@ print-vm:
 # WiFi-enabled Fedora test VM with mac80211_hwsim simulation
 WIFI_TEST_OS = fedora-43
 WIFI_IMAGE = $(CURDIR)/test/images/$(WIFI_TEST_OS)
-
-$(WIFI_IMAGE): $(TARFILE) $(NODE_CACHE) bots test/vm-wifi.install
+$(WIFI_IMAGE): bots test/vm-wifi.install $(SPEC)
+	$(MAKE) rpm
 	bots/image-customize --fresh \
-		--upload $(NODE_CACHE):/var/tmp/ --build $(TARFILE) \
+		--upload $$(ls $(RPM_NAME)-*.noarch.rpm | head -1):/var/tmp/ \
 		--script $(CURDIR)/test/vm-wifi.install $(WIFI_TEST_OS)
 
 vm-wifi: $(WIFI_IMAGE)
 	@echo $(WIFI_IMAGE)
 
-check-wifi: check-browser $(WIFI_IMAGE) test/common
-	TEST_OS=$(WIFI_TEST_OS) test/common/run-tests --test-glob 'check-network' ${RUN_TESTS_OPTIONS}
+check-fedora: check-browser $(WIFI_IMAGE) test/common
+	TEST_OS=$(WIFI_TEST_OS) test/common/run-tests --test-glob 'check-*' ${RUN_TESTS_OPTIONS}
 
 # fail fast if the browser testlib needs isn't installed, instead of silently
 # timing out and retrying for ~30 minutes
@@ -290,7 +290,7 @@ help:
 	@echo "  prepare-check    Set up test VM and dependencies without running tests"
 	@echo "  vm               Build a test VM image"
 	@echo "  vm-wifi          Build a WiFi-enabled Fedora test VM image"
-	@echo "  check-wifi       Run WiFi integration tests (Fedora only)"
+	@echo "  check-fedora     Run all integration tests on Fedora (includes WiFi)"
 	@echo "  print-vm         Print the test VM image path"
 	@echo ""
 	@echo "VM targets:"
@@ -301,4 +301,4 @@ help:
 	@echo "i18n targets:"
 	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check check-browser vm print-vm vm-wifi check-wifi deploy-test-vm install-flightctl-on-vm clean-test-vm help
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check check-browser vm print-vm vm-wifi check-fedora deploy-test-vm install-flightctl-on-vm clean-test-vm help

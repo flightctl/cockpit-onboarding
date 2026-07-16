@@ -14,8 +14,8 @@ permissions:
   contents: read
 
 jobs:
-  check-wifi:
-    name: WiFi/network integration tests
+  check-fedora:
+    name: Fedora integration tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -76,8 +76,8 @@ jobs:
           path: ~/.cache/cockpit-images
           key: cockpit-images-fedora-43-${{ hashFiles('Makefile') }}
 
-      - name: Run WiFi/network integration tests
-        run: make check-wifi
+      - name: Run integration tests
+        run: make check-fedora
         env:
           PYTHONUNBUFFERED: 1
           RUN_TESTS_OPTIONS: -v

@@ -3,6 +3,9 @@
 # Extends the base vm.install with mac80211_hwsim WiFi simulation
 set -eux
 
+# ── Install the host-built RPM ────────────────────────────────────────
+rpm -U --force --verbose /var/tmp/flightctl-onboarding-*.noarch.rpm
+
 # ── Base cockpit setup (same as vm.install) ──────────────────────────
 mkdir -p /etc/cockpit
 printf "[WebService]\nAllowUnencrypted=true\n" > /etc/cockpit/cockpit.conf
