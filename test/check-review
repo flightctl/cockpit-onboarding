@@ -11,10 +11,17 @@ from __future__ import annotations
 
 import testlib
 
-from wizard_navigation import advance_past_optional_steps_to_review
+from wizard_navigation import (
+    IFACE_TABLE,
+    advance_past_optional_steps_to_review,
+    click_button_text,
+    iface_row_selector,
+)
 
-DESC_LIST = ".pf-v6-c-description-list"
-IFACE_TABLE = "table[aria-label='Network interface selector']"
+REVIEW_NETWORK = "#review-network"
+REVIEW_SERVICES = "#review-network-services"
+REVIEW_ENROLLMENT = "#review-enrollment"
+REVIEW_LABELS = "#review-device-labels"
 
 
 @testlib.nondestructive
@@ -29,10 +36,10 @@ class TestReview(testlib.MachineCase):
 
         advance_past_optional_steps_to_review(b, "test-review-host")
 
-        b.wait_in_text(DESC_LIST, "test-review-host")
-        b.wait_in_text(DESC_LIST, "Network interface")
-        b.wait_in_text(DESC_LIST, "IPv4 Connection")
-        b.wait_in_text(DESC_LIST, "NTP Server Hostname")
+        b.wait_in_text(REVIEW_LABELS, "test-review-host")
+        b.wait_in_text(REVIEW_NETWORK, "Network interface")
+        b.wait_in_text(REVIEW_NETWORK, "IPv4 Connection")
+        b.wait_in_text(REVIEW_SERVICES, "NTP Server Hostname")
 
     def testBackNavigationFromReview(self):
         """Test that users can navigate back from review page to edit settings"""
@@ -41,9 +48,9 @@ class TestReview(testlib.MachineCase):
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
 
         advance_past_optional_steps_to_review(b, "initial-hostname")
-        b.wait_in_text(DESC_LIST, "initial-hostname")
+        b.wait_in_text(REVIEW_LABELS, "initial-hostname")
 
-        b.click("button:contains('Back')")
+        click_button_text(b, "Back")
         b.wait_visible("#labelsStep")
 
     def testEditDeviceLabelsNavigation(self):
@@ -53,7 +60,7 @@ class TestReview(testlib.MachineCase):
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
 
         advance_past_optional_steps_to_review(b, "edit-test-host")
-        b.wait_in_text(DESC_LIST, "edit-test-host")
+        b.wait_in_text(REVIEW_LABELS, "edit-test-host")
 
         b.click("button[aria-label='Edit device labels']")
         b.wait_visible("#labelsStep")
@@ -102,15 +109,15 @@ class TestReview(testlib.MachineCase):
         modified_hostname = "after-change"
 
         advance_past_optional_steps_to_review(b, initial_hostname)
-        b.wait_in_text(DESC_LIST, initial_hostname)
+        b.wait_in_text(REVIEW_LABELS, initial_hostname)
 
-        b.click("button:contains('Back')")
+        click_button_text(b, "Back")
         b.wait_visible("#labelsStep")
         b.set_input_text("#hostname-input", modified_hostname)
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#reviewStep")
 
-        b.wait_in_text(DESC_LIST, modified_hostname)
+        b.wait_in_text(REVIEW_LABELS, modified_hostname)
 
     def testReviewDisplaysIPv4Configuration(self):
         """Test that review page shows IPv4 configuration correctly"""
@@ -120,8 +127,8 @@ class TestReview(testlib.MachineCase):
 
         advance_past_optional_steps_to_review(b, "ipv4-test-host")
 
-        b.wait_in_text(DESC_LIST, "IPv4 Connection")
-        b.wait_in_text(DESC_LIST, "Automatic (DHCP)")
+        b.wait_in_text(REVIEW_NETWORK, "IPv4 Connection")
+        b.wait_in_text(REVIEW_NETWORK, "Automatic (DHCP)")
 
     def testReviewDisplaysProxyNotConfigured(self):
         """Test that review page shows 'No proxy configured' by default"""
@@ -131,8 +138,8 @@ class TestReview(testlib.MachineCase):
 
         advance_past_optional_steps_to_review(b, "proxy-test-host")
 
-        b.wait_in_text(DESC_LIST, "HTTP proxy")
-        b.wait_in_text(DESC_LIST, "No proxy configured")
+        b.wait_in_text(REVIEW_SERVICES, "HTTP proxy")
+        b.wait_in_text(REVIEW_SERVICES, "No proxy configured")
 
     def testReviewDisplaysEnrollmentSkipped(self):
         """Test that review page shows enrollment skipped when not selected"""
@@ -142,7 +149,7 @@ class TestReview(testlib.MachineCase):
 
         advance_past_optional_steps_to_review(b, "no-enroll-host")
 
-        b.wait_in_text(DESC_LIST, "Enrollment skipped")
+        b.wait_in_text(REVIEW_ENROLLMENT, "Enrollment skipped")
 
 
 @testlib.nondestructive
@@ -170,22 +177,23 @@ class TestReviewSingleNic(testlib.MachineCase):
         b.wait_visible("#networkStep")
         b.wait_visible(IFACE_TABLE)
 
-        iface_radio = f"{IFACE_TABLE} tr:contains('{self.setup_iface}') input[type='radio']"
+        row_sel = iface_row_selector(b, IFACE_TABLE, self.setup_iface)
+        iface_radio = f"{row_sel} input[type='radio']"
         if not b.is_present(f"{iface_radio}:checked"):
             b.click(iface_radio)
 
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#enrollmentStep")
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#labelsStep")
         b.set_input_text("#hostname-input", "single-nic-test")
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#reviewStep")
 
         b.wait_in_text(
-            ".pf-v6-c-alert.pf-m-warning",
+            "#review-singlenic-warning",
             "Connection will be interrupted"
         )
 

@@ -15,22 +15,30 @@ import time
 
 import testlib
 
-from wizard_navigation import advance_past_optional_steps_to_review
-
-IFACE_TABLE = "table[aria-label='Network interface selector']"
+from wizard_navigation import (
+    IFACE_TABLE,
+    advance_past_optional_steps_to_review,
+    click_button_text,
+    iface_row_selector,
+)
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 
 
 class TestApplyConfiguration(testlib.MachineCase):
     """Test the enrollment progress page UI"""
+    provision = {'machine1': {'restrict': False}}
+
+    def setUp(self):
+        super().setUp()
+        self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
 
     def navigate_to_apply_step(self):
         b = self.browser
 
         advance_past_optional_steps_to_review(b, "apply-test-host")
         b.wait_visible("#reviewStep")
-        b.click("button:contains('Apply')")
-        b.wait_visible("#progressStep")
+        b.click("#wizard-next-btn")
+        b.wait_in_text("#progressStep", "Apply")
 
     def testProgressPageElements(self):
         """Test that progress page shows overall progress and step list"""
@@ -39,11 +47,10 @@ class TestApplyConfiguration(testlib.MachineCase):
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.navigate_to_apply_step()
 
-        b.wait_in_text("#progressStep", "Overall progress")
-        b.wait_in_text("#progressStep", "Steps")
+        b.wait_in_text("#apply-content", "Overall progress")
 
-        b.wait_visible(".pf-v6-c-progress")
-        b.wait_visible(".pf-v6-c-list")
+        b.wait_visible("#apply-progress")
+        b.wait_visible("#apply-steps")
 
     def testProgressStepNames(self):
         """Test that the expected built-in steps are listed"""
@@ -52,9 +59,9 @@ class TestApplyConfiguration(testlib.MachineCase):
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.navigate_to_apply_step()
 
-        b.wait_in_text(".pf-v6-c-list", "Applying configuration changes")
-        b.wait_in_text(".pf-v6-c-list", "Testing network connectivity")
-        b.wait_in_text(".pf-v6-c-list", "Finalizing configuration")
+        b.wait_in_text("#apply-steps", "Applying configuration changes")
+        b.wait_in_text("#apply-steps", "Testing network connectivity")
+        b.wait_in_text("#apply-steps", "Finalizing configuration")
 
     def testProgressCompletion(self):
         """Test that progress reaches 100% and shows success alert"""
@@ -63,11 +70,11 @@ class TestApplyConfiguration(testlib.MachineCase):
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.navigate_to_apply_step()
 
-        b.wait_in_text(
-            ".pf-v6-c-alert.pf-m-success",
-            "Configuration completed successfully",
-            timeout=120
-        )
+        with b.wait_timeout(120):
+            b.wait_in_text(
+                "#apply-success-alert",
+                "Configuration completed successfully",
+            )
 
 
 class TestApplySingleNic(testlib.MachineCase):
@@ -75,6 +82,7 @@ class TestApplySingleNic(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
+        self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
         m = self.machine
         addr = m.ssh_address
         try:
@@ -90,20 +98,19 @@ class TestApplySingleNic(testlib.MachineCase):
         b.wait_visible("#networkStep")
         b.wait_visible(IFACE_TABLE)
 
-        iface_radio = (
-            f"{IFACE_TABLE} tr:contains('{self.setup_iface}') input[type='radio']"
-        )
+        row_sel = iface_row_selector(b, IFACE_TABLE, self.setup_iface)
+        iface_radio = f"{row_sel} input[type='radio']"
         if not b.is_present(f"{iface_radio}:checked"):
             b.click(iface_radio)
 
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#enrollmentStep")
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#labelsStep")
         b.set_input_text("#hostname-input", hostname)
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#reviewStep")
 
     def testSingleNicDelegation(self):
@@ -116,20 +123,20 @@ class TestApplySingleNic(testlib.MachineCase):
         self.select_setup_interface_and_navigate_to_review("single-nic-apply")
 
         b.wait_in_text(
-            ".pf-v6-c-alert.pf-m-warning",
+            "#review-singlenic-warning",
             "Connection will be interrupted"
         )
 
-        b.click("button:contains('Apply')")
-        b.wait_visible("#progressStep")
+        b.click("#wizard-next-btn")
+        b.wait_in_text("#progressStep", "Apply")
 
-        b.wait_in_text(".pf-v6-c-list", "Applying configuration changes")
+        b.wait_in_text("#apply-steps", "Applying configuration changes")
 
-        b.wait_in_text(
-            ".pf-v6-c-alert.pf-m-info",
-            "Onboarding continues in the background",
-            timeout=120
-        )
+        with b.wait_timeout(120):
+            b.wait_in_text(
+                "#apply-singlenic-alert",
+                "Onboarding continues in the background",
+            )
 
     def testSingleNicStepsDelegated(self):
         """Test that remaining steps show 'Delegated to background service' status"""
@@ -140,14 +147,14 @@ class TestApplySingleNic(testlib.MachineCase):
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.select_setup_interface_and_navigate_to_review("single-nic-delegated")
 
-        b.click("button:contains('Apply')")
-        b.wait_visible("#progressStep")
+        b.click("#wizard-next-btn")
+        b.wait_in_text("#progressStep", "Apply")
 
-        b.wait_in_text(
-            "#progressStep",
-            "Delegated to background service",
-            timeout=120
-        )
+        with b.wait_timeout(120):
+            b.wait_in_text(
+                "#apply-content",
+                "Delegated to background service",
+            )
 
 
 class TestApplySingleNicRollback(testlib.MachineCase):
@@ -163,6 +170,7 @@ class TestApplySingleNicRollback(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
+        self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
         m = self.machine
         addr = m.ssh_address
         try:
@@ -203,35 +211,34 @@ class TestApplySingleNicRollback(testlib.MachineCase):
         b.wait_visible("#networkStep")
         b.wait_visible(IFACE_TABLE)
 
-        iface_radio = (
-            f"{IFACE_TABLE} tr:contains('{self.setup_iface}') input[type='radio']"
-        )
+        row_sel = iface_row_selector(b, IFACE_TABLE, self.setup_iface)
+        iface_radio = f"{row_sel} input[type='radio']"
         if not b.is_present(f"{iface_radio}:checked"):
             b.click(iface_radio)
 
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#enrollmentStep")
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#labelsStep")
         b.set_input_text("#hostname-input", "rollback-test-host")
-        b.click("button:contains('Next')")
+        click_button_text(b, "Next")
         b.wait_visible("#reviewStep")
 
         b.wait_in_text(
-            ".pf-v6-c-alert.pf-m-warning",
+            "#review-singlenic-warning",
             "Connection will be interrupted"
         )
 
-        b.click("button:contains('Apply')")
-        b.wait_visible("#progressStep")
+        b.click("#wizard-next-btn")
+        b.wait_in_text("#progressStep", "Apply")
 
-        b.wait_in_text(
-            ".pf-v6-c-alert.pf-m-info",
-            "Onboarding continues in the background",
-            timeout=120
-        )
+        with b.wait_timeout(120):
+            b.wait_in_text(
+                "#apply-singlenic-alert",
+                "Onboarding continues in the background",
+            )
 
         # With connectivityRetries=2 at 2s intervals, the script fails in ~4s
         # then rolls back. Wait up to 30s for the log to confirm.

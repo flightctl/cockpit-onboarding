@@ -9,7 +9,6 @@ Tests the Flight Control enrollment page UI.
 from __future__ import annotations
 
 import json
-import typing
 
 import testlib
 
@@ -19,10 +18,6 @@ from wizard_navigation import navigate_to_enrollment_step
 @testlib.nondestructive
 class TestEnrollment(testlib.MachineCase):
     """Test Flight Control enrollment selection and credential input"""
-
-    provision: typing.ClassVar = {
-        "0": {"memory_mb": 512}
-    }
 
     def setUp(self):
         super().setUp()
@@ -45,25 +40,21 @@ class TestEnrollment(testlib.MachineCase):
         """Test that Flight Control enrollment is displayed correctly"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_enrollment_step(b)
 
-        b.wait_in_text("#enrollmentStep", "Flight Control")
+        b.wait_in_text("#enrollment-content", "Flight Control enrollment")
 
     def testEnrollmentServiceSelection(self):
         """Test selecting and deselecting Flight Control enrollment"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_enrollment_step(b)
 
         toggle = "label[for='flightctl-enrollment']"
         switch = "#flightctl-enrollment"
 
-        b.wait_visible(switch)
-        self.assertFalse(b.is_present(f"{switch}:checked"))
-
-        b.click(toggle)
         b.wait_visible(f"{switch}:checked")
         b.wait_visible("#credential-token")
 
@@ -71,14 +62,17 @@ class TestEnrollment(testlib.MachineCase):
         self.assertFalse(b.is_present(f"{switch}:checked"))
         b.wait_not_present("#credential-token")
 
+        b.click(toggle)
+        b.wait_visible(f"{switch}:checked")
+        b.wait_visible("#credential-token")
+
     def testEnrollmentCredentialsInput(self):
         """Test entering credentials for enrollment"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_enrollment_step(b)
 
-        b.click("label[for='flightctl-enrollment']")
         b.wait_visible("#flightctl-enrollment:checked")
 
         b.set_input_text("#credential-token", "test-token")
@@ -88,12 +82,10 @@ class TestEnrollment(testlib.MachineCase):
         """Test overriding the enrollment endpoint URL"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_enrollment_step(b)
 
-        b.click("label[for='flightctl-enrollment']")
         b.wait_visible("#flightctl-enrollment:checked")
-
         b.wait_visible("#endpoint-flightctl")
         self.assertEqual(b.val("#endpoint-flightctl"), "https://test.example.com")
 
@@ -104,10 +96,9 @@ class TestEnrollment(testlib.MachineCase):
         """Test switching between token and password auth methods"""
         b = self.browser
 
-        self.login_and_go("/system-onboarding")
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_enrollment_step(b)
 
-        b.click("label[for='flightctl-enrollment']")
         b.wait_visible("#flightctl-enrollment:checked")
 
         b.click("#auth-password")

@@ -39,6 +39,7 @@ interface ReviewPageProps {
 }
 
 interface ReviewSectionCardProps {
+    id?: string;
     title: string;
     editStepId: WizardStepId;
     editAriaLabel: string;
@@ -184,6 +185,7 @@ const EnrollmentCardBody = ({
 };
 
 const ReviewSectionCard = ({
+    id,
     title,
     editStepId,
     editAriaLabel,
@@ -219,6 +221,7 @@ const ReviewSectionCard = ({
                     </StackItem>
                     <StackItem>
                         <DescriptionList
+                            id={id}
                             orientation={REVIEW_DESCRIPTION_LIST_ORIENTATION}
                             style={REVIEW_DESCRIPTION_LIST_TERM_WIDTH_STYLE}
                         >
@@ -295,7 +298,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
 
             {isSingleNic && (
                 <StackItem>
-                    <Alert variant="warning" isInline title={_("Connection will be interrupted")}>
+                    <Alert id="review-singlenic-warning" variant="warning" isInline title={_("Connection will be interrupted")}>
                         {_(
                             "You are applying changes to the interface serving this browser session. Your connection will drop when the new network profile is activated. The remaining steps (connectivity test, enrollment, and cleanup) will continue in the background automatically."
                         )}
@@ -307,6 +310,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
                 <Stack hasGutter>
                     <StackItem>
                         <ReviewSectionCard
+                            id="review-network"
                             title={_("Network")}
                             editStepId={WIZARD_STEP_IDS.network}
                             editAriaLabel={_("Edit network configuration")}
@@ -455,6 +459,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
 
                     <StackItem>
                         <ReviewSectionCard
+                            id="review-network-services"
                             title={_("Network services")}
                             editStepId={WIZARD_STEP_IDS.networkServices}
                             editAriaLabel={_("Edit network services")}
@@ -506,6 +511,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
 
                     <StackItem>
                         <ReviewSectionCard
+                            id="review-enrollment"
                             title={_("Enrollment")}
                             editStepId={WIZARD_STEP_IDS.enrollment}
                             editAriaLabel={_("Edit enrollment")}
@@ -559,6 +565,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
 
                     <StackItem>
                         <ReviewSectionCard
+                            id="review-device-labels"
                             title={_("Device labels")}
                             editStepId={WIZARD_STEP_IDS.labels}
                             editAriaLabel={_("Edit device labels")}

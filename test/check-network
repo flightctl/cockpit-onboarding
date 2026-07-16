@@ -19,21 +19,7 @@
 
 import testlib
 
-IFACE_TABLE = "table[aria-label='Network interface selector']"
-HELPER_TEXT_ERROR = ".pf-v6-c-form__helper-text .pf-m-error"
-
-
-def iface_row_selector(browser, table, interface):
-    """Return a CSS selector for the table row whose Name cell matches interface.
-
-    Avoids jQuery's :contains(), which isn't available on this app's pages.
-    """
-    names = browser.eval_js(
-        f"Array.from(document.querySelectorAll(\"{table} td[data-label='Name']\"))"
-        ".map(e => e.textContent)"
-    )
-    row = names.index(interface) + 1
-    return f"{table} tbody tr:nth-child({row})"
+from wizard_navigation import IFACE_TABLE, iface_row_selector
 
 
 @testlib.nondestructive
@@ -117,10 +103,10 @@ class TestNetworkInterface(testlib.MachineCase):
         self.assertEqual(b.val(vlan_input), "4094")
 
         b.set_input_text(vlan_input, "0")
-        b.wait_in_text(HELPER_TEXT_ERROR, "VLAN ID must be a number between 1 and 4094")
+        b.wait_in_text("#vlan-id-input-helper-error", "VLAN ID must be a number between 1 and 4094")
 
         b.set_input_text(vlan_input, "4095")
-        b.wait_in_text(HELPER_TEXT_ERROR, "VLAN ID must be a number between 1 and 4094")
+        b.wait_in_text("#vlan-id-input-helper-error", "VLAN ID must be a number between 1 and 4094")
 
 
 @testlib.nondestructive
@@ -153,7 +139,7 @@ class TestSingleNic(testlib.MachineCase):
             b.click(iface_radio)
 
         b.wait_in_text(
-            ".pf-v6-c-alert.pf-m-warning",
+            "#setup-iface-warning",
             "You are currently connected through this interface"
         )
 
@@ -181,21 +167,21 @@ class TestIPConfiguration(testlib.MachineCase):
         b.set_input_text("#ipv4-address", "1.1.1.1")
         b.set_input_text("#ipv4-address", "")
         b.focus("#subnet-mask")
-        b.wait_in_text(HELPER_TEXT_ERROR, "IPv4 address is required")
+        b.wait_in_text("#ipv4-address-helper-error", "IPv4 address is required")
 
         b.set_input_text("#ipv4-address", "192.168.1")
         b.focus("#subnet-mask")
-        b.wait_in_text(HELPER_TEXT_ERROR, "Invalid IPv4 address format")
+        b.wait_in_text("#ipv4-address-helper-error", "Invalid IPv4 address format")
 
         b.set_input_text("#ipv4-address", "256.1.1.1")
         b.focus("#subnet-mask")
-        b.wait_in_text(HELPER_TEXT_ERROR, "IPv4 octets must be between 0 and 255")
+        b.wait_in_text("#ipv4-address-helper-error", "IPv4 octets must be between 0 and 255")
 
         b.set_input_text("#ipv4-address", "192.168.1.100")
 
         b.set_input_text("#subnet-mask", "255.0.255.0")
         b.focus("#gateway-ip")
-        b.wait_in_text(HELPER_TEXT_ERROR, "must have consecutive 1s followed by 0s")
+        b.wait_in_text("#subnet-mask-helper-error", "must have consecutive 1s followed by 0s")
 
         b.set_input_text("#subnet-mask", "255.255.255.0")
         b.set_input_text("#gateway-ip", "192.168.1.1")
@@ -224,15 +210,15 @@ class TestIPConfiguration(testlib.MachineCase):
         b.set_input_text("#ipv6-address", "2001:db8::1/64")
         b.set_input_text("#ipv6-address", "")
         b.focus("#gateway-ipv6")
-        b.wait_in_text(HELPER_TEXT_ERROR, "IPv6 address is required")
+        b.wait_in_text("#ipv6-address-helper-error", "IPv6 address is required")
 
         b.set_input_text("#ipv6-address", "gggg::/64")
         b.focus("#gateway-ipv6")
-        b.wait_in_text(HELPER_TEXT_ERROR, "Invalid IPv6 address format")
+        b.wait_in_text("#ipv6-address-helper-error", "Invalid IPv6 address format")
 
         b.set_input_text("#ipv6-address", "2001:db8::1/129")
         b.focus("#gateway-ipv6")
-        b.wait_in_text(HELPER_TEXT_ERROR, "IPv6 prefix must be between 0 and 128")
+        b.wait_in_text("#ipv6-address-helper-error", "IPv6 prefix must be between 0 and 128")
 
         b.set_input_text("#ipv6-address", "2001:db8::1/64")
 
@@ -248,7 +234,7 @@ class TestIPConfiguration(testlib.MachineCase):
 
         b.set_input_text("#gateway-ipv6", "fe80::1")
         b.focus("#ipv6-address")
-        b.wait_in_text(HELPER_TEXT_ERROR, "Gateway cannot be a link-local address")
+        b.wait_in_text("#gateway-ipv6-helper-error", "Gateway cannot be a link-local address")
 
         b.set_input_text("#gateway-ipv6", "2001:db8::ffff")
 
