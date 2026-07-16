@@ -22,7 +22,7 @@ const SetupInterfaceAlert = ({ isWifi }: { isWifi: boolean }) => {
               "Applying network changes to this interface will disconnect your browser session. After applying, unplug the ethernet cable from this device and connect it to your production network. The wizard will wait up to 5 minutes for the new connection before rolling back."
           );
     return (
-        <Alert variant="warning" isInline title={_("You are currently connected through this interface")}>
+        <Alert id="setup-iface-warning" variant="warning" isInline title={_("You are currently connected through this interface")}>
             {message}
         </Alert>
     );

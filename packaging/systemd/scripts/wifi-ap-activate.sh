@@ -12,4 +12,4 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 ip addr add "${WIFI_AP_ADDRESS}/${WIFI_AP_NETMASK}" dev "$IFACE"
 
 # Add the interface to the onboarding firewalld zone (best-effort)
-firewall-cmd --zone=flightctl-onboarding-ap --add-interface="$IFACE" 2>/dev/null || true
+firewall-cmd --zone=fc-onboarding-ap --add-interface="$IFACE" 2>/dev/null || true

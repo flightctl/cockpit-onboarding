@@ -175,8 +175,8 @@ nmcli connection up "$CONNECTION_ID"
 # for carrier, then 30 retries at 2s intervals (~60 seconds) for connectivity.
 # Carrier is checked on the physical interface, not the VLAN subinterface.
 CARRIER_FILE="/sys/class/net/${INTERFACE_NAME}/carrier"
-CARRIER_TIMEOUT=300
-CONNECTIVITY_TIMEOUT=30
+CARRIER_TIMEOUT=$(jq -r '.carrierTimeoutSeconds // 300' "$PARAMS_FILE")
+CONNECTIVITY_TIMEOUT=$(jq -r '.connectivityRetries // 30' "$PARAMS_FILE")
 
 if [ -n "$INTERFACE_NAME" ] && [ -f "$CARRIER_FILE" ]; then
     log "Waiting for link carrier on $INTERFACE_NAME (up to ${CARRIER_TIMEOUT}s)..."

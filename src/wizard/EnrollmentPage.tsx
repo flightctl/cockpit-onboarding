@@ -133,7 +133,7 @@ export const EnrollmentPage = () => {
     };
 
     return (
-        <Stack hasGutter>
+        <Stack id="enrollment-content" hasGutter>
             <StackItem>
                 <Title headingLevel="h2" size="md">
                     {cockpit.format(_("$0 enrollment"), brandName)}

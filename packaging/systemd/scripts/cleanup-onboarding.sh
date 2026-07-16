@@ -61,10 +61,10 @@ done
 
 # Remove the dedicated firewalld zone if it exists
 if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
-    if firewall-cmd --permanent --info-zone=flightctl-onboarding-ap >/dev/null 2>&1; then
-        firewall-cmd --permanent --delete-zone=flightctl-onboarding-ap
+    if firewall-cmd --permanent --info-zone=fc-onboarding-ap >/dev/null 2>&1; then
+        firewall-cmd --permanent --delete-zone=fc-onboarding-ap
         firewall-cmd --reload
-        echo "Removed firewalld zone 'flightctl-onboarding-ap'"
+        echo "Removed firewalld zone 'fc-onboarding-ap'"
     fi
 fi
 

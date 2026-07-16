@@ -492,6 +492,7 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
                             }
                         >
                             <Button
+                                id="wifi-rescan"
                                 variant="link"
                                 onClick={handleRescan}
                                 icon={<WifiIcon />}
@@ -581,12 +582,16 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
 export const NetworkVlanSelector = () => {
     const { model, updateModel } = useModelContext();
     const [vlanInputError, setVlanInputError] = React.useState<string | null>(null);
+    const [vlanIdText, setVlanIdText] = React.useState(String(model.networkInterface.vlanId ?? ""));
     const useVlan = model.networkInterface.vlanEnabled;
     const vlanError =
         vlanInputError ?? validateVlanConfig(model.networkInterface.vlanEnabled, model.networkInterface.vlanId);
 
     const onToggleUseVlan = (enabled: boolean) => {
         setVlanInputError(null);
+        if (!enabled) {
+            setVlanIdText("");
+        }
         updateModel("networkInterface", {
             vlanEnabled: enabled,
             vlanId: enabled ? model.networkInterface.vlanId : null,
@@ -594,6 +599,8 @@ export const NetworkVlanSelector = () => {
     };
 
     const onVlanIdChange = (_event: React.FormEvent<HTMLInputElement>, valStr: string) => {
+        setVlanIdText(valStr);
+
         if (!valStr.trim()) {
             setVlanInputError(null);
             updateModel("networkInterface", { vlanId: null });
@@ -613,10 +620,10 @@ export const NetworkVlanSelector = () => {
 
     return (
         <FeatureSwitch fieldId="vlan-id" label={_("VLAN ID")} isChecked={useVlan} onToggle={onToggleUseVlan}>
-            <FormGroup label={_("VLAN ID")} isRequired fieldId="vlan-id">
+            <FormGroup label={_("VLAN ID")} isRequired fieldId="vlan-id-input">
                 <ValidatedTextInput
-                    id="vlan-id"
-                    value={model.networkInterface.vlanId || ""}
+                    id="vlan-id-input"
+                    value={vlanIdText}
                     error={vlanError}
                     isRequired
                     placeholder={_("Enter a number from 1-4094")}

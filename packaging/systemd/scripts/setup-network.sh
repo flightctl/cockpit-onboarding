@@ -77,6 +77,7 @@ if command -v dnsmasq >/dev/null 2>&1; then
     cat > "$DNSMASQ_CONF" <<EOF
 interface=${ETHERNET_INTERFACE}
 bind-interfaces
+except-interface=lo
 dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_NETMASK},1h
 dhcp-option=3,${STATIC_IP}
 dhcp-option=6,${STATIC_IP}

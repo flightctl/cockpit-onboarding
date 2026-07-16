@@ -26,6 +26,8 @@ export interface SystemOnboardingConfig {
 
 export interface ConnectivityTestConfig {
     host?: string;
+    carrierTimeoutSeconds?: number;
+    connectivityRetries?: number;
 }
 
 export interface FlightctlConfig {

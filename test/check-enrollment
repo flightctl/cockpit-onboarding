@@ -1,0 +1,120 @@
+#!/usr/bin/python3 -cimport os, sys; os.execv(os.path.dirname(sys.argv[1]) + "/common/pywrap", sys.argv)
+
+"""
+Integration test for enrollment functionality
+
+Tests the Flight Control enrollment page UI.
+"""
+
+from __future__ import annotations
+
+import json
+
+import testlib
+
+from wizard_navigation import navigate_to_enrollment_step
+
+
+@testlib.nondestructive
+class TestEnrollment(testlib.MachineCase):
+    """Test Flight Control enrollment selection and credential input"""
+
+    def setUp(self):
+        super().setUp()
+
+        self.config = {
+            "version": "1.0",
+            "runOnce": False,
+            "hideModules": False,
+            "flightctl": {
+                "defaultEndpoint": "https://test.example.com"
+            }
+        }
+
+        self.machine.write(
+            "/etc/cockpit/system-onboarding/config.json",
+            json.dumps(self.config)
+        )
+
+    def testEnrollmentPageDisplay(self):
+        """Test that Flight Control enrollment is displayed correctly"""
+        b = self.browser
+
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
+        navigate_to_enrollment_step(b)
+
+        b.wait_in_text("#enrollment-content", "Flight Control enrollment")
+
+    def testEnrollmentServiceSelection(self):
+        """Test selecting and deselecting Flight Control enrollment"""
+        b = self.browser
+
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
+        navigate_to_enrollment_step(b)
+
+        toggle = "label[for='flightctl-enrollment']"
+        switch = "#flightctl-enrollment"
+
+        b.wait_visible(f"{switch}:checked")
+        b.wait_visible("#credential-token")
+
+        b.click(toggle)
+        self.assertFalse(b.is_present(f"{switch}:checked"))
+        b.wait_not_present("#credential-token")
+
+        b.click(toggle)
+        b.wait_visible(f"{switch}:checked")
+        b.wait_visible("#credential-token")
+
+    def testEnrollmentCredentialsInput(self):
+        """Test entering credentials for enrollment"""
+        b = self.browser
+
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
+        navigate_to_enrollment_step(b)
+
+        b.wait_visible("#flightctl-enrollment:checked")
+
+        b.set_input_text("#credential-token", "test-token")
+        self.assertEqual(b.val("#credential-token"), "test-token")
+
+    def testEnrollmentEndpointOverride(self):
+        """Test overriding the enrollment endpoint URL"""
+        b = self.browser
+
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
+        navigate_to_enrollment_step(b)
+
+        b.wait_visible("#flightctl-enrollment:checked")
+        b.wait_visible("#endpoint-flightctl")
+        self.assertEqual(b.val("#endpoint-flightctl"), "https://test.example.com")
+
+        b.set_input_text("#endpoint-flightctl", "https://custom.example.com")
+        self.assertEqual(b.val("#endpoint-flightctl"), "https://custom.example.com")
+
+    def testEnrollmentCredentialsValidation(self):
+        """Test switching between token and password auth methods"""
+        b = self.browser
+
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
+        navigate_to_enrollment_step(b)
+
+        b.wait_visible("#flightctl-enrollment:checked")
+
+        b.click("#auth-password")
+        b.wait_visible("#credential-username")
+        b.wait_visible("#credential-password")
+
+        b.set_input_text("#credential-username", "testuser")
+        b.set_input_text("#credential-password", "testpassword")
+
+        self.assertEqual(b.val("#credential-username"), "testuser")
+        self.assertEqual(b.val("#credential-password"), "testpassword")
+
+        b.click("#auth-token")
+        b.wait_visible("#credential-token")
+        b.wait_not_present("#credential-username")
+
+
+if __name__ == '__main__':
+    testlib.test_main()

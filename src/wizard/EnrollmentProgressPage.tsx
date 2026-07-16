@@ -571,6 +571,8 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             hostname: model.hostname.value,
             originalHostname,
             connectivityTestHost: model.connectivityTestHost,
+            carrierTimeoutSeconds: config?.connectivityTest?.carrierTimeoutSeconds ?? 300,
+            connectivityRetries: config?.connectivityTest?.connectivityRetries ?? 30,
         };
         const masterParamsFile = await createSecureTempFile(JSON.stringify(masterParams), ".onboarding-apply-");
         tempFilesToCleanup.push(masterParamsFile);
@@ -937,7 +939,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
     };
 
     return (
-        <Stack hasGutter>
+        <Stack id="apply-content" hasGutter>
             <StackItem>
                 <p>
                     {isEnrollmentSelected
@@ -950,6 +952,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 <Card>
                     <CardBody>
                         <Progress
+                            id="apply-progress"
                             title={_("Overall progress")}
                             value={overallProgress}
                             size="lg"
@@ -959,7 +962,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                         <Title headingLevel="h3" size="md" className="pf-v6-u-mt-md">
                             {_("Steps")}
                         </Title>
-                        <List isPlain className="pf-v6-u-mt-sm">
+                        <List isPlain id="apply-steps" className="pf-v6-u-mt-sm">
                             {steps.map((step) => {
                                 const isFlightctlStep = step.id === `enroll-${FLIGHTCTL_SERVICE_ID}`;
                                 const statusLabel = getStepStatusLabel(step.status);
@@ -1029,7 +1032,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                         </List>
 
                         {executionState === "failed" && (
-                            <Alert variant="danger" title={_("Enrollment failed")} className="pf-v6-u-mt-md">
+                            <Alert id="apply-failure-alert" variant="danger" title={_("Enrollment failed")} className="pf-v6-u-mt-md">
                                 {delegatedFailureMessage ? (
                                     <Stack hasGutter>
                                         <StackItem>
@@ -1052,6 +1055,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                         )}
                         {executionState === "success" && !singleNic && (
                             <Alert
+                                id="apply-success-alert"
                                 variant="success"
                                 title={_("Configuration completed successfully")}
                                 className="pf-v6-u-mt-md"
@@ -1061,6 +1065,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                         )}
                         {executionState === "success" && singleNic && (
                             <Alert
+                                id="apply-singlenic-alert"
                                 variant="info"
                                 title={_("Onboarding continues in the background")}
                                 className="pf-v6-u-mt-md"

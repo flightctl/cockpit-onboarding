@@ -1,0 +1,139 @@
+#!/bin/sh
+# WiFi-enabled image customization for Fedora test VMs
+# Extends the base vm.install with mac80211_hwsim WiFi simulation
+set -eux
+
+# ── Build and install RPM from uploaded tarball ───────────────────────
+dnf install -y rpm-build make gettext libappstream-glib systemd-rpm-macros nodejs
+
+SRCTARBALL=$(ls /var/tmp/flightctl-onboarding-[0-9]*.tar.xz)
+tar -xf "$SRCTARBALL" -C /var/tmp --strip-components=1 'flightctl-onboarding/flightctl-onboarding.spec'
+
+mkdir -p /var/tmp/build
+rpmbuild --define "_sourcedir /var/tmp" \
+         --define "_topdir /var/tmp/build" \
+         -bb /var/tmp/flightctl-onboarding.spec
+
+rpm -U --force --verbose /var/tmp/build/RPMS/noarch/flightctl-onboarding-*.noarch.rpm
+
+# ── Base cockpit setup (same as vm.install) ──────────────────────────
+mkdir -p /etc/cockpit
+printf "[WebService]\nAllowUnencrypted=true\n" > /etc/cockpit/cockpit.conf
+
+if systemctl is-active -q firewalld.service; then
+    firewall-cmd --add-service=cockpit --permanent
+fi
+systemctl enable cockpit.socket
+
+# ── WiFi simulation packages ─────────────────────────────────────────
+# kernel-modules-internal (which ships mac80211_hwsim.ko) and the rest of the
+# WiFi stack are already present on the Fedora cloud base image, matching the
+# running kernel. Do NOT `dnf install` here: pulling any of these in would
+# drag a newer kernel-core in as a dependency, leaving mac80211_hwsim built
+# for a kernel that isn't booted yet.
+for pkg in kernel-modules-internal NetworkManager-wifi wpa_supplicant iw \
+           wireless-regdb hostapd dnsmasq iptables-nft; do
+    rpm -q "$pkg" >/dev/null
+done
+
+# ── mac80211_hwsim module autoload (3 radios) ────────────────────────
+# Radio 1: claimed by flightctl-onboarding-setup.service (onboarding AP)
+# Radio 2: claimed by test infra AP script (test-infra-wifi SSID)
+# Radio 3: free client interface for the wizard UI
+echo "mac80211_hwsim" > /etc/modules-load.d/mac80211_hwsim.conf
+echo "options mac80211_hwsim radios=3" > /etc/modprobe.d/mac80211_hwsim.conf
+
+# ── IP forwarding for infra AP ────────────────────────────────────────
+echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-wifi-test-forward.conf
+
+# ── Infra AP setup script ─────────────────────────────────────────────
+cat > /usr/local/bin/test-wifi-infra-setup.sh <<'SETUP_EOF'
+#!/bin/bash
+set -euo pipefail
+
+NS="wifi_test_ap"
+SUBNET="10.43.0"
+
+# Clean up any previous state
+/usr/local/bin/test-wifi-infra-teardown.sh 2>/dev/null || true
+
+# Find the first NM-managed WiFi interface (not claimed by onboarding)
+IFACE=$(nmcli -t -f DEVICE,TYPE,STATE device \
+    | grep ':wifi:' \
+    | grep -v ':unmanaged' \
+    | grep -v 'p2p' \
+    | head -1 \
+    | cut -d: -f1)
+
+if [ -z "$IFACE" ]; then
+    echo "ERROR: No managed WiFi interface available for infra AP" >&2
+    exit 1
+fi
+echo "$IFACE" > /run/test-wifi-infra-iface
+
+PHY=$(cat "/sys/class/net/${IFACE}/phy80211/name")
+echo "Using ${IFACE} (${PHY}) for infrastructure AP"
+
+nmcli device disconnect "$IFACE" 2>/dev/null || true
+nmcli device set "$IFACE" managed no 2>/dev/null || true
+sleep 1
+
+ip netns add "$NS"
+iw phy "$PHY" set netns name "$NS"
+
+ip netns exec "$NS" ip link set lo up
+ip netns exec "$NS" ip link set "$IFACE" up
+ip netns exec "$NS" ip addr add "${SUBNET}.1/24" dev "$IFACE"
+
+cat > /run/test-wifi-hostapd.conf <<HAPD
+interface=${IFACE}
+driver=nl80211
+ssid=test-infra-wifi
+hw_mode=g
+channel=1
+wmm_enabled=0
+macaddr_acl=0
+auth_algs=1
+ieee80211n=1
+HAPD
+
+ip netns exec "$NS" hostapd -B /run/test-wifi-hostapd.conf \
+    -P /run/test-wifi-hostapd.pid
+sleep 1
+
+ip netns exec "$NS" dnsmasq \
+    --listen-address="${SUBNET}.1" \
+    --bind-interfaces \
+    --no-resolv --no-hosts \
+    --dhcp-range="${SUBNET}.10,${SUBNET}.50,255.255.255.0,1h" \
+    --dhcp-option="3,${SUBNET}.1" \
+    --dhcp-option="6,${SUBNET}.1" \
+    --pid-file=/run/test-wifi-dnsmasq.pid
+
+echo "Infra AP ready: SSID=test-infra-wifi on ${IFACE} in namespace ${NS}"
+SETUP_EOF
+chmod +x /usr/local/bin/test-wifi-infra-setup.sh
+
+# ── Infra AP teardown script ──────────────────────────────────────────
+cat > /usr/local/bin/test-wifi-infra-teardown.sh <<'TEARDOWN_EOF'
+#!/bin/bash
+
+NS="wifi_test_ap"
+IFACE=$(cat /run/test-wifi-infra-iface 2>/dev/null || echo "")
+
+ip netns pids "$NS" 2>/dev/null | xargs -r kill 2>/dev/null || true
+sleep 1
+
+ip netns delete "$NS" 2>/dev/null || true
+
+rm -f /run/test-wifi-hostapd.conf /run/test-wifi-hostapd.pid \
+      /run/test-wifi-dnsmasq.pid /run/test-wifi-infra-iface
+
+if [ -n "$IFACE" ]; then
+    sleep 1
+    nmcli device set "$IFACE" managed yes 2>/dev/null || true
+fi
+
+echo "Infra AP stopped"
+TEARDOWN_EOF
+chmod +x /usr/local/bin/test-wifi-infra-teardown.sh

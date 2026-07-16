@@ -140,14 +140,15 @@ DNSMASQ_CONF="$RUNTIME_DIR/dnsmasq-${WIFI_INTERFACE}.conf"
 cat > "$DNSMASQ_CONF" <<EOF
 interface=${WIFI_INTERFACE}
 bind-interfaces
+except-interface=lo
 dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_NETMASK},1h
 dhcp-option=3,${AP_ADDRESS}
 dhcp-option=6,${AP_ADDRESS}
 no-resolv
 no-hosts
 address=/#/${AP_ADDRESS}
-dhcp-leasefile=/tmp/dnsmasq.leases
-pid-file=/tmp/dnsmasq.pid
+dhcp-leasefile=/tmp/dnsmasq-${WIFI_INTERFACE}.leases
+pid-file=/tmp/dnsmasq-${WIFI_INTERFACE}.pid
 EOF
 echo "Generated dnsmasq DHCP config"
 
@@ -161,7 +162,7 @@ EOF
 # Create a dedicated firewalld zone for the AP interface if firewalld is active.
 # The zone only permits DHCP, DNS, Cockpit (9090/tcp), and captive portal (80/tcp).
 # All other inbound traffic on the AP interface is rejected.
-ONBOARDING_FW_ZONE="flightctl-onboarding-ap"
+ONBOARDING_FW_ZONE="fc-onboarding-ap"
 if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
     if ! firewall-cmd --permanent --info-zone="$ONBOARDING_FW_ZONE" >/dev/null 2>&1; then
         firewall-cmd --permanent --new-zone="$ONBOARDING_FW_ZONE"

@@ -564,7 +564,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                             isNextDisabled: !isReviewStepValid,
                             isCancelHidden: true,
                             // onMouseDown runs before Next navigation checks whether the progress step is enabled
-                            nextButtonProps: { onMouseDown: authorizeApply },
+                            nextButtonProps: { id: "wizard-next-btn", onMouseDown: authorizeApply },
                         }}
                         isDisabled={isStepDisabled(WIZARD_STEP_IDS.review)}
                     >
