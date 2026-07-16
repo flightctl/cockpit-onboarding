@@ -7,9 +7,6 @@ License: LGPL-2.1-or-later
 Source0: https://github.com/flightctl/cockpit-onboarding/releases/download/v%{version}/%{name}-%{version}.tar.xz
 Source1: https://github.com/flightctl/cockpit-onboarding/releases/download/v%{version}/%{name}-node-%{version}.tar.xz
 BuildArch: noarch
-%if ! 0%{?suse_version}
-ExclusiveArch: %{nodejs_arches} noarch
-%endif
 %if ! 0%{?rhel} || 0%{?rhel} >= 10
 BuildRequires: nodejs >= 18
 %endif
