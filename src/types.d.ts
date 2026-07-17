@@ -194,6 +194,7 @@ export interface ServiceEnrollmentConfig {
     useExisting?: boolean;
     tlsMode?: TlsMode;
     caCertPem?: string;
+    authCaCertPem?: string;
 }
 
 export type GenericLabel = { key: string; value: string };

@@ -14,12 +14,15 @@ import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { ClipboardCopy } from "@patternfly/react-core/dist/esm/components/ClipboardCopy/index.js";
+import { ExpandableSection } from "@patternfly/react-core/dist/esm/components/ExpandableSection/index.js";
 import { FileUpload } from "@patternfly/react-core/dist/esm/components/FileUpload/index.js";
+import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/components/HelperText/index.js";
 import { Popover } from "@patternfly/react-core/dist/esm/components/Popover/index.js";
 import { TextArea } from "@patternfly/react-core/dist/esm/components/TextArea/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 import HelpIcon from "@patternfly/react-icons/dist/esm/icons/help-icon";
+import InfoCircleIcon from "@patternfly/react-icons/dist/esm/icons/info-circle-icon";
 
 import { useModelContext } from "../model-context";
 import { useConfig } from "../app";
@@ -53,6 +56,8 @@ export const EnrollmentPage = () => {
     const [endpointTouched, setEndpointTouched] = useState(false);
     const [endpointError, setEndpointError] = useState<string | undefined>();
     const [caFilename, setCaFilename] = useState("");
+    const [authCaFilename, setAuthCaFilename] = useState("");
+    const [authCaExpanded, setAuthCaExpanded] = useState(false);
 
     const credentials = enrollment.credentials;
     const authMethod = credentials?.authMethod ?? "token";
@@ -428,6 +433,52 @@ export const EnrollmentPage = () => {
                                                                                                 {_("Where can I find the CA certificate?")}
                                                                                             </Button>
                                                                                         </Popover>
+                                                                                    </StackItem>
+                                                                                    <StackItem>
+                                                                                        <ExpandableSection
+                                                                                            toggleText={_("Use a separate CA for authentication")}
+                                                                                            isExpanded={authCaExpanded}
+                                                                                            onToggle={(_ev, expanded) => setAuthCaExpanded(expanded)}
+                                                                                        >
+                                                                                            <Stack hasGutter>
+                                                                                                <StackItem>
+                                                                                                    <HelperText>
+                                                                                                        <HelperTextItem icon={<InfoCircleIcon />}>
+                                                                                                            {_("Only required when the authentication provider uses a different CA than the API server, such as OpenShift OAuth or an external identity provider.")}
+                                                                                                        </HelperTextItem>
+                                                                                                    </HelperText>
+                                                                                                </StackItem>
+                                                                                                <StackItem>
+                                                                                                    <FormGroup label={_("Auth CA certificate (PEM)")}>
+                                                                                                        <FileUpload
+                                                                                                            id="auth-ca-cert-pem"
+                                                                                                            type="text"
+                                                                                                            value={enrollment.authCaCertPem ?? ""}
+                                                                                                            filename={authCaFilename}
+                                                                                                            onFileInputChange={(_event, file) =>
+                                                                                                                setAuthCaFilename(file.name)
+                                                                                                            }
+                                                                                                            onDataChange={(_event, value) =>
+                                                                                                                updateEnrollment({ authCaCertPem: value })
+                                                                                                            }
+                                                                                                            onTextChange={(_event, value) =>
+                                                                                                                updateEnrollment({ authCaCertPem: value })
+                                                                                                            }
+                                                                                                            onClearClick={() => {
+                                                                                                                updateEnrollment({ authCaCertPem: "" });
+                                                                                                                setAuthCaFilename("");
+                                                                                                            }}
+                                                                                                            allowEditingUploadedText
+                                                                                                            browseButtonText={_("Browse...")}
+                                                                                                            clearButtonText={_("Clear")}
+                                                                                                            dropzoneProps={{
+                                                                                                                accept: { "application/x-pem-file": [".pem", ".crt", ".cer"] },
+                                                                                                            }}
+                                                                                                        />
+                                                                                                    </FormGroup>
+                                                                                                </StackItem>
+                                                                                            </Stack>
+                                                                                        </ExpandableSection>
                                                                                     </StackItem>
                                                                                 </Stack>
                                                                             )

@@ -51,6 +51,7 @@ if [ -n "${1:-}" ] && [ -f "$1" ]; then
     ENROLLMENT_PROXY_NO_PROXY=$(jq -r '.ENROLLMENT_PROXY_NO_PROXY // empty' "$1")
     ENROLLMENT_TLS_MODE=$(jq -r '.ENROLLMENT_TLS_MODE // "system"' "$1")
     ENROLLMENT_CA_CERT_PEM=$(jq -r '.ENROLLMENT_CA_CERT_PEM // empty' "$1")
+    ENROLLMENT_AUTH_CA_CERT_PEM=$(jq -r '.ENROLLMENT_AUTH_CA_CERT_PEM // empty' "$1")
     export ENROLLMENT_SERVICE_ID ENROLLMENT_SERVICE_NAME ENROLLMENT_ENDPOINT
     rm -f "$1"
 fi
@@ -154,10 +155,15 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
     elif [ "${ENROLLMENT_TLS_MODE:-system}" = "customCa" ] && [ -n "${ENROLLMENT_CA_CERT_PEM:-}" ]; then
         echo "$ENROLLMENT_CA_CERT_PEM" > "$TMPDIR/ca.crt"
         chmod 600 "$TMPDIR/ca.crt"
-        # --certificate-authority validates the management API connection;
-        # --auth-certificate-authority separately validates the auth/OIDC
-        # provider connection made during login. Both are the same CA here.
-        TLS_ARGS+=("--certificate-authority" "$TMPDIR/ca.crt" "--auth-certificate-authority" "$TMPDIR/ca.crt")
+        TLS_ARGS+=("--certificate-authority" "$TMPDIR/ca.crt")
+
+        if [ -n "${ENROLLMENT_AUTH_CA_CERT_PEM:-}" ]; then
+            echo "$ENROLLMENT_AUTH_CA_CERT_PEM" > "$TMPDIR/auth-ca.crt"
+            chmod 600 "$TMPDIR/auth-ca.crt"
+            TLS_ARGS+=("--auth-certificate-authority" "$TMPDIR/auth-ca.crt")
+        else
+            TLS_ARGS+=("--auth-certificate-authority" "$TMPDIR/ca.crt")
+        fi
     fi
 
     # Write credentials JSON to a temp file for --credentials-file
