@@ -7,9 +7,13 @@ Provisions two VMs:
   - machine1: the onboarding device (WiFi image with flightctl-agent + CLI)
   - services: a Flight Control server (flightctl-services RPM)
 
-Both VMs get a second ethernet NIC on a dedicated mcast L2 segment (the
-"production" network).  The wizard selects that NIC on machine1, configures
-it with a static IP, and enrolls against the services VM.
+machine1 gets a second ethernet NIC hot-plugged onto the same mcast network
+already used for the base test network (see add_netiface_with_localaddr()
+below), so the wizard has an unconfigured interface to select as
+"production". services is already reachable on that same network via its
+base interface and just gets a second static IP added there. The wizard
+configures machine1's new interface with a static IP and enrolls against
+the services VM.
 """
 
 from __future__ import annotations
@@ -28,14 +32,26 @@ from wizard_navigation import (
 AGENT_CONFIG = "/etc/flightctl/config.yaml"
 TEST_DIR = os.path.dirname(__file__)
 
-PROD_MCAST_PORT = 57931
 
-PROD_NIC_XML = """
-    <qemu:arg value='-netdev'/>
-    <qemu:arg value='socket,mcast=230.0.0.1:{mcast},id=prodnet,localaddr=127.0.0.1'/>
-    <qemu:arg value='-device'/>
-    <qemu:arg value='virtio-net-pci,netdev=prodnet,mac={mac},bus=pci.0,addr=0x07'/>
-"""
+def add_netiface_with_localaddr(machine, networking):
+    """Hot-plug a NIC onto the shared mcast test network, bound to loopback
+
+    Machine.add_netiface() (bots/machine/machine_core/machine_virtual.py)
+    omits localaddr=127.0.0.1 from its netdev_add call, unlike the mcast NIC
+    QEMU is booted with. Without it, QEMU sends multicast traffic out via the
+    default route interface instead of loopback, so a hot-plugged NIC can't
+    reach other VMs on the same mcast group. bots/ is vendored and not
+    patchable here, so this replicates add_netiface() with the fix inlined.
+    """
+    machine._qemu_monitor(
+        "netdev_add socket,mcast=230.0.0.1:{mcast},localaddr=127.0.0.1,id={id}".format(
+            mcast=networking["mcast"], id=networking["hostnet"]
+        )
+    )
+    machine._qemu_monitor(
+        f"device_add virtio-net-pci,mac={networking['mac']},netdev={networking['hostnet']}"
+    )
+    return networking["mac"]
 
 
 class TestEnrollmentE2E(testlib.MachineCase):
@@ -45,9 +61,6 @@ class TestEnrollmentE2E(testlib.MachineCase):
     MACHINE_IP = "10.111.118.2"
     SUBNET_MASK = "255.255.240.0"
     BASE_DOMAIN = "e2e-flightctl.test"
-
-    MACHINE1_PROD_MAC = "52:54:02:00:00:01"
-    SERVICES_PROD_MAC = "52:54:02:00:00:02"
 
     provision = {
         'machine1': {
@@ -61,41 +74,37 @@ class TestEnrollmentE2E(testlib.MachineCase):
         },
     }
 
-    def new_machine(self, image=None, **kwargs):
-        machine = super().new_machine(image=image, **kwargs)
-        if image and 'services' in image:
-            mac = self.SERVICES_PROD_MAC
-        else:
-            mac = self.MACHINE1_PROD_MAC
-        extra_xml = PROD_NIC_XML.format(mcast=PROD_MCAST_PORT, mac=mac)
-        machine.networking["ethernet"] += extra_xml
-        return machine
-
     def setUp(self):
         super().setUp()
 
         m = self.machine
         services = self.machines['services']
 
-        mac_lower = self.MACHINE1_PROD_MAC.lower()
+        # machine1 needs a NIC distinct from the one Cockpit is reached over,
+        # so the wizard has an unconfigured interface to select as
+        # "production". services is already reachable on the shared mcast
+        # network via its base interface, so it just gets a second static IP
+        # added there instead of a whole new NIC.
+        machine1_mac = add_netiface_with_localaddr(m, self.network.interface())
+        m.execute("udevadm settle")
+
         self.production_iface = m.execute(
-            f"grep -l '{mac_lower}' /sys/class/net/*/address"
+            f"grep -l '{machine1_mac.lower()}' /sys/class/net/*/address"
             " | head -1 | cut -d / -f 5"
         ).strip()
 
-        services_mac = self.SERVICES_PROD_MAC.lower()
-        services_prod_iface = services.execute(
-            f"grep -l '{services_mac}' /sys/class/net/*/address"
+        services_base_iface = services.execute(
+            f"grep -l '{services.networking['mac'].lower()}' /sys/class/net/*/address"
             " | head -1 | cut -d / -f 5"
         ).strip()
         services.execute(
-            f"nmcli con add type ethernet ifname {services_prod_iface}"
+            f"nmcli con add type ethernet ifname {services_base_iface}"
             f" con-name production ipv4.method manual"
             f" ipv4.addresses {self.SERVICES_IP}/20"
             f" ipv4.gateway ''"
             f" connection.autoconnect yes"
         )
-        services.execute(f"nmcli con up production")
+        services.execute("nmcli con up production")
 
         # dnsmasq (serving BASE_DOMAIN, baked into the image by
         # vm-flightctl-services.install) binds to the production IP, which
