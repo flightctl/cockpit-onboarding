@@ -16,6 +16,13 @@ rpmbuild --define "_sourcedir /var/tmp" \
 
 rpm -U --force --verbose /var/tmp/build/RPMS/noarch/flightctl-onboarding-*.noarch.rpm
 
+# ── Install flightctl agent + CLI from COPR (needed for e2e enrollment) ──
+FEDORA_VERSION=43
+COPR_REPO_URL="https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-${FEDORA_VERSION}/flightctl-redhat-et-flightctl-dev-fedora-${FEDORA_VERSION}.repo"
+dnf install -y dnf-plugins-core
+dnf config-manager addrepo --from-repofile="${COPR_REPO_URL}"
+dnf install -y flightctl-agent flightctl-cli
+
 # ── Base cockpit setup (same as vm.install) ──────────────────────────
 mkdir -p /etc/cockpit
 printf "[WebService]\nAllowUnencrypted=true\n" > /etc/cockpit/cockpit.conf

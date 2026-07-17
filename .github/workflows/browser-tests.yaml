@@ -17,7 +17,7 @@ jobs:
   check-fedora:
     name: Fedora integration tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -68,6 +68,25 @@ jobs:
         run: make vm-wifi
         env:
           PYTHONUNBUFFERED: 1
+
+      - name: Restore cached services VM image
+        id: restore-services-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: test/images/fedora-43-services
+          key: services-image-${{ hashFiles('test/vm-flightctl-services.install', 'Makefile') }}
+
+      - name: Build Flight Control services VM image
+        run: make vm-services
+        env:
+          PYTHONUNBUFFERED: 1
+
+      - name: Save services VM image cache
+        if: github.ref == 'refs/heads/main' && steps.restore-services-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: test/images/fedora-43-services
+          key: services-image-${{ hashFiles('test/vm-flightctl-services.install', 'Makefile') }}
 
       - name: Save Fedora base image cache
         if: github.ref == 'refs/heads/main' && steps.restore-image-cache.outputs.cache-hit != 'true'

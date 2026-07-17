@@ -154,7 +154,10 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
     elif [ "${ENROLLMENT_TLS_MODE:-system}" = "customCa" ] && [ -n "${ENROLLMENT_CA_CERT_PEM:-}" ]; then
         echo "$ENROLLMENT_CA_CERT_PEM" > "$TMPDIR/ca.crt"
         chmod 600 "$TMPDIR/ca.crt"
-        TLS_ARGS+=("--certificate-authority" "$TMPDIR/ca.crt")
+        # --certificate-authority validates the management API connection;
+        # --auth-certificate-authority separately validates the auth/OIDC
+        # provider connection made during login. Both are the same CA here.
+        TLS_ARGS+=("--certificate-authority" "$TMPDIR/ca.crt" "--auth-certificate-authority" "$TMPDIR/ca.crt")
     fi
 
     # Write credentials JSON to a temp file for --credentials-file
