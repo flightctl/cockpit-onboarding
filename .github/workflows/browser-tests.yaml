@@ -17,7 +17,7 @@ jobs:
   check-fedora:
     name: Fedora integration tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -66,6 +66,11 @@ jobs:
 
       - name: Build WiFi test VM image
         run: make vm-wifi
+        env:
+          PYTHONUNBUFFERED: 1
+
+      - name: Build Flight Control services VM image
+        run: make vm-services
         env:
           PYTHONUNBUFFERED: 1
 

@@ -1,0 +1,130 @@
+#!/bin/sh
+# Image customization script for a Fedora VM running Flight Control services.
+# Used by bots/image-customize to build a qcow2 with all services pre-pulled
+# and ready to start via `systemctl start flightctl.target`.
+set -eux
+
+FEDORA_VERSION=43
+COPR_REPO_URL="https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-${FEDORA_VERSION}/flightctl-redhat-et-flightctl-dev-fedora-${FEDORA_VERSION}.repo"
+
+# Fixed production-network identity for this image. check-enrollment-e2e
+# brings up a second NIC at this address before starting flightctl.target.
+SERVICES_IP="10.111.118.1"
+BASE_DOMAIN="e2e-flightctl.test"
+
+# ── Install flightctl-services and CLI from COPR ────────────────────────
+dnf install -y dnf-plugins-core
+dnf config-manager addrepo --from-repofile="${COPR_REPO_URL}"
+dnf install -y flightctl-services flightctl-cli dnsmasq
+
+# ── Firewall: allow HTTPS gateway port and DNS ───────────────────────────
+if systemctl is-active -q firewalld.service; then
+    firewall-cmd --add-port=443/tcp --permanent
+    firewall-cmd --add-port=53/tcp --permanent
+    firewall-cmd --add-port=53/udp --permanent
+    firewall-cmd --reload
+fi
+
+# ── DNS: resolve the base domain to this VM's production IP ─────────────
+# Both test VMs are cloned from the same base image and get the same
+# auto-generated hostname, so the OIDC issuer must not default to that
+# hostname. A dedicated base domain, served locally over DNS, keeps the
+# issuer URL resolvable without hardcoding it via /etc/hosts on the client.
+echo "${SERVICES_IP} ${BASE_DOMAIN}" >> /etc/hosts
+mkdir -p /etc/dnsmasq.d
+cat > /etc/dnsmasq.d/e2e.conf <<EOF
+address=/${BASE_DOMAIN}/${SERVICES_IP}
+listen-address=127.0.0.1,${SERVICES_IP}
+bind-interfaces
+no-resolv
+EOF
+systemctl enable dnsmasq
+
+# ── Set the deployment base domain and API cert SANs ─────────────────────
+python3 -c "
+import yaml
+f = '/etc/flightctl/service-config.yaml'
+d = yaml.safe_load(open(f))
+d['global']['baseDomain'] = '${BASE_DOMAIN}'
+yaml.safe_dump(d, open(f, 'w'))
+"
+sed -i "/host_ips+=(\"127.0.0.1\")/a\\    host_ips+=(\"${SERVICES_IP}\")" \
+    /usr/share/flightctl/init_certs.sh
+
+# ── Start services to pull all container images and initialize ──────────
+systemctl start flightctl.target
+
+# Wait for database
+timeout 120 bash -c '
+    while true; do
+        if podman ps --quiet --filter "name=flightctl-db" | grep -q . && \
+           podman exec flightctl-db pg_isready -U postgres >/dev/null 2>&1; then
+            echo "Database is ready"
+            break
+        fi
+        echo "Waiting for database..."
+        sleep 3
+    done
+'
+
+# Wait for database migration
+timeout 120 bash -c '
+    while true; do
+        if systemctl is-active --quiet flightctl-db-migrate.service; then
+            echo "Database migration completed"
+            break
+        fi
+        echo "Waiting for database migration..."
+        sleep 3
+    done
+'
+
+# Wait for key-value service
+timeout 60 bash -c '
+    while true; do
+        if podman ps --quiet --filter "name=flightctl-kv" | grep -q . && \
+           podman exec flightctl-kv redis-cli ping >/dev/null 2>&1; then
+            echo "Key-value service is ready"
+            break
+        fi
+        echo "Waiting for key-value service..."
+        sleep 2
+    done
+'
+
+# Wait for all services under flightctl.target
+timeout 120 bash -c '
+    ALL_SERVICES=$(systemctl show flightctl.target -p Wants --value \
+        | tr " " "\n" | grep -E "^flightctl-.*\.service$" | sort)
+    while true; do
+        all_active=true
+        for svc in $ALL_SERVICES; do
+            if ! systemctl is-active --quiet "$svc"; then
+                echo "Waiting for $svc..."
+                all_active=false
+                break
+            fi
+        done
+        if $all_active; then
+            echo "All services are active"
+            break
+        fi
+        sleep 3
+    done
+'
+
+# ── Create default PAM user for test authentication ─────────────────────
+PAM_USER="admin"
+PAM_PASSWORD="flightctl"
+
+podman exec flightctl-pam-issuer groupadd flightctl-admin 2>/dev/null || true
+if ! podman exec flightctl-pam-issuer id "$PAM_USER" >/dev/null 2>&1; then
+    podman exec flightctl-pam-issuer adduser "$PAM_USER"
+    podman exec flightctl-pam-issuer sh -c "echo '${PAM_USER}:${PAM_PASSWORD}' | chpasswd"
+    podman exec flightctl-pam-issuer usermod -aG flightctl-admin "$PAM_USER"
+    echo "PAM user '${PAM_USER}' created"
+fi
+
+# ── Stop services — images stay cached in podman storage ────────────────
+systemctl stop flightctl.target
+echo "Flight Control services image build complete"

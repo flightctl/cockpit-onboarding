@@ -208,7 +208,17 @@ $(WIFI_IMAGE): $(TARFILE) $(NODE_CACHE) bots test/vm-wifi.install
 vm-wifi: $(WIFI_IMAGE)
 	@echo $(WIFI_IMAGE)
 
-check-fedora: check-browser $(WIFI_IMAGE) test/common
+# Flight Control services VM for end-to-end enrollment tests
+SERVICES_IMAGE = $(CURDIR)/test/images/$(WIFI_TEST_OS)-services
+$(SERVICES_IMAGE): bots test/vm-flightctl-services.install
+	bots/image-customize --fresh \
+		--base-image $(WIFI_TEST_OS) \
+		--script $(CURDIR)/test/vm-flightctl-services.install $(WIFI_TEST_OS)-services
+
+vm-services: $(SERVICES_IMAGE)
+	@echo $(SERVICES_IMAGE)
+
+check-fedora: check-browser $(WIFI_IMAGE) $(SERVICES_IMAGE) test/common
 	TEST_OS=$(WIFI_TEST_OS) test/common/run-tests --test-glob 'check-*' ${RUN_TESTS_OPTIONS}
 
 # fail fast if the browser testlib needs isn't installed, instead of silently
@@ -290,6 +300,7 @@ help:
 	@echo "  prepare-check    Set up test VM and dependencies without running tests"
 	@echo "  vm               Build a test VM image"
 	@echo "  vm-wifi          Build a WiFi-enabled Fedora test VM image"
+	@echo "  vm-services      Build a Flight Control services VM image"
 	@echo "  check-fedora     Run all integration tests on Fedora (includes WiFi)"
 	@echo "  print-vm         Print the test VM image path"
 	@echo ""
@@ -301,4 +312,4 @@ help:
 	@echo "i18n targets:"
 	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check check-browser vm print-vm vm-wifi check-fedora deploy-test-vm install-flightctl-on-vm clean-test-vm help
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check check-browser vm print-vm vm-wifi vm-services check-fedora deploy-test-vm install-flightctl-on-vm clean-test-vm help
