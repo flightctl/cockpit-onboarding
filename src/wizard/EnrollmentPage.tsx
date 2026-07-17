@@ -14,7 +14,6 @@ import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { ClipboardCopy } from "@patternfly/react-core/dist/esm/components/ClipboardCopy/index.js";
-import { ExpandableSection } from "@patternfly/react-core/dist/esm/components/ExpandableSection/index.js";
 import { FileUpload } from "@patternfly/react-core/dist/esm/components/FileUpload/index.js";
 import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/components/HelperText/index.js";
 import { Popover } from "@patternfly/react-core/dist/esm/components/Popover/index.js";
@@ -57,7 +56,7 @@ export const EnrollmentPage = () => {
     const [endpointError, setEndpointError] = useState<string | undefined>();
     const [caFilename, setCaFilename] = useState("");
     const [authCaFilename, setAuthCaFilename] = useState("");
-    const [authCaExpanded, setAuthCaExpanded] = useState(false);
+    const [useAuthCa, setUseAuthCa] = useState(Boolean(enrollment.authCaCertPem));
 
     const credentials = enrollment.credentials;
     const authMethod = credentials?.authMethod ?? "token";
@@ -435,10 +434,17 @@ export const EnrollmentPage = () => {
                                                                                         </Popover>
                                                                                     </StackItem>
                                                                                     <StackItem>
-                                                                                        <ExpandableSection
-                                                                                            toggleText={_("Use a separate CA for authentication")}
-                                                                                            isExpanded={authCaExpanded}
-                                                                                            onToggle={(_ev, expanded) => setAuthCaExpanded(expanded)}
+                                                                                        <FeatureSwitch
+                                                                                            fieldId="auth-ca-toggle"
+                                                                                            label={_("Authentication CA certificate (PEM)")}
+                                                                                            isChecked={useAuthCa}
+                                                                                            onToggle={(checked) => {
+                                                                                                setUseAuthCa(checked);
+                                                                                                if (!checked) {
+                                                                                                    updateEnrollment({ authCaCertPem: "" });
+                                                                                                    setAuthCaFilename("");
+                                                                                                }
+                                                                                            }}
                                                                                         >
                                                                                             <Stack hasGutter>
                                                                                                 <StackItem>
@@ -449,36 +455,34 @@ export const EnrollmentPage = () => {
                                                                                                     </HelperText>
                                                                                                 </StackItem>
                                                                                                 <StackItem>
-                                                                                                    <FormGroup label={_("Auth CA certificate (PEM)")}>
-                                                                                                        <FileUpload
-                                                                                                            id="auth-ca-cert-pem"
-                                                                                                            type="text"
-                                                                                                            value={enrollment.authCaCertPem ?? ""}
-                                                                                                            filename={authCaFilename}
-                                                                                                            onFileInputChange={(_event, file) =>
-                                                                                                                setAuthCaFilename(file.name)
-                                                                                                            }
-                                                                                                            onDataChange={(_event, value) =>
-                                                                                                                updateEnrollment({ authCaCertPem: value })
-                                                                                                            }
-                                                                                                            onTextChange={(_event, value) =>
-                                                                                                                updateEnrollment({ authCaCertPem: value })
-                                                                                                            }
-                                                                                                            onClearClick={() => {
-                                                                                                                updateEnrollment({ authCaCertPem: "" });
-                                                                                                                setAuthCaFilename("");
-                                                                                                            }}
-                                                                                                            allowEditingUploadedText
-                                                                                                            browseButtonText={_("Browse...")}
-                                                                                                            clearButtonText={_("Clear")}
-                                                                                                            dropzoneProps={{
-                                                                                                                accept: { "application/x-pem-file": [".pem", ".crt", ".cer"] },
-                                                                                                            }}
-                                                                                                        />
-                                                                                                    </FormGroup>
+                                                                                                    <FileUpload
+                                                                                                        id="auth-ca-cert-pem"
+                                                                                                        type="text"
+                                                                                                        value={enrollment.authCaCertPem ?? ""}
+                                                                                                        filename={authCaFilename}
+                                                                                                        onFileInputChange={(_event, file) =>
+                                                                                                            setAuthCaFilename(file.name)
+                                                                                                        }
+                                                                                                        onDataChange={(_event, value) =>
+                                                                                                            updateEnrollment({ authCaCertPem: value })
+                                                                                                        }
+                                                                                                        onTextChange={(_event, value) =>
+                                                                                                            updateEnrollment({ authCaCertPem: value })
+                                                                                                        }
+                                                                                                        onClearClick={() => {
+                                                                                                            updateEnrollment({ authCaCertPem: "" });
+                                                                                                            setAuthCaFilename("");
+                                                                                                        }}
+                                                                                                        allowEditingUploadedText
+                                                                                                        browseButtonText={_("Browse...")}
+                                                                                                        clearButtonText={_("Clear")}
+                                                                                                        dropzoneProps={{
+                                                                                                            accept: { "application/x-pem-file": [".pem", ".crt", ".cer"] },
+                                                                                                        }}
+                                                                                                    />
                                                                                                 </StackItem>
                                                                                             </Stack>
-                                                                                        </ExpandableSection>
+                                                                                        </FeatureSwitch>
                                                                                     </StackItem>
                                                                                 </Stack>
                                                                             )
