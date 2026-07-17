@@ -85,7 +85,7 @@ jobs:
         run: make check-fedora
         env:
           PYTHONUNBUFFERED: 1
-          RUN_TESTS_OPTIONS: -v
+          RUN_TESTS_OPTIONS: -v -j 2
 
       - name: Upload test failure artifacts
         if: failure()
