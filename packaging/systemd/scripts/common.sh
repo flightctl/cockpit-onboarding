@@ -41,8 +41,10 @@ load_config() {
 # writes a failure status or performs a rollback.
 disarm_watchdog() {
     systemctl stop flightctl-onboarding-watchdog.timer 2>/dev/null || true
-    systemctl stop flightctl-onboarding-watchdog.service 2>/dev/null || true
     rm -f "${ONBOARDING_MARKER_DIR}/.watchdog-active" 2>/dev/null || true
+    # Stop the service last — when called from watchdog-rollback.sh this
+    # sends SIGTERM to the running script, so any work must finish first.
+    systemctl stop flightctl-onboarding-watchdog.service 2>/dev/null || true
 }
 
 prefix_to_netmask() {

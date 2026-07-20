@@ -1,0 +1,165 @@
+#!/usr/bin/python3 -cimport os, sys; os.execv(os.path.dirname(sys.argv[1]) + "/common/pywrap", sys.argv)
+
+"""
+Integration tests for the connectivity watchdog
+
+The watchdog is a transient systemd timer armed before apply. If
+onboarding does not complete within the timeout, watchdog-rollback.sh
+fires and either keeps the config (app_failure — network works but
+enrollment didn't finish) or rolls back and re-enters setup mode
+(network_failure — DNS/carrier check failed).
+"""
+
+from __future__ import annotations
+
+import json
+import time
+
+import testlib
+
+MARKER_DIR = "/var/lib/flightctl-onboarding"
+MARKER_COMPLETE = f"{MARKER_DIR}/.onboarding-complete"
+MARKER_ATTEMPTED = f"{MARKER_DIR}/.onboarding-attempted"
+WATCHDOG_STATUS = f"{MARKER_DIR}/.watchdog-status"
+WATCHDOG_ACTIVE = f"{MARKER_DIR}/.watchdog-active"
+RUN_WATCHDOG = "/usr/libexec/flightctl-onboarding/run-watchdog.sh"
+
+ATTEMPTED_MARKER = json.dumps({
+    "attemptedAt": "2026-01-01T00:00:00Z",
+    "hostname": {"value": "watchdog-test"},
+    "networkAddress": {
+        "ipv4": {
+            "method": "auto",
+            "address": None,
+            "subnetMask": None,
+            "gateway": None,
+            "autoDns": True,
+            "primaryDns": None,
+            "secondaryDns": None,
+        },
+        "ipv6": {
+            "method": "auto",
+            "address": None,
+            "gateway": None,
+            "autoDns": True,
+            "primaryDns": None,
+            "secondaryDns": None,
+        },
+    },
+    "networkInterface": {
+        "selectedInterface": None,
+        "interfaceType": None,
+        "wifiSsid": None,
+        "wifiSecurity": None,
+        "wifiBand": None,
+        "vlanEnabled": False,
+        "vlanId": None,
+    },
+    "networkServices": {
+        "ntp": {"autoConfig": True, "servers": []},
+        "proxy": {
+            "enabled": False,
+            "protocol": "http",
+            "hostname": None,
+            "port": None,
+            "noProxy": "localhost,127.0.0.1,::1",
+        },
+    },
+    "enrollment": {},
+    "alias": {},
+    "labels": {"deviceLabels": [], "systemInfoMappings": []},
+    "connectivityTestHost": "test",
+})
+
+
+class TestWatchdog(testlib.MachineCase):
+    """Test the connectivity watchdog rollback mechanism"""
+
+    def setUp(self):
+        super().setUp()
+        m = self.machine
+
+        m.execute(
+            "systemctl start flightctl-onboarding-setup.service || true",
+            timeout=60,
+        )
+
+        m.execute(f"rm -f {MARKER_COMPLETE} {WATCHDOG_STATUS} {WATCHDOG_ACTIVE}")
+        m.write(MARKER_ATTEMPTED, ATTEMPTED_MARKER)
+        m.execute(
+            f"chown onboarding:onboarding {MARKER_ATTEMPTED} && "
+            f"chmod 0600 {MARKER_ATTEMPTED}"
+        )
+
+    def wait_for_watchdog_status(self, timeout=120):
+        """Poll until .watchdog-status appears and .watchdog-active is removed"""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                content = self.machine.execute(
+                    f"cat {WATCHDOG_STATUS} 2>/dev/null || true"
+                )
+                if content.strip():
+                    active = self.machine.execute(
+                        f"test -f {WATCHDOG_ACTIVE} && echo yes || echo no"
+                    ).strip()
+                    if active == "no":
+                        return json.loads(content)
+            except Exception:
+                pass
+            time.sleep(3)
+        self.fail(f"Watchdog did not complete within {timeout}s")
+
+    def testWatchdogNetworkFailure(self):
+        """Watchdog rolls back and re-enters setup when DNS fails"""
+        m = self.machine
+
+        m.execute(f"{RUN_WATCHDOG} 60 nonexistent.invalid")
+
+        status = self.wait_for_watchdog_status()
+
+        self.assertEqual(status["status"], "network_failure")
+        self.assertFalse(status["details"]["dnsResolved"])
+        self.assertIn("nonexistent.invalid", status["message"])
+
+        m.execute("systemctl is-active flightctl-onboarding-setup.service")
+
+        self.login_and_go(
+            "/system-onboarding", user="onboarding", password="",
+            superuser=False, tls=True,
+        )
+        b = self.browser
+        b.wait_in_text(
+            "#system-onboarding-wizard",
+            "Network configuration rolled back",
+        )
+        b.wait_in_text(
+            "#system-onboarding-wizard",
+            "DNS resolution failed for nonexistent.invalid",
+        )
+
+    def testWatchdogAppFailure(self):
+        """Watchdog reports app_failure when network works but enrollment didn't finish"""
+        m = self.machine
+
+        m.execute(f"{RUN_WATCHDOG} 60 localhost")
+
+        status = self.wait_for_watchdog_status()
+
+        self.assertEqual(status["status"], "app_failure")
+        self.assertTrue(status["details"]["dnsResolved"])
+        self.assertTrue(status["details"]["carrierDetected"])
+
+        self.login_and_go(
+            "/system-onboarding", user="onboarding", password="",
+            superuser=False, tls=True,
+        )
+        b = self.browser
+        b.wait_in_text(
+            "#system-onboarding-wizard",
+            "Enrollment did not complete",
+        )
+
+
+if __name__ == "__main__":
+    testlib.test_main()
