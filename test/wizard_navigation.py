@@ -39,15 +39,31 @@ def add_single_nic_interface(test_case):
 
     m.execute("udevadm settle")
 
-    iface = m.execute(
-        f"for d in /sys/class/net/*/address; do "
-        f"  if grep -qi {SINGLE_NIC_MAC} \"$d\" 2>/dev/null; then "
-        f"    basename $(dirname \"$d\"); break; "
-        f"  fi; "
-        f"done"
-    ).strip()
+    deadline = time.time() + 15
+    iface = ""
+    while time.time() < deadline:
+        iface = m.execute(
+            f"for d in /sys/class/net/*/address; do "
+            f"  if grep -qi {SINGLE_NIC_MAC} \"$d\" 2>/dev/null; then "
+            f"    basename $(dirname \"$d\"); break; "
+            f"  fi; "
+            f"done"
+        ).strip()
+        if iface:
+            break
+        time.sleep(1)
     if not iface:
         raise Exception("Secondary NIC not found after hotplug")
+
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        rc = m.execute(
+            f"nmcli -g GENERAL.STATE device show {iface} >/dev/null 2>&1"
+            f" && echo ok || echo wait"
+        ).strip()
+        if rc == "ok":
+            break
+        time.sleep(1)
 
     m.execute(f"nmcli device connect {iface}", timeout=30)
     deadline = time.time() + 30

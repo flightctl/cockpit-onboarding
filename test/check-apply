@@ -26,18 +26,50 @@ from wizard_navigation import (
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 
 
+MULTI_NIC_MAC = "52:54:00:88:00:01"
+
+
 class TestApplyConfiguration(testlib.MachineCase):
-    """Test the enrollment progress page UI"""
+    """Test the enrollment progress page UI (multi-NIC path)"""
     provision = {'machine1': {'restrict': False}}
 
     def setUp(self):
         super().setUp()
-        self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+        m = self.machine
+        m.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+
+        m._qemu_monitor(
+            f"netdev_add user,id=multinic_net,net=10.111.114.0/24"
+        )
+        m._qemu_monitor(
+            f"device_add virtio-net-pci,netdev=multinic_net,"
+            f"mac={MULTI_NIC_MAC},id=multinic_dev"
+        )
+        m.execute("udevadm settle")
+
+        self.production_iface = m.execute(
+            f"for d in /sys/class/net/*/address; do "
+            f"  if grep -qi {MULTI_NIC_MAC} \"$d\" 2>/dev/null; then "
+            f"    basename $(dirname \"$d\"); break; "
+            f"  fi; "
+            f"done"
+        ).strip()
 
     def navigate_to_apply_step(self):
         b = self.browser
 
-        advance_past_optional_steps_to_review(b, "apply-test-host")
+        b.wait_visible("#networkStep")
+        b.wait_visible(IFACE_TABLE)
+        row_sel = iface_row_selector(b, IFACE_TABLE, self.production_iface)
+        b.click(f"{row_sel} input[type='radio']")
+        click_button_text(b, "Next")
+        b.wait_visible("#networkServicesStep")
+        click_button_text(b, "Next")
+        complete_enrollment_step(b)
+        b.wait_visible("#labelsStep")
+        b.wait_visible("#hostname-input")
+        b.set_input_text("#hostname-input", "apply-test-host")
+        click_button_text(b, "Next")
         b.wait_visible("#reviewStep")
         b.click("#wizard-next-btn")
         b.wait_in_text("#progressStep", "Apply")
