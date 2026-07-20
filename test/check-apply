@@ -22,6 +22,7 @@ from wizard_navigation import (
     click_button_text,
     complete_enrollment_step,
     iface_row_selector,
+    wait_for_nic,
 )
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 
@@ -46,14 +47,7 @@ class TestApplyConfiguration(testlib.MachineCase):
             f"mac={MULTI_NIC_MAC},id=multinic_dev"
         )
         m.execute("udevadm settle")
-
-        self.production_iface = m.execute(
-            f"for d in /sys/class/net/*/address; do "
-            f"  if grep -qi {MULTI_NIC_MAC} \"$d\" 2>/dev/null; then "
-            f"    basename $(dirname \"$d\"); break; "
-            f"  fi; "
-            f"done"
-        ).strip()
+        self.production_iface = wait_for_nic(m, MULTI_NIC_MAC)
 
     def navigate_to_apply_step(self):
         b = self.browser

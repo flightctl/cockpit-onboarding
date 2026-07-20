@@ -9,6 +9,41 @@ SINGLE_NIC_DEV_ID = "singlenic_dev"
 SINGLE_NIC_SUBNET = "10.111.113.0/24"
 
 
+def wait_for_nic(machine, mac, timeout=15):
+    """Wait for a NIC with the given MAC to appear in sysfs and NetworkManager.
+
+    Returns the interface name. Raises if the NIC is not detected within the
+    timeout.
+    """
+    deadline = time.time() + timeout
+    iface = ""
+    while time.time() < deadline:
+        iface = machine.execute(
+            f"for d in /sys/class/net/*/address; do "
+            f"  if grep -qi {mac} \"$d\" 2>/dev/null; then "
+            f"    basename $(dirname \"$d\"); break; "
+            f"  fi; "
+            f"done"
+        ).strip()
+        if iface:
+            break
+        time.sleep(1)
+    if not iface:
+        raise Exception(f"NIC with MAC {mac} not found after {timeout}s")
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        rc = machine.execute(
+            f"nmcli -g GENERAL.STATE device show {iface} >/dev/null 2>&1"
+            f" && echo ok || echo wait"
+        ).strip()
+        if rc == "ok":
+            break
+        time.sleep(1)
+
+    return iface
+
+
 def add_single_nic_interface(test_case):
     """Hotplug a secondary NIC with cockpit port forwarding for single-NIC tests.
 
@@ -39,31 +74,7 @@ def add_single_nic_interface(test_case):
 
     m.execute("udevadm settle")
 
-    deadline = time.time() + 15
-    iface = ""
-    while time.time() < deadline:
-        iface = m.execute(
-            f"for d in /sys/class/net/*/address; do "
-            f"  if grep -qi {SINGLE_NIC_MAC} \"$d\" 2>/dev/null; then "
-            f"    basename $(dirname \"$d\"); break; "
-            f"  fi; "
-            f"done"
-        ).strip()
-        if iface:
-            break
-        time.sleep(1)
-    if not iface:
-        raise Exception("Secondary NIC not found after hotplug")
-
-    deadline = time.time() + 15
-    while time.time() < deadline:
-        rc = m.execute(
-            f"nmcli -g GENERAL.STATE device show {iface} >/dev/null 2>&1"
-            f" && echo ok || echo wait"
-        ).strip()
-        if rc == "ok":
-            break
-        time.sleep(1)
+    iface = wait_for_nic(m, SINGLE_NIC_MAC)
 
     m.execute(f"nmcli device connect {iface}", timeout=30)
     deadline = time.time() + 30

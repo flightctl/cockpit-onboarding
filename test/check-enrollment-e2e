@@ -30,6 +30,7 @@ from wizard_navigation import (
     IFACE_TABLE,
     click_button_text,
     iface_row_selector,
+    wait_for_nic,
 )
 
 AGENT_CONFIG = "/etc/flightctl/config.yaml"
@@ -58,8 +59,12 @@ def add_netiface_with_localaddr(machine, networking):
     return networking["mac"]
 
 
-class TestEnrollmentE2E(testlib.MachineCase):
-    """End-to-end enrollment against a live Flight Control server"""
+class TestEnrollmentE2EBase(testlib.MachineCase):
+    """Shared setup and helpers for e2e enrollment tests.
+
+    Provisions two VMs and hot-plugs a production NIC on machine1.
+    Subclasses add their own test methods for multi-NIC or single-NIC paths.
+    """
 
     SERVICES_IP = "10.111.118.1"
     MACHINE_IP = "10.111.118.2"
@@ -84,18 +89,9 @@ class TestEnrollmentE2E(testlib.MachineCase):
         m = self.machine
         services = self.machines['services']
 
-        # machine1 needs a NIC distinct from the one Cockpit is reached over,
-        # so the wizard has an unconfigured interface to select as
-        # "production". services is already reachable on the shared mcast
-        # network via its base interface, so it just gets a second static IP
-        # added there instead of a whole new NIC.
         machine1_mac = add_netiface_with_localaddr(m, self.network.interface())
         m.execute("udevadm settle")
-
-        self.production_iface = m.execute(
-            f"grep -l '{machine1_mac.lower()}' /sys/class/net/*/address"
-            " | head -1 | cut -d / -f 5"
-        ).strip()
+        self.production_iface = wait_for_nic(m, machine1_mac)
 
         services_base_iface = services.execute(
             f"grep -l '{services.networking['mac'].lower()}' /sys/class/net/*/address"
@@ -211,6 +207,10 @@ class TestEnrollmentE2E(testlib.MachineCase):
         b.click("#tls-custom-ca")
         self.set_react_textarea_value("#ca-cert-pem", self.ca_cert)
 
+
+class TestEnrollmentE2E(TestEnrollmentE2EBase):
+    """Multi-NIC enrollment: browser stays on the base NIC, wizard configures the production NIC"""
+
     def testEndToEndEnrollment(self):
         """Walk through the wizard and enroll against the live server"""
         m = self.machine
@@ -278,8 +278,8 @@ class TestEnrollmentE2E(testlib.MachineCase):
         m.execute(f"test ! -f {AGENT_CONFIG}")
 
 
-class TestEnrollmentE2ESingleNic(TestEnrollmentE2E):
-    """End-to-end enrollment via single-NIC background delegation path
+class TestEnrollmentE2ESingleNic(TestEnrollmentE2EBase):
+    """Single-NIC enrollment via background delegation path
 
     Uses an SSH tunnel so the browser connects to cockpit-ws through the
     mcast NIC's IP, triggering isConnectedViaInterface() → true.  The
@@ -343,12 +343,6 @@ class TestEnrollmentE2ESingleNic(TestEnrollmentE2E):
             "/etc/cockpit/system-onboarding/config.json",
             json.dumps(self.config),
         )
-
-    def testEndToEndEnrollment(self):
-        self.skipTest("Multi-NIC path; not applicable in single-NIC subclass")
-
-    def testEnrollmentLoginFailure(self):
-        self.skipTest("Multi-NIC path; not applicable in single-NIC subclass")
 
     def testEndToEndEnrollmentSingleNic(self):
         """Walk through the wizard and enroll via single-NIC background delegation"""
