@@ -20,6 +20,7 @@ from wizard_navigation import (
     add_single_nic_interface,
     advance_past_optional_steps_to_review,
     click_button_text,
+    complete_enrollment_step,
     iface_row_selector,
 )
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
@@ -100,9 +101,9 @@ class TestApplySingleNic(testlib.MachineCase):
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
-        b.wait_visible("#enrollmentStep")
-        click_button_text(b, "Next")
+        complete_enrollment_step(b)
         b.wait_visible("#labelsStep")
+        b.wait_visible("#hostname-input")
         b.set_input_text("#hostname-input", hostname)
         click_button_text(b, "Next")
         b.wait_visible("#reviewStep")
@@ -167,8 +168,8 @@ class TestApplySingleNicRollback(testlib.MachineCase):
             "runOnce": False,
             "hideModules": False,
             "connectivityTest": {
-                "host": "nonexistent.invalid.test",
-                "carrierTimeoutSeconds": 5,
+                "host": "192.0.2.1",
+                "carrierTimeoutSeconds": 1,
                 "connectivityRetries": 2,
             }
         }
@@ -198,9 +199,9 @@ class TestApplySingleNicRollback(testlib.MachineCase):
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
-        b.wait_visible("#enrollmentStep")
-        click_button_text(b, "Next")
+        complete_enrollment_step(b)
         b.wait_visible("#labelsStep")
+        b.wait_visible("#hostname-input")
         b.set_input_text("#hostname-input", "rollback-test-host")
         click_button_text(b, "Next")
         b.wait_visible("#reviewStep")
@@ -219,9 +220,9 @@ class TestApplySingleNicRollback(testlib.MachineCase):
                 "Onboarding continues in the background",
             )
 
-        # With connectivityRetries=2 at 2s intervals, the script fails in ~4s
-        # then rolls back. Wait up to 30s for the log to confirm.
-        deadline = time.time() + 30
+        # The background script waits for carrier (up to 5s) then retries
+        # connectivity 2 times at 2s intervals before rolling back.
+        deadline = time.time() + 60
         rollback_confirmed = False
         while time.time() < deadline:
             try:
@@ -231,12 +232,12 @@ class TestApplySingleNicRollback(testlib.MachineCase):
                     break
             except Exception:
                 pass
-            time.sleep(5)
+            time.sleep(3)
 
         self.assertTrue(
             rollback_confirmed,
             f"Rollback did not complete within timeout. Log:\n"
-            f"{m.execute(f'cat {APPLY_LOG} 2>/dev/null || echo (no log)')}"
+            f"{m.execute(f'cat {APPLY_LOG} 2>/dev/null || echo no-log')}"
         )
 
         log_contents = m.execute(f"cat {APPLY_LOG}")

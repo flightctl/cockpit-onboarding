@@ -118,12 +118,13 @@ rollback() {
     rollback_params=$(mktemp /tmp/.rollback-params-XXXXXX)
     chmod 600 "$rollback_params"
 
-    local manifest='{'
-    manifest+="\"network\":{\"connectionId\":\"$CONNECTION_ID\"}"
+    local manifest
+    manifest=$(jq -n \
+        --arg connId "$CONNECTION_ID" \
+        '{network: {connectionId: $connId}, ntp: true, proxy: true, labels: true}')
     if [ -n "$ORIGINAL_HOSTNAME" ]; then
-        manifest+=",\"hostname\":{\"original\":\"$ORIGINAL_HOSTNAME\"}"
+        manifest=$(echo "$manifest" | jq --arg h "$ORIGINAL_HOSTNAME" '.hostname = {original: $h}')
     fi
-    manifest+=',\"ntp\":true,\"proxy\":true,\"labels\":true}'
     echo "$manifest" > "$rollback_params"
 
     "$ROLLBACK_SCRIPT" "$rollback_params" 2>&1 | while IFS= read -r line; do
@@ -133,7 +134,7 @@ rollback() {
     rm -f "$PARAMS_FILE" 2>/dev/null || true
     log "Rollback complete"
 }
-trap rollback ERR
+trap 'rc=$?; if [ $rc -ne 0 ]; then rollback; fi; exit $rc' EXIT
 
 # Step 0: Stop onboarding network services on the target interface so NM
 # can reclaim the device cleanly.

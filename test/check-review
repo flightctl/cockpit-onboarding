@@ -16,6 +16,7 @@ from wizard_navigation import (
     add_single_nic_interface,
     advance_past_optional_steps_to_review,
     click_button_text,
+    complete_enrollment_step,
     iface_row_selector,
 )
 
@@ -153,12 +154,12 @@ class TestReview(testlib.MachineCase):
         b.wait_in_text(REVIEW_ENROLLMENT, "Enrollment skipped")
 
 
-@testlib.nondestructive
 class TestReviewSingleNic(testlib.MachineCase):
     """Test review page warnings when configuring the setup interface"""
 
     def setUp(self):
         super().setUp()
+        self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
         self.setup_iface = add_single_nic_interface(self)
 
     def testSingleNicReviewWarning(self):
@@ -176,9 +177,9 @@ class TestReviewSingleNic(testlib.MachineCase):
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
-        b.wait_visible("#enrollmentStep")
-        click_button_text(b, "Next")
+        complete_enrollment_step(b)
         b.wait_visible("#labelsStep")
+        b.wait_visible("#hostname-input")
         b.set_input_text("#hostname-input", "single-nic-test")
         click_button_text(b, "Next")
         b.wait_visible("#reviewStep")

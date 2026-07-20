@@ -109,12 +109,12 @@ class TestNetworkInterface(testlib.MachineCase):
         b.wait_in_text("#vlan-id-input-helper-error", "VLAN ID must be a number between 1 and 4094")
 
 
-@testlib.nondestructive
 class TestSingleNic(testlib.MachineCase):
     """Test single-NIC detection warning on the Network wizard step"""
 
     def setUp(self):
         super().setUp()
+        self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
         self.setup_iface = add_single_nic_interface(self)
 
     def testSingleNicWarningOnNetworkStep(self):
