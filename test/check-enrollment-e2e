@@ -207,6 +207,8 @@ class TestEnrollmentE2EBase(testlib.MachineCase):
         b.click("#tls-custom-ca")
         self.set_react_textarea_value("#ca-cert-pem", self.ca_cert)
 
+        b.click("#auth-ca-server")
+
 
 class TestEnrollmentE2E(TestEnrollmentE2EBase):
     """Multi-NIC enrollment: browser stays on the base NIC, wizard configures the production NIC"""
@@ -261,6 +263,8 @@ class TestEnrollmentE2E(TestEnrollmentE2EBase):
 
         b.click("#tls-custom-ca")
         self.set_react_textarea_value("#ca-cert-pem", self.ca_cert)
+
+        b.click("#auth-ca-server")
 
         click_button_text(b, "Next")
         b.wait_visible("#labelsStep")

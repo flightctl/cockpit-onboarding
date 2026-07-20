@@ -32,6 +32,9 @@ export function serializeEnrollmentForMarker(enrollment: ServiceEnrollmentConfig
     if (enrollment.caCertPem !== undefined) {
         marker.caCertPem = enrollment.caCertPem;
     }
+    if (enrollment.authCaMode !== undefined) {
+        marker.authCaMode = enrollment.authCaMode;
+    }
     if (enrollment.authCaCertPem !== undefined) {
         marker.authCaCertPem = enrollment.authCaCertPem;
     }

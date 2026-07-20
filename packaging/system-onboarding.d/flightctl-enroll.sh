@@ -156,14 +156,12 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
         echo "$ENROLLMENT_CA_CERT_PEM" > "$TMPDIR/ca.crt"
         chmod 600 "$TMPDIR/ca.crt"
         TLS_ARGS+=("--certificate-authority" "$TMPDIR/ca.crt")
+    fi
 
-        if [ -n "${ENROLLMENT_AUTH_CA_CERT_PEM:-}" ]; then
-            echo "$ENROLLMENT_AUTH_CA_CERT_PEM" > "$TMPDIR/auth-ca.crt"
-            chmod 600 "$TMPDIR/auth-ca.crt"
-            TLS_ARGS+=("--auth-certificate-authority" "$TMPDIR/auth-ca.crt")
-        else
-            TLS_ARGS+=("--auth-certificate-authority" "$TMPDIR/ca.crt")
-        fi
+    if [ "${ENROLLMENT_TLS_MODE:-system}" != "insecure" ] && [ -n "${ENROLLMENT_AUTH_CA_CERT_PEM:-}" ]; then
+        echo "$ENROLLMENT_AUTH_CA_CERT_PEM" > "$TMPDIR/auth-ca.crt"
+        chmod 600 "$TMPDIR/auth-ca.crt"
+        TLS_ARGS+=("--auth-certificate-authority" "$TMPDIR/auth-ca.crt")
     fi
 
     # Write credentials JSON to a temp file for --credentials-file
