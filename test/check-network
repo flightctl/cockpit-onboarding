@@ -19,7 +19,7 @@
 
 import testlib
 
-from wizard_navigation import IFACE_TABLE, iface_row_selector
+from wizard_navigation import IFACE_TABLE, add_single_nic_interface, iface_row_selector
 
 
 @testlib.nondestructive
@@ -115,20 +115,10 @@ class TestSingleNic(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
-        m = self.machine
-        addr = m.ssh_address
-        try:
-            self.setup_iface = m.execute(
-                f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
-            ).strip().split('\n')[0]
-        except Exception:
-            self.setup_iface = None
+        self.setup_iface = add_single_nic_interface(self)
 
     def testSingleNicWarningOnNetworkStep(self):
         """Test that a warning appears when the setup interface is selected"""
-        if not self.setup_iface:
-            self.skipTest("Could not determine setup interface")
-
         b = self.browser
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         b.wait_visible("#networkStep")

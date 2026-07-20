@@ -58,6 +58,33 @@ function isLocalhost(hostname: string): boolean {
     return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 }
 
+const COCKPIT_WS_DEFAULT_PORT = "9090";
+const COCKPIT_CONF_PATH = "/etc/cockpit/cockpit.conf";
+
+let cachedCockpitWsPort: string | null = null;
+
+async function getCockpitWsPort(): Promise<string> {
+    if (cachedCockpitWsPort !== null) {
+        return cachedCockpitWsPort;
+    }
+
+    let port = COCKPIT_WS_DEFAULT_PORT;
+    try {
+        const content = await cockpit.file(COCKPIT_CONF_PATH).read();
+        if (content) {
+            const match = content.match(/^\s*Port\s*=\s*(\d+)/m);
+            if (match) {
+                port = match[1];
+            }
+        }
+    } catch {
+        // Config file may not exist
+    }
+
+    cachedCockpitWsPort = port;
+    return port;
+}
+
 export function mapWifiSecurity(security: string): WifiSecurity {
     switch (security) {
         case "None":
@@ -109,7 +136,7 @@ export async function isConnectedViaInterface(ifaceName: string): Promise<boolea
         return false;
     }
 
-    const port = window.location.port || "9090";
+    const port = await getCockpitWsPort();
 
     let cockpitLocalAddrs: Set<string>;
     try {

@@ -17,6 +17,7 @@ import testlib
 
 from wizard_navigation import (
     IFACE_TABLE,
+    add_single_nic_interface,
     advance_past_optional_steps_to_review,
     click_button_text,
     iface_row_selector,
@@ -83,14 +84,7 @@ class TestApplySingleNic(testlib.MachineCase):
     def setUp(self):
         super().setUp()
         self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
-        m = self.machine
-        addr = m.ssh_address
-        try:
-            self.setup_iface = m.execute(
-                f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
-            ).strip().split('\n')[0]
-        except Exception:
-            self.setup_iface = None
+        self.setup_iface = add_single_nic_interface(self)
 
     def select_setup_interface_and_navigate_to_review(self, hostname):
         b = self.browser
@@ -115,9 +109,6 @@ class TestApplySingleNic(testlib.MachineCase):
 
     def testSingleNicDelegation(self):
         """Test that single-NIC apply delegates to background and shows info alert"""
-        if not self.setup_iface:
-            self.skipTest("Could not determine setup interface")
-
         b = self.browser
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.select_setup_interface_and_navigate_to_review("single-nic-apply")
@@ -140,9 +131,6 @@ class TestApplySingleNic(testlib.MachineCase):
 
     def testSingleNicStepsDelegated(self):
         """Test that remaining steps show 'Delegated to background service' status"""
-        if not self.setup_iface:
-            self.skipTest("Could not determine setup interface")
-
         b = self.browser
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.select_setup_interface_and_navigate_to_review("single-nic-delegated")
@@ -171,14 +159,8 @@ class TestApplySingleNicRollback(testlib.MachineCase):
     def setUp(self):
         super().setUp()
         self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+        self.setup_iface = add_single_nic_interface(self)
         m = self.machine
-        addr = m.ssh_address
-        try:
-            self.setup_iface = m.execute(
-                f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
-            ).strip().split('\n')[0]
-        except Exception:
-            self.setup_iface = None
 
         self.config = {
             "version": "1.0",
@@ -197,9 +179,6 @@ class TestApplySingleNicRollback(testlib.MachineCase):
 
     def testSingleNicRollbackOnConnectivityFailure(self):
         """Test that failed connectivity triggers rollback of NM profiles"""
-        if not self.setup_iface:
-            self.skipTest("Could not determine setup interface")
-
         m = self.machine
         b = self.browser
 

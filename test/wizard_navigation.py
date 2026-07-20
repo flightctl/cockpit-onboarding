@@ -1,4 +1,82 @@
+import socket
+import time
+
 IFACE_TABLE = "table[aria-label='Network interface selector']"
+
+SINGLE_NIC_MAC = "52:54:00:99:00:01"
+SINGLE_NIC_NETDEV_ID = "singlenic_net"
+SINGLE_NIC_DEV_ID = "singlenic_dev"
+SINGLE_NIC_SUBNET = "10.111.113.0/24"
+
+
+def add_single_nic_interface(test_case):
+    """Hotplug a secondary NIC with cockpit port forwarding for single-NIC tests.
+
+    Adds a QEMU user-mode NIC so that the browser connects to cockpit
+    through the secondary interface while SSH stays on the primary.
+    Registers cleanup via addCleanup so the NIC is removed after the test.
+
+    Returns the interface name inside the VM.
+    """
+    m = test_case.machine
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(('127.0.0.2', 0))
+    host_port = s.getsockname()[1]
+    s.close()
+
+    m._qemu_monitor(
+        f"netdev_add user,id={SINGLE_NIC_NETDEV_ID},"
+        f"net={SINGLE_NIC_SUBNET},"
+        f"hostfwd=tcp:127.0.0.2:{host_port}-:9090"
+    )
+    m._qemu_monitor(
+        f"device_add virtio-net-pci,"
+        f"netdev={SINGLE_NIC_NETDEV_ID},"
+        f"mac={SINGLE_NIC_MAC},"
+        f"id={SINGLE_NIC_DEV_ID}"
+    )
+
+    m.execute("udevadm settle")
+
+    iface = m.execute(
+        f"for d in /sys/class/net/*/address; do "
+        f"  if grep -qi {SINGLE_NIC_MAC} \"$d\" 2>/dev/null; then "
+        f"    basename $(dirname \"$d\"); break; "
+        f"  fi; "
+        f"done"
+    ).strip()
+    if not iface:
+        raise Exception("Secondary NIC not found after hotplug")
+
+    m.execute(f"nmcli device connect {iface}", timeout=30)
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        addr = m.execute(
+            f"nmcli -g IP4.ADDRESS device show {iface} 2>/dev/null || true"
+        ).strip()
+        if addr:
+            break
+        time.sleep(1)
+    else:
+        raise Exception(f"Secondary NIC {iface} did not get a DHCP address")
+
+    original_port = test_case.browser.port
+    test_case.browser.port = host_port
+
+    test_case.addCleanup(lambda: setattr(test_case.browser, 'port', original_port))
+    test_case.addCleanup(remove_single_nic_interface, m)
+
+    return iface
+
+
+def remove_single_nic_interface(machine):
+    """Remove the secondary NIC added by add_single_nic_interface."""
+    try:
+        machine._qemu_monitor(f"device_del {SINGLE_NIC_DEV_ID}")
+        machine._qemu_monitor(f"netdev_del {SINGLE_NIC_NETDEV_ID}")
+    except Exception:
+        pass
 
 
 def click_button_text(b, text):
