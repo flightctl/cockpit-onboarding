@@ -12,27 +12,37 @@ SINGLE_NIC_SUBNET = "10.111.113.0/24"
 def wait_for_nic(machine, mac, timeout=15):
     """Wait for a NIC with the given MAC to appear in sysfs and NetworkManager.
 
-    Returns the interface name. Raises if the NIC is not detected within the
-    timeout.
+    Returns the final interface name (after udev predictable-name rename).
+    Raises if the NIC is not detected within the timeout.
     """
+    mac_query = (
+        f"for d in /sys/class/net/*/address; do "
+        f"  if grep -qi {mac} \"$d\" 2>/dev/null; then "
+        f"    basename $(dirname \"$d\"); break; "
+        f"  fi; "
+        f"done"
+    )
+
     deadline = time.time() + timeout
     iface = ""
     while time.time() < deadline:
-        iface = machine.execute(
-            f"for d in /sys/class/net/*/address; do "
-            f"  if grep -qi {mac} \"$d\" 2>/dev/null; then "
-            f"    basename $(dirname \"$d\"); break; "
-            f"  fi; "
-            f"done"
-        ).strip()
+        iface = machine.execute(mac_query).strip()
         if iface:
             break
         time.sleep(1)
     if not iface:
         raise Exception(f"NIC with MAC {mac} not found after {timeout}s")
 
+    machine.execute("udevadm settle")
+    settled = machine.execute(mac_query).strip()
+    if settled:
+        iface = settled
+
     deadline = time.time() + timeout
     while time.time() < deadline:
+        current = machine.execute(mac_query).strip()
+        if current:
+            iface = current
         rc = machine.execute(
             f"nmcli -g GENERAL.STATE device show {iface} >/dev/null 2>&1"
             f" && echo ok || echo wait"
