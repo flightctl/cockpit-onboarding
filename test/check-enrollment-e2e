@@ -20,6 +20,9 @@ from __future__ import annotations
 
 import json
 import os
+import socket
+import subprocess
+import time
 
 import testlib
 
@@ -30,6 +33,7 @@ from wizard_navigation import (
 )
 
 AGENT_CONFIG = "/etc/flightctl/config.yaml"
+APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 TEST_DIR = os.path.dirname(__file__)
 
 
@@ -272,6 +276,211 @@ class TestEnrollmentE2E(testlib.MachineCase):
             b.wait_in_text("#apply-steps", "flightctl login failed")
 
         m.execute(f"test ! -f {AGENT_CONFIG}")
+
+
+class TestEnrollmentE2ESingleNic(TestEnrollmentE2E):
+    """End-to-end enrollment via single-NIC background delegation path
+
+    Uses an SSH tunnel so the browser connects to cockpit-ws through the
+    mcast NIC's IP, triggering isConnectedViaInterface() → true.  The
+    wizard then delegates network activation and enrollment to
+    apply-and-enroll.sh via systemd-run.
+    """
+
+    def setUp(self):
+        super().setUp()
+        m = self.machine
+
+        # Assign static IP to the production mcast NIC so the SSH tunnel
+        # has a stable target for cockpit-ws.
+        m.execute(
+            f"nmcli con add type ethernet ifname {self.production_iface}"
+            f" con-name temp-e2e ipv4.method manual"
+            f" ipv4.addresses {self.MACHINE_IP}/20"
+            f" connection.autoconnect yes"
+        )
+        m.execute("nmcli con up temp-e2e")
+
+        # Allocate a free host port for the SSH tunnel.
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('127.0.0.2', 0))
+        tunnel_port = s.getsockname()[1]
+        s.close()
+
+        identity = os.path.join(TEST_DIR, "..", "bots", "machine", "identity")
+        self.tunnel_proc = subprocess.Popen([
+            "ssh", "-N",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "IdentitiesOnly=yes",
+            "-o", "BatchMode=yes",
+            "-i", identity,
+            "-p", str(m.ssh_port),
+            "-L", f"127.0.0.2:{tunnel_port}:{self.MACHINE_IP}:9090",
+            f"root@{m.ssh_address}",
+        ], stderr=subprocess.PIPE)
+        self.addCleanup(self.tunnel_proc.kill)
+
+        time.sleep(2)
+        if self.tunnel_proc.poll() is not None:
+            stderr = self.tunnel_proc.stderr.read().decode() if self.tunnel_proc.stderr else ""
+            raise Exception(f"SSH tunnel exited immediately: {stderr}")
+
+        original_port = self.browser.port
+        self.browser.port = tunnel_port
+        self.addCleanup(lambda: setattr(self.browser, 'port', original_port))
+
+        m.execute(
+            "systemctl start flightctl-onboarding-setup.service || true",
+            timeout=60,
+        )
+
+        self.config["connectivityTest"] = {
+            "carrierTimeoutSeconds": 10,
+            "connectivityRetries": 10,
+        }
+        m.write(
+            "/etc/cockpit/system-onboarding/config.json",
+            json.dumps(self.config),
+        )
+
+    def testEndToEndEnrollment(self):
+        self.skipTest("Multi-NIC path; not applicable in single-NIC subclass")
+
+    def testEnrollmentLoginFailure(self):
+        self.skipTest("Multi-NIC path; not applicable in single-NIC subclass")
+
+    def testEndToEndEnrollmentSingleNic(self):
+        """Walk through the wizard and enroll via single-NIC background delegation"""
+        m = self.machine
+        b = self.browser
+
+        m.execute(f"rm -f {APPLY_LOG}")
+
+        self.login_and_go(
+            "/system-onboarding", user="onboarding", password="",
+            superuser=False, tls=True,
+        )
+
+        self.fill_enrollment_form()
+
+        click_button_text(b, "Next")
+        b.wait_visible("#labelsStep")
+        b.set_input_text("#hostname-input", "e2e-singlenic-test")
+
+        click_button_text(b, "Next")
+        b.wait_visible("#reviewStep")
+
+        b.wait_in_text(
+            "#review-singlenic-warning",
+            "Connection will be interrupted",
+        )
+
+        b.click("#wizard-next-btn")
+        b.wait_in_text("#progressStep", "Apply")
+
+        with b.wait_timeout(120):
+            b.wait_in_text(
+                "#apply-singlenic-alert",
+                "Onboarding continues in the background",
+            )
+
+        deadline = time.time() + 180
+        completed = False
+        while time.time() < deadline:
+            try:
+                log = m.execute(f"cat {APPLY_LOG} 2>/dev/null || true")
+                if "Onboarding completed successfully" in log:
+                    completed = True
+                    break
+            except Exception:
+                pass
+            time.sleep(5)
+
+        self.assertTrue(
+            completed,
+            f"Background enrollment did not complete within timeout. Log:\n"
+            f"{m.execute(f'cat {APPLY_LOG} 2>/dev/null || echo no-log')}",
+        )
+
+        m.execute(f"test -f {AGENT_CONFIG}")
+        m.execute("systemctl is-enabled flightctl-agent")
+
+    def testEnrollmentSingleNicLoginFailure(self):
+        """Verify bad credentials cause rollback in single-NIC delegation"""
+        m = self.machine
+        b = self.browser
+
+        m.execute(f"rm -f {APPLY_LOG}")
+        original_hostname = m.execute("hostnamectl --static").strip()
+
+        self.login_and_go(
+            "/system-onboarding", user="onboarding", password="",
+            superuser=False, tls=True,
+        )
+
+        self.navigate_to_enrollment()
+        b.wait_visible("#flightctl-enrollment:checked")
+
+        b.click("#auth-password")
+        b.set_input_text("#credential-username", "admin")
+        b.set_input_text("#credential-password", "wrong-password")
+
+        b.click("#tls-custom-ca")
+        self.set_react_textarea_value("#ca-cert-pem", self.ca_cert)
+
+        click_button_text(b, "Next")
+        b.wait_visible("#labelsStep")
+        b.set_input_text("#hostname-input", "e2e-singlenic-fail")
+
+        click_button_text(b, "Next")
+        b.wait_visible("#reviewStep")
+
+        b.wait_in_text(
+            "#review-singlenic-warning",
+            "Connection will be interrupted",
+        )
+
+        b.click("#wizard-next-btn")
+        b.wait_in_text("#progressStep", "Apply")
+
+        with b.wait_timeout(120):
+            b.wait_in_text(
+                "#apply-singlenic-alert",
+                "Onboarding continues in the background",
+            )
+
+        deadline = time.time() + 180
+        rollback_confirmed = False
+        while time.time() < deadline:
+            try:
+                log = m.execute(f"cat {APPLY_LOG} 2>/dev/null || true")
+                if "Rollback complete" in log:
+                    rollback_confirmed = True
+                    break
+            except Exception:
+                pass
+            time.sleep(5)
+
+        self.assertTrue(
+            rollback_confirmed,
+            f"Rollback did not complete within timeout. Log:\n"
+            f"{m.execute(f'cat {APPLY_LOG} 2>/dev/null || echo no-log')}",
+        )
+
+        log = m.execute(f"cat {APPLY_LOG}")
+        self.assertIn("Enrollment script failed", log)
+
+        m.execute(f"test ! -f {AGENT_CONFIG}")
+
+        nm_connections = m.execute("nmcli -t -f NAME connection show")
+        self.assertNotIn(
+            f"flightctl-onboarding-{self.production_iface}",
+            nm_connections,
+        )
+
+        restored_hostname = m.execute("hostnamectl --static").strip()
+        self.assertEqual(restored_hostname, original_hostname)
 
 
 if __name__ == "__main__":
