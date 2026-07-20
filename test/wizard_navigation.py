@@ -124,13 +124,22 @@ def wait_button_text(b, text):
     )
 
 
-def iface_row_selector(browser, table, interface):
-    names = browser.eval_js(
-        f"Array.from(document.querySelectorAll(\"{table} td[data-label='Name']\"))"
-        ".map(e => e.textContent)"
-    )
-    row = names.index(interface) + 1
-    return f"{table} tbody tr:nth-child({row})"
+def iface_row_selector(browser, table, interface, timeout=15):
+    deadline = time.time() + timeout
+    while True:
+        names = browser.eval_js(
+            f"Array.from(document.querySelectorAll(\"{table} td[data-label='Name']\"))"
+            ".map(e => e.textContent)"
+        )
+        if interface in names:
+            row = names.index(interface) + 1
+            return f"{table} tbody tr:nth-child({row})"
+        if time.time() >= deadline:
+            raise ValueError(
+                f"'{interface}' not found in interface table after {timeout}s. "
+                f"Available: {names}"
+            )
+        time.sleep(1)
 
 
 def complete_network_step(b):
