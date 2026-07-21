@@ -461,17 +461,17 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                 cockpit
                     .spawn(["sudo", SCRIPT_CLEANUP], { err: "message" })
                     .catch((error) => console.warn("Cleanup failed:", error));
-            const handleFinish = () => {
-                window.location.reload();
+            const handleFinish = async () => {
                 if (!backgroundCompletion) {
-                    // Multi-NIC: cleanup tears down the WiFi AP after the user sees feedback.
-                    setTimeout(() => runCleanup(), 2000);
+                    await runCleanup();
                 }
-            };
-            const handleFinishAndReboot = () => {
-                cockpit
-                    .spawn(["sudo", "shutdown", "-r", "now"], { err: "message" })
-                    .catch((error) => console.error("Failed to trigger reboot:", error));
+                if (wantReboot) {
+                    cockpit
+                        .spawn(["sudo", "shutdown", "-r", "now"], { err: "message" })
+                        .catch((error) => console.error("Failed to trigger reboot:", error));
+                } else {
+                    window.location.reload();
+                }
             };
             return {
                 isBackDisabled: true,
@@ -481,7 +481,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     : wantReboot
                       ? _("Finish & Reboot")
                       : _("Finish"),
-                onNext: wantReboot && !backgroundCompletion ? handleFinishAndReboot : handleFinish,
+                onNext: handleFinish,
                 isCancelHidden: true,
             };
         } else if (enrollmentExecutionState === "failed") {
