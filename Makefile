@@ -218,7 +218,17 @@ $(SERVICES_IMAGE): bots test/vm-flightctl-services.install
 vm-services: $(SERVICES_IMAGE)
 	@echo $(SERVICES_IMAGE)
 
-check-fedora: check-browser $(WIFI_IMAGE) $(SERVICES_IMAGE) test/common
+# Network services VM (Squid proxy + chrony NTP) for e2e network-services tests
+NETWORK_SERVICES_IMAGE = $(CURDIR)/test/images/$(WIFI_TEST_OS)-network-services
+$(NETWORK_SERVICES_IMAGE): bots test/vm-network-services.install
+	bots/image-customize --fresh \
+		--base-image $(WIFI_TEST_OS) \
+		--script $(CURDIR)/test/vm-network-services.install $(WIFI_TEST_OS)-network-services
+
+vm-network-services: $(NETWORK_SERVICES_IMAGE)
+	@echo $(NETWORK_SERVICES_IMAGE)
+
+check-fedora: check-browser $(WIFI_IMAGE) $(SERVICES_IMAGE) $(NETWORK_SERVICES_IMAGE) test/common
 	TEST_OS=$(WIFI_TEST_OS) test/common/run-tests --test-glob 'check-*' ${RUN_TESTS_OPTIONS}
 
 # fail fast if the browser testlib needs isn't installed, instead of silently
@@ -312,4 +322,4 @@ help:
 	@echo "i18n targets:"
 	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check check-browser vm print-vm vm-wifi vm-services check-fedora deploy-test-vm install-flightctl-on-vm clean-test-vm help
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check check-browser vm print-vm vm-wifi vm-services vm-network-services check-fedora deploy-test-vm install-flightctl-on-vm clean-test-vm help

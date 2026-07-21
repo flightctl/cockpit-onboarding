@@ -9,6 +9,26 @@ SINGLE_NIC_DEV_ID = "singlenic_dev"
 SINGLE_NIC_SUBNET = "10.111.113.0/24"
 
 
+def add_netiface_with_localaddr(machine, networking):
+    """Hot-plug a NIC onto the shared mcast test network, bound to loopback.
+
+    Machine.add_netiface() (bots/machine/machine_core/machine_virtual.py)
+    omits localaddr=127.0.0.1 from its netdev_add call, unlike the mcast NIC
+    QEMU is booted with. Without it, QEMU sends multicast traffic out via the
+    default route interface instead of loopback, so a hot-plugged NIC can't
+    reach other VMs on the same mcast group.
+    """
+    machine._qemu_monitor(
+        "netdev_add socket,mcast=230.0.0.1:{mcast},localaddr=127.0.0.1,id={id}".format(
+            mcast=networking["mcast"], id=networking["hostnet"]
+        )
+    )
+    machine._qemu_monitor(
+        f"device_add virtio-net-pci,mac={networking['mac']},netdev={networking['hostnet']}"
+    )
+    return networking["mac"]
+
+
 def wait_for_nic(machine, mac, timeout=15):
     """Wait for a NIC with the given MAC to appear in sysfs and NetworkManager.
 
