@@ -186,6 +186,7 @@ export interface FlightctlPasswordCredentials {
 export type FlightctlCredentials = FlightctlTokenCredentials | FlightctlPasswordCredentials;
 
 export type TlsMode = "system" | "customCa" | "insecure";
+export type AuthCaMode = "system" | "serverCa" | "custom";
 
 export interface ServiceEnrollmentConfig {
     selected: boolean;
@@ -194,6 +195,8 @@ export interface ServiceEnrollmentConfig {
     useExisting?: boolean;
     tlsMode?: TlsMode;
     caCertPem?: string;
+    authCaMode?: AuthCaMode;
+    authCaCertPem?: string;
 }
 
 export type GenericLabel = { key: string; value: string };

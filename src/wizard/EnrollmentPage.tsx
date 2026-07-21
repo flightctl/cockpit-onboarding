@@ -15,11 +15,13 @@ import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { ClipboardCopy } from "@patternfly/react-core/dist/esm/components/ClipboardCopy/index.js";
 import { FileUpload } from "@patternfly/react-core/dist/esm/components/FileUpload/index.js";
+import { HelperText, HelperTextItem } from "@patternfly/react-core/dist/esm/components/HelperText/index.js";
 import { Popover } from "@patternfly/react-core/dist/esm/components/Popover/index.js";
 import { TextArea } from "@patternfly/react-core/dist/esm/components/TextArea/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
 import HelpIcon from "@patternfly/react-icons/dist/esm/icons/help-icon";
+import InfoCircleIcon from "@patternfly/react-icons/dist/esm/icons/info-circle-icon";
 
 import { useModelContext } from "../model-context";
 import { useConfig } from "../app";
@@ -33,6 +35,7 @@ import type {
     FlightctlAuthMethod,
     FlightctlPasswordCredentials,
     FlightctlTokenCredentials,
+    AuthCaMode,
     ServiceEnrollmentConfig,
     TlsMode,
 } from "../types";
@@ -53,10 +56,12 @@ export const EnrollmentPage = () => {
     const [endpointTouched, setEndpointTouched] = useState(false);
     const [endpointError, setEndpointError] = useState<string | undefined>();
     const [caFilename, setCaFilename] = useState("");
+    const [authCaFilename, setAuthCaFilename] = useState("");
 
     const credentials = enrollment.credentials;
     const authMethod = credentials?.authMethod ?? "token";
     const tlsMode = enrollment.tlsMode ?? "system";
+    const authCaMode = enrollment.authCaMode ?? "system";
     const isUsingExisting = hasExistingCredentials && (enrollment.useExisting ?? false);
     const isEndpointFromExistingConfig = Boolean(existingServerUrl) && serviceEndpoint === existingServerUrl;
 
@@ -336,6 +341,9 @@ export const EnrollmentPage = () => {
                                                         >
                                                             <Stack hasGutter>
                                                                 <StackItem>
+                                                                    <LabelHeading text={cockpit.format(_("$0 server certificate"), brandName)} />
+                                                                </StackItem>
+                                                                <StackItem>
                                                                     <Radio
                                                                         id="tls-system"
                                                                         name="tls-mode"
@@ -359,33 +367,31 @@ export const EnrollmentPage = () => {
                                                                             tlsMode === "customCa" && (
                                                                                 <Stack hasGutter>
                                                                                     <StackItem>
-                                                                                        <FormGroup label={_("CA certificate (PEM)")}>
-                                                                                            <FileUpload
-                                                                                                id="ca-cert-pem"
-                                                                                                type="text"
-                                                                                                value={enrollment.caCertPem ?? ""}
-                                                                                                filename={caFilename}
-                                                                                                onFileInputChange={(_event, file) =>
-                                                                                                    setCaFilename(file.name)
-                                                                                                }
-                                                                                                onDataChange={(_event, value) =>
-                                                                                                    updateEnrollment({ caCertPem: value })
-                                                                                                }
-                                                                                                onTextChange={(_event, value) =>
-                                                                                                    updateEnrollment({ caCertPem: value })
-                                                                                                }
-                                                                                                onClearClick={() => {
-                                                                                                    updateEnrollment({ caCertPem: "" });
-                                                                                                    setCaFilename("");
-                                                                                                }}
-                                                                                                allowEditingUploadedText
-                                                                                                browseButtonText={_("Browse...")}
-                                                                                                clearButtonText={_("Clear")}
-                                                                                                dropzoneProps={{
-                                                                                                    accept: { "application/x-pem-file": [".pem", ".crt", ".cer"] },
-                                                                                                }}
-                                                                                            />
-                                                                                        </FormGroup>
+                                                                                        <FileUpload
+                                                                                            id="ca-cert-pem"
+                                                                                            type="text"
+                                                                                            value={enrollment.caCertPem ?? ""}
+                                                                                            filename={caFilename}
+                                                                                            onFileInputChange={(_event, file) =>
+                                                                                                setCaFilename(file.name)
+                                                                                            }
+                                                                                            onDataChange={(_event, value) =>
+                                                                                                updateEnrollment({ caCertPem: value })
+                                                                                            }
+                                                                                            onTextChange={(_event, value) =>
+                                                                                                updateEnrollment({ caCertPem: value })
+                                                                                            }
+                                                                                            onClearClick={() => {
+                                                                                                updateEnrollment({ caCertPem: "" });
+                                                                                                setCaFilename("");
+                                                                                            }}
+                                                                                            allowEditingUploadedText
+                                                                                            browseButtonText={_("Browse...")}
+                                                                                            clearButtonText={_("Clear")}
+                                                                                            dropzoneProps={{
+                                                                                                accept: { "application/x-pem-file": [".pem", ".crt", ".cer"] },
+                                                                                            }}
+                                                                                        />
                                                                                     </StackItem>
                                                                                     <StackItem>
                                                                                         <Popover
@@ -434,7 +440,102 @@ export const EnrollmentPage = () => {
                                                                         }
                                                                     />
                                                                 </StackItem>
+
+                                                                {authMethod !== "token" && (
+                                                                <>
+                                                                <StackItem>
+                                                                    <Divider />
+                                                                </StackItem>
+                                                                <StackItem>
+                                                                    <LabelHeading text={_("Authentication certificate")} />
+                                                                </StackItem>
+                                                                <StackItem>
+                                                                    <HelperText>
+                                                                        <HelperTextItem icon={<InfoCircleIcon />}>
+                                                                            {_("The OIDC provider may use a different CA than the server.")}
+                                                                        </HelperTextItem>
+                                                                    </HelperText>
+                                                                </StackItem>
+                                                                <StackItem>
+                                                                    <Radio
+                                                                        id="auth-ca-system"
+                                                                        name="auth-ca-mode"
+                                                                        label={_("System default")}
+                                                                        isChecked={authCaMode === "system"}
+                                                                        onChange={() =>
+                                                                            updateEnrollment({
+                                                                                authCaMode: "system" as AuthCaMode,
+                                                                            })
+                                                                        }
+                                                                    />
+                                                                </StackItem>
+                                                                <StackItem>
+                                                                    <WithTooltip
+                                                                        showTooltip={tlsMode !== "customCa"}
+                                                                        content={_("No custom server CA certificate is configured")}
+                                                                    >
+                                                                        <Radio
+                                                                            id="auth-ca-server"
+                                                                            name="auth-ca-mode"
+                                                                            label={_("Use server CA certificate")}
+                                                                            isChecked={authCaMode === "serverCa"}
+                                                                            isDisabled={tlsMode !== "customCa"}
+                                                                            onChange={() =>
+                                                                                updateEnrollment({
+                                                                                    authCaMode: "serverCa" as AuthCaMode,
+                                                                                })
+                                                                            }
+                                                                        />
+                                                                    </WithTooltip>
+                                                                </StackItem>
+                                                                <StackItem>
+                                                                    <Radio
+                                                                        id="auth-ca-custom"
+                                                                        name="auth-ca-mode"
+                                                                        label={_("Custom CA certificate")}
+                                                                        isChecked={authCaMode === "custom"}
+                                                                        onChange={() =>
+                                                                            updateEnrollment({
+                                                                                authCaMode: "custom" as AuthCaMode,
+                                                                            })
+                                                                        }
+                                                                        body={
+                                                                            authCaMode === "custom" && (
+                                                                                <FileUpload
+                                                                                    id="auth-ca-cert-pem"
+                                                                                    type="text"
+                                                                                    value={enrollment.authCaCertPem ?? ""}
+                                                                                    filename={authCaFilename}
+                                                                                    onFileInputChange={(_event, file) =>
+                                                                                        setAuthCaFilename(file.name)
+                                                                                    }
+                                                                                    onDataChange={(_event, value) =>
+                                                                                        updateEnrollment({ authCaCertPem: value })
+                                                                                    }
+                                                                                    onTextChange={(_event, value) =>
+                                                                                        updateEnrollment({ authCaCertPem: value })
+                                                                                    }
+                                                                                    onClearClick={() => {
+                                                                                        updateEnrollment({ authCaCertPem: "" });
+                                                                                        setAuthCaFilename("");
+                                                                                    }}
+                                                                                    allowEditingUploadedText
+                                                                                    browseButtonText={_("Browse...")}
+                                                                                    clearButtonText={_("Clear")}
+                                                                                    dropzoneProps={{
+                                                                                        accept: {
+                                                                                            "application/x-pem-file": [".pem", ".crt", ".cer"],
+                                                                                        },
+                                                                                    }}
+                                                                                />
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </StackItem>
+                                                                </>
+                                                                )}
                                                             </Stack>
+
                                                         </FeatureSwitch>
                                                         {tlsMode === "insecure" && (
                                                             <Alert

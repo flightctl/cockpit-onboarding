@@ -101,9 +101,12 @@ class TestEnrollment(testlib.MachineCase):
 
         b.wait_visible("#flightctl-enrollment:checked")
 
+        b.wait_not_present("#auth-ca-system")
+
         b.click("#auth-password")
         b.wait_visible("#credential-username")
         b.wait_visible("#credential-password")
+        b.wait_visible("#auth-ca-system")
 
         b.set_input_text("#credential-username", "testuser")
         b.set_input_text("#credential-password", "testpassword")
@@ -114,6 +117,7 @@ class TestEnrollment(testlib.MachineCase):
         b.click("#auth-token")
         b.wait_visible("#credential-token")
         b.wait_not_present("#credential-username")
+        b.wait_not_present("#auth-ca-system")
 
 
 if __name__ == '__main__':
