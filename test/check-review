@@ -13,8 +13,10 @@ import testlib
 
 from wizard_navigation import (
     IFACE_TABLE,
+    add_single_nic_interface,
     advance_past_optional_steps_to_review,
     click_button_text,
+    complete_enrollment_step,
     iface_row_selector,
 )
 
@@ -152,26 +154,16 @@ class TestReview(testlib.MachineCase):
         b.wait_in_text(REVIEW_ENROLLMENT, "Enrollment skipped")
 
 
-@testlib.nondestructive
 class TestReviewSingleNic(testlib.MachineCase):
     """Test review page warnings when configuring the setup interface"""
 
     def setUp(self):
         super().setUp()
-        m = self.machine
-        addr = m.ssh_address
-        try:
-            self.setup_iface = m.execute(
-                f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
-            ).strip().split('\n')[0]
-        except Exception:
-            self.setup_iface = None
+        self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+        self.setup_iface = add_single_nic_interface(self)
 
     def testSingleNicReviewWarning(self):
         """Test that review page shows 'Connection will be interrupted' warning"""
-        if not self.setup_iface:
-            self.skipTest("Could not determine setup interface")
-
         b = self.browser
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         b.wait_visible("#networkStep")
@@ -185,9 +177,9 @@ class TestReviewSingleNic(testlib.MachineCase):
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
-        b.wait_visible("#enrollmentStep")
-        click_button_text(b, "Next")
+        complete_enrollment_step(b)
         b.wait_visible("#labelsStep")
+        b.wait_visible("#hostname-input")
         b.set_input_text("#hostname-input", "single-nic-test")
         click_button_text(b, "Next")
         b.wait_visible("#reviewStep")

@@ -17,25 +17,53 @@ import testlib
 
 from wizard_navigation import (
     IFACE_TABLE,
+    add_single_nic_interface,
     advance_past_optional_steps_to_review,
     click_button_text,
+    complete_enrollment_step,
     iface_row_selector,
+    wait_for_nic,
 )
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 
 
+MULTI_NIC_MAC = "52:54:00:88:00:01"
+
+
 class TestApplyConfiguration(testlib.MachineCase):
-    """Test the enrollment progress page UI"""
+    """Test the enrollment progress page UI (multi-NIC path)"""
     provision = {'machine1': {'restrict': False}}
 
     def setUp(self):
         super().setUp()
-        self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+        m = self.machine
+        m.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+
+        m._qemu_monitor(
+            f"netdev_add user,id=multinic_net,net=10.111.114.0/24"
+        )
+        m._qemu_monitor(
+            f"device_add virtio-net-pci,netdev=multinic_net,"
+            f"mac={MULTI_NIC_MAC},id=multinic_dev"
+        )
+        m.execute("udevadm settle")
+        self.production_iface = wait_for_nic(m, MULTI_NIC_MAC)
 
     def navigate_to_apply_step(self):
         b = self.browser
 
-        advance_past_optional_steps_to_review(b, "apply-test-host")
+        b.wait_visible("#networkStep")
+        b.wait_visible(IFACE_TABLE)
+        row_sel = iface_row_selector(b, IFACE_TABLE, self.production_iface)
+        b.click(f"{row_sel} input[type='radio']")
+        click_button_text(b, "Next")
+        b.wait_visible("#networkServicesStep")
+        click_button_text(b, "Next")
+        complete_enrollment_step(b)
+        b.wait_visible("#labelsStep")
+        b.wait_visible("#hostname-input")
+        b.set_input_text("#hostname-input", "apply-test-host")
+        click_button_text(b, "Next")
         b.wait_visible("#reviewStep")
         b.click("#wizard-next-btn")
         b.wait_in_text("#progressStep", "Apply")
@@ -83,14 +111,7 @@ class TestApplySingleNic(testlib.MachineCase):
     def setUp(self):
         super().setUp()
         self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
-        m = self.machine
-        addr = m.ssh_address
-        try:
-            self.setup_iface = m.execute(
-                f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
-            ).strip().split('\n')[0]
-        except Exception:
-            self.setup_iface = None
+        self.setup_iface = add_single_nic_interface(self)
 
     def select_setup_interface_and_navigate_to_review(self, hostname):
         b = self.browser
@@ -106,18 +127,15 @@ class TestApplySingleNic(testlib.MachineCase):
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
-        b.wait_visible("#enrollmentStep")
-        click_button_text(b, "Next")
+        complete_enrollment_step(b)
         b.wait_visible("#labelsStep")
+        b.wait_visible("#hostname-input")
         b.set_input_text("#hostname-input", hostname)
         click_button_text(b, "Next")
         b.wait_visible("#reviewStep")
 
     def testSingleNicDelegation(self):
         """Test that single-NIC apply delegates to background and shows info alert"""
-        if not self.setup_iface:
-            self.skipTest("Could not determine setup interface")
-
         b = self.browser
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.select_setup_interface_and_navigate_to_review("single-nic-apply")
@@ -140,9 +158,6 @@ class TestApplySingleNic(testlib.MachineCase):
 
     def testSingleNicStepsDelegated(self):
         """Test that remaining steps show 'Delegated to background service' status"""
-        if not self.setup_iface:
-            self.skipTest("Could not determine setup interface")
-
         b = self.browser
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.select_setup_interface_and_navigate_to_review("single-nic-delegated")
@@ -171,22 +186,16 @@ class TestApplySingleNicRollback(testlib.MachineCase):
     def setUp(self):
         super().setUp()
         self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+        self.setup_iface = add_single_nic_interface(self)
         m = self.machine
-        addr = m.ssh_address
-        try:
-            self.setup_iface = m.execute(
-                f"ip -o addr show | grep '{addr}/' | awk '{{print $2}}'"
-            ).strip().split('\n')[0]
-        except Exception:
-            self.setup_iface = None
 
         self.config = {
             "version": "1.0",
             "runOnce": False,
             "hideModules": False,
             "connectivityTest": {
-                "host": "nonexistent.invalid.test",
-                "carrierTimeoutSeconds": 5,
+                "host": "192.0.2.1",
+                "carrierTimeoutSeconds": 1,
                 "connectivityRetries": 2,
             }
         }
@@ -197,9 +206,6 @@ class TestApplySingleNicRollback(testlib.MachineCase):
 
     def testSingleNicRollbackOnConnectivityFailure(self):
         """Test that failed connectivity triggers rollback of NM profiles"""
-        if not self.setup_iface:
-            self.skipTest("Could not determine setup interface")
-
         m = self.machine
         b = self.browser
 
@@ -219,9 +225,9 @@ class TestApplySingleNicRollback(testlib.MachineCase):
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
-        b.wait_visible("#enrollmentStep")
-        click_button_text(b, "Next")
+        complete_enrollment_step(b)
         b.wait_visible("#labelsStep")
+        b.wait_visible("#hostname-input")
         b.set_input_text("#hostname-input", "rollback-test-host")
         click_button_text(b, "Next")
         b.wait_visible("#reviewStep")
@@ -240,9 +246,9 @@ class TestApplySingleNicRollback(testlib.MachineCase):
                 "Onboarding continues in the background",
             )
 
-        # With connectivityRetries=2 at 2s intervals, the script fails in ~4s
-        # then rolls back. Wait up to 30s for the log to confirm.
-        deadline = time.time() + 30
+        # The background script waits for carrier (up to 5s) then retries
+        # connectivity 2 times at 2s intervals before rolling back.
+        deadline = time.time() + 60
         rollback_confirmed = False
         while time.time() < deadline:
             try:
@@ -252,12 +258,12 @@ class TestApplySingleNicRollback(testlib.MachineCase):
                     break
             except Exception:
                 pass
-            time.sleep(5)
+            time.sleep(3)
 
         self.assertTrue(
             rollback_confirmed,
             f"Rollback did not complete within timeout. Log:\n"
-            f"{m.execute(f'cat {APPLY_LOG} 2>/dev/null || echo (no log)')}"
+            f"{m.execute(f'cat {APPLY_LOG} 2>/dev/null || echo no-log')}"
         )
 
         log_contents = m.execute(f"cat {APPLY_LOG}")
