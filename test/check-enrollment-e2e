@@ -34,6 +34,7 @@ from wizard_navigation import (
 )
 
 AGENT_CONFIG = "/etc/flightctl/config.yaml"
+LABELS_CONFIG = "/etc/flightctl/conf.d/50-cockpit-labels.yaml"
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 TEST_DIR = os.path.dirname(__file__)
 
@@ -159,6 +160,19 @@ class TestEnrollmentE2EBase(testlib.MachineCase):
             "})()"
         )
 
+    def set_react_input_value(self, selector, value):
+        """Set a controlled React input's value via the native HTMLInputElement setter"""
+        self.browser.wait_visible(selector)
+        self.browser.eval_js(
+            "(function() {"
+            f"  var el = document.querySelector({json.dumps(selector)});"
+            "   var setter = Object.getOwnPropertyDescriptor("
+            "       window.HTMLInputElement.prototype, 'value').set;"
+            f"  setter.call(el, {json.dumps(value)});"
+            "   el.dispatchEvent(new Event('input', {bubbles: true}));"
+            "})()"
+        )
+
     def navigate_to_enrollment(self):
         """Select the production interface with static IP and advance to enrollment"""
         b = self.browser
@@ -208,6 +222,54 @@ class TestEnrollmentE2EBase(testlib.MachineCase):
         self.set_react_textarea_value("#ca-cert-pem", self.ca_cert)
 
         b.click("#auth-ca-server")
+
+    def query_enrollment_request_labels(self, timeout=120):
+        """Wait for the agent to start, then poll the Flight Control server
+        for the enrollment request labels.
+
+        The caller is responsible for triggering cleanup (e.g. clicking Finish
+        in the wizard, which runs cleanup-onboarding.sh).  The cleanup creates
+        the onboarding gate file and starts flightctl-agent.  The agent reads
+        /etc/flightctl/conf.d/ and sends an enrollment request whose
+        spec.labels reflect the configured default-labels and
+        label-from-systeminfo mappings.
+        """
+        m = self.machine
+        services = self.machines['services']
+
+        m.execute(
+            "timeout 60 bash -c '"
+            "while ! systemctl is-active --quiet flightctl-agent; do sleep 2; done"
+            "'",
+            timeout=65,
+        )
+
+        services.execute(
+            "install -m 0600 /dev/null /tmp/creds.json && "
+            "echo '{\"username\":\"admin\",\"password\":\"flightctl\"}' > /tmp/creds.json && "
+            f"flightctl login https://{self.SERVICES_IP} "
+            "--credentials-file /tmp/creds.json "
+            "--config-dir /tmp/flightctl-cli "
+            "--certificate-authority /etc/flightctl/pki/ca.crt "
+            "--auth-certificate-authority /etc/flightctl/pki/ca.crt"
+        )
+
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                output = services.execute(
+                    "flightctl get enrollmentrequests -o json "
+                    "--config-dir /tmp/flightctl-cli"
+                )
+                data = json.loads(output)
+                items = data.get("items", [])
+                if items:
+                    return items[0].get("spec", {}).get("labels") or {}
+            except Exception:
+                pass
+            time.sleep(5)
+
+        return None
 
 
 class TestEnrollmentE2E(TestEnrollmentE2EBase):
@@ -280,6 +342,77 @@ class TestEnrollmentE2E(TestEnrollmentE2EBase):
             b.wait_in_text("#apply-steps", "flightctl login failed")
 
         m.execute(f"test ! -f {AGENT_CONFIG}")
+
+    def testLabelsInEnrollmentRequest(self):
+        """Verify labels configured in the wizard propagate to the enrollment request"""
+        m = self.machine
+        b = self.browser
+
+        self.login_and_go(
+            "/system-onboarding", user="onboarding", password="",
+            superuser=False, tls=True,
+        )
+
+        self.fill_enrollment_form()
+
+        click_button_text(b, "Next")
+        b.wait_visible("#labelsStep")
+
+        b.set_input_text("#hostname-input", "e2e-labels-test")
+
+        b.wait_visible("#alias-enabled:checked")
+        b.wait_visible("#alias-mode-hostname:checked")
+
+        self.set_react_input_value("#device-label-key-0", "env")
+        self.set_react_input_value("#device-label-value-0", "production")
+
+        click_button_text(b, "Add another label")
+        b.wait_visible("#device-label-key-1")
+        self.set_react_input_value("#device-label-key-1", "region")
+        self.set_react_input_value("#device-label-value-1", "us-east")
+
+        self.set_react_input_value("#sysinfo-label-key-0", "arch")
+        b.click("#sysinfo-field-0")
+        b.wait_visible("#sysinfo-field-0-menu")
+        b.click("#sysinfo-field-0-menu li:first-child button")
+
+        click_button_text(b, "Next")
+        b.wait_visible("#review-enrollment")
+
+        b.click("#wizard-next-btn")
+        b.wait_in_text("#progressStep", "Apply")
+
+        with b.wait_timeout(180):
+            b.wait_in_text("#apply-steps", "Enrollment credentials provisioned")
+            b.wait_visible("#apply-success-alert")
+
+        m.execute(f"test -f {AGENT_CONFIG}")
+        m.execute(f"test -f {LABELS_CONFIG}")
+
+        labels_yaml = m.execute(f"cat {LABELS_CONFIG}")
+        self.assertIn("default-labels:", labels_yaml)
+        self.assertIn('alias: "e2e-labels-test"', labels_yaml)
+        self.assertIn('env: "production"', labels_yaml)
+        self.assertIn('region: "us-east"', labels_yaml)
+        self.assertIn("label-from-systeminfo:", labels_yaml)
+        self.assertIn("arch: architecture", labels_yaml)
+
+        click_button_text(b, "Finish")
+
+        er_labels = self.query_enrollment_request_labels()
+        self.assertIsNotNone(
+            er_labels,
+            "No enrollment request appeared on the server within the timeout",
+        )
+
+        self.assertEqual(er_labels.get("alias"), "e2e-labels-test")
+        self.assertEqual(er_labels.get("env"), "production")
+        self.assertEqual(er_labels.get("region"), "us-east")
+        self.assertIn("arch", er_labels)
+        self.assertTrue(
+            len(er_labels.get("arch", "")) > 0,
+            "Expected 'arch' label to have a non-empty value from system info",
+        )
 
 
 class TestEnrollmentE2ESingleNic(TestEnrollmentE2EBase):
