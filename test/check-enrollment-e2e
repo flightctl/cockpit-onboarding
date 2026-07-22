@@ -9,7 +9,7 @@ Provisions two VMs:
 
 machine1 gets a second ethernet NIC hot-plugged onto the same mcast network
 already used for the base test network (see add_netiface_with_localaddr()
-below), so the wizard has an unconfigured interface to select as
+in wizard_navigation.py), so the wizard has an unconfigured interface to select as
 "production". services is already reachable on that same network via its
 base interface and just gets a second static IP added there. The wizard
 configures machine1's new interface with a static IP and enrolls against
@@ -28,6 +28,7 @@ import testlib
 
 from wizard_navigation import (
     IFACE_TABLE,
+    add_netiface_with_localaddr,
     click_button_text,
     iface_row_selector,
     wait_for_nic,
@@ -37,27 +38,6 @@ AGENT_CONFIG = "/etc/flightctl/config.yaml"
 LABELS_CONFIG = "/etc/flightctl/conf.d/50-cockpit-labels.yaml"
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 TEST_DIR = os.path.dirname(__file__)
-
-
-def add_netiface_with_localaddr(machine, networking):
-    """Hot-plug a NIC onto the shared mcast test network, bound to loopback
-
-    Machine.add_netiface() (bots/machine/machine_core/machine_virtual.py)
-    omits localaddr=127.0.0.1 from its netdev_add call, unlike the mcast NIC
-    QEMU is booted with. Without it, QEMU sends multicast traffic out via the
-    default route interface instead of loopback, so a hot-plugged NIC can't
-    reach other VMs on the same mcast group. bots/ is vendored and not
-    patchable here, so this replicates add_netiface() with the fix inlined.
-    """
-    machine._qemu_monitor(
-        "netdev_add socket,mcast=230.0.0.1:{mcast},localaddr=127.0.0.1,id={id}".format(
-            mcast=networking["mcast"], id=networking["hostnet"]
-        )
-    )
-    machine._qemu_monitor(
-        f"device_add virtio-net-pci,mac={networking['mac']},netdev={networking['hostnet']}"
-    )
-    return networking["mac"]
 
 
 class TestEnrollmentE2EBase(testlib.MachineCase):

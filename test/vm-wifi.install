@@ -43,6 +43,9 @@ for pkg in kernel-modules-internal NetworkManager-wifi wpa_supplicant iw \
     rpm -q "$pkg" >/dev/null
 done
 
+# ── Ensure chronyd is enabled (default NTP backend on Fedora) ────
+systemctl enable chronyd.service
+
 # ── mac80211_hwsim module autoload (3 radios) ────────────────────────
 # Radio 1: claimed by flightctl-onboarding-setup.service (onboarding AP)
 # Radio 2: claimed by test infra AP script (test-infra-wifi SSID)

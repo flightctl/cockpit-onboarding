@@ -1,0 +1,91 @@
+#!/bin/sh
+# Image customization script for a Fedora VM running Squid HTTP proxy
+# and chrony NTP server. Used by bots/image-customize to build a qcow2
+# for network-services e2e tests (check-network-services-e2e).
+set -eux
+
+# Fixed production-network identity for this image.
+NETSERVICES_IP="10.111.118.3"
+
+# ── Install squid, chrony, and htpasswd ───────────────────────────────
+dnf install -y squid chrony httpd-tools
+
+# ── Configure chrony as an NTP server ─────────────────────────────────
+cat > /etc/chrony.conf <<'EOF'
+allow 10.111.112.0/20
+local stratum 10
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync
+log measurements statistics tracking
+EOF
+
+# ── Configure squid proxy (unauthenticated by default) ────────────────
+htpasswd -bc /etc/squid/passwd proxyuser proxypass
+
+cat > /etc/squid/squid.conf <<'EOF'
+acl test_subnet src 10.111.112.0/20
+acl SSL_ports port 443
+acl SSL_ports port 7443
+acl SSL_ports port 7444
+acl Safe_ports port 80
+acl Safe_ports port 443
+acl Safe_ports port 7443
+acl Safe_ports port 7444
+acl CONNECT method CONNECT
+
+http_access deny !Safe_ports
+http_access deny CONNECT !SSL_ports
+http_access allow test_subnet
+http_access deny all
+
+http_port 3128
+access_log daemon:/var/log/squid/access.log squid
+EOF
+
+# Auth-required variant swapped in at runtime by tests that need it
+cat > /etc/squid/squid-auth-required.conf <<'EOF'
+acl test_subnet src 10.111.112.0/20
+acl SSL_ports port 443
+acl SSL_ports port 7443
+acl SSL_ports port 7444
+acl Safe_ports port 80
+acl Safe_ports port 443
+acl Safe_ports port 7443
+acl Safe_ports port 7444
+acl CONNECT method CONNECT
+
+auth_param basic program /usr/lib64/squid/basic_ncsa_auth /etc/squid/passwd
+auth_param basic children 5
+auth_param basic realm Test Proxy
+auth_param basic credentialsttl 2 hours
+
+acl authenticated proxy_auth REQUIRED
+
+http_access deny !Safe_ports
+http_access deny CONNECT !SSL_ports
+http_access allow authenticated
+http_access deny all
+
+http_port 3128
+access_log daemon:/var/log/squid/access.log squid
+EOF
+
+# ── Firewall: allow proxy and NTP ─────────────────────────────────────
+if systemctl is-active -q firewalld.service; then
+    firewall-cmd --add-port=3128/tcp --permanent
+    firewall-cmd --add-port=123/udp --permanent
+    firewall-cmd --reload
+fi
+
+# ── Enable services (started at test runtime, not image build) ────────
+systemctl enable chronyd
+systemctl enable squid
+
+# Verify they start cleanly, then stop for image snapshot
+systemctl start chronyd
+systemctl start squid
+systemctl stop squid
+systemctl stop chronyd
+
+echo "Network services image build complete"

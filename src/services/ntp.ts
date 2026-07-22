@@ -1,6 +1,5 @@
 import cockpit from "cockpit";
 import { SCRIPT_NTP } from "../paths";
-import { waitForProxy } from "./dbus-helpers";
 import { ServerTime } from "../../pkg/lib/serverTime.js";
 import { validateHostnameOrIP } from "../validation";
 import {
@@ -55,19 +54,7 @@ export async function getNtpServers(): Promise<string[]> {
 export async function configureNtpServers(servers: string[], autoConfig: boolean): Promise<StepAction[]> {
     const actions: StepAction[] = [];
 
-    const timedateClient = cockpit.dbus("org.freedesktop.timedate1");
     try {
-        const timedateProxy = await waitForProxy(
-            timedateClient.proxy("org.freedesktop.timedate1", "/org/freedesktop/timedate1")
-        );
-
-        await timedateProxy.call("SetNTP", [true, true]);
-        // Disable NTP before changing server config
-        await timedateProxy.call("SetNTP", [false, true]);
-
-        // Write NTP config files via a helper script run with sudo.
-        // We can't use serverTime.js set_custom_ntp() because it uses
-        // { superuser: "require" } which needs Cockpit's superuser bridge.
         if (autoConfig) {
             await cockpit.spawn(["sudo", SCRIPT_NTP, "auto"], { err: "message" });
             actions.push(
@@ -102,12 +89,8 @@ export async function configureNtpServers(servers: string[], autoConfig: boolean
                 )
             );
         }
-
-        await timedateProxy.call("SetNTP", [true, true]);
     } catch (error) {
         throw new Error(`NTP configuration failed: ${String(error)}`);
-    } finally {
-        timedateClient.close();
     }
 
     return actions;
