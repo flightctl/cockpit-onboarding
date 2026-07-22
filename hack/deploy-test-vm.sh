@@ -190,17 +190,12 @@ provision_vm() {
     run_ssh "${vm_ip}" "echo mac80211_hwsim | sudo tee /etc/modules-load.d/mac80211_hwsim.conf > /dev/null"
     run_ssh "${vm_ip}" "echo 'options mac80211_hwsim radios=3' | sudo tee /etc/modprobe.d/mac80211_hwsim.conf > /dev/null"
 
-    echo "Installing RPM build dependencies..."
-    run_ssh "${vm_ip}" "sudo dnf install -y make rpm-build nodejs npm gettext libappstream-glib"
-
-    echo "Building and installing flightctl-onboarding RPM..."
-    make -C "${PROJECT_DIR}" rpm \
-        BRAND_NAME="${BRAND_NAME:-Flight Control}" \
-        NODE_ENV="${NODE_ENV:-production}"
+    echo "Building flightctl-onboarding RPM..."
+    make -C "${PROJECT_DIR}" rpm
 
     local rpm_file
     shopt -s nullglob
-    local rpms=("${PROJECT_DIR}"/flightctl-onboarding-*.noarch.rpm)
+    local rpms=("${PROJECT_DIR}"/bin/rpm/flightctl-onboarding-*.noarch.rpm)
     shopt -u nullglob
     if [[ ${#rpms[@]} -eq 0 ]]; then
         echo "ERROR: RPM build failed - no .rpm file found" >&2

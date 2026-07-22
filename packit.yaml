@@ -2,6 +2,7 @@
 # To use this, enable Packit-as-a-service in GitHub: https://packit.dev/docs/packit-as-a-service/
 # See https://packit.dev/docs/configuration/ for the format of this file
 
+downstream_package_name: flightctl-onboarding
 specfile_path: flightctl-onboarding.spec
 # use the nicely formatted release description from our upstream release, instead of git shortlog
 copy_upstream_release_description: true
@@ -17,46 +18,36 @@ actions:
     - make node-cache
     - sh -c 'sed -i "/^Source1:/ s/https:.*/$(ls *-node*.tar.xz)/" flightctl-onboarding.spec'
   create-archive: make dist
-  # flightctl-onboarding-wizard.git has no release tags; your project can drop this once you have a release
-  get-current-version: make print-version
+  get-current-version:
+    - bash -c './hack/current-version | sed "s/^v//; s/-/~/g"'
 
 jobs:
-  - job: tests
-    trigger: pull_request
-    targets: &test_targets
-      - fedora-all
-      - fedora-latest-aarch64
-      - centos-stream-9
-      - centos-stream-9-aarch64
-      - centos-stream-10
-
   - job: copr_build
     trigger: pull_request
-    targets: *test_targets
+    targets:
+      - fedora-43-x86_64
+      - epel-9-x86_64
+      - epel-10-x86_64
+    module_hotfixes: true
+    notifications:
+      failure_comment:
+        message: "/packit build"
 
-  # Build releases in COPR: https://packit.dev/docs/configuration/#copr_build
-  #- job: copr_build
-  #  trigger: release
-  #  owner: your_copr_login
-  #  project: your_copr_project
-  #  preserve_project: True
-  #  targets:
-  #    - fedora-all
-  #    - centos-stream-9-x86_64
+  - job: copr_build
+    trigger: commit
+    branch: main
+    owner: "@redhat-et"
+    project: flightctl-dev
+    preserve_project: true
+    targets: &copr_targets
+      - fedora-42-x86_64
+      - fedora-43-x86_64
+      - epel-9-x86_64
+      - epel-10-x86_64
 
-  # Build releases in Fedora: https://packit.dev/docs/configuration/#propose_downstream
-  #- job: propose_downstream
-  #  trigger: release
-  #  dist_git_branches:
-  #    - fedora-all
-
-  #- job: koji_build
-  #  trigger: commit
-  #  dist_git_branches:
-  #    - fedora-all
-
-  #- job: bodhi_update
-  #  trigger: commit
-  #  dist_git_branches:
-  #    # rawhide updates are created automatically
-  #    - fedora-branched
+  - job: copr_build
+    trigger: release
+    owner: "@redhat-et"
+    project: flightctl
+    preserve_project: true
+    targets: *copr_targets

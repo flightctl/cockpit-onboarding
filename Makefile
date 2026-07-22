@@ -1,7 +1,7 @@
 # extract name from package.json
 PACKAGE_NAME := $(shell awk '/"name":/ {gsub(/[",]/, "", $$2); print $$2}' package.json)
 RPM_NAME := flightctl-onboarding
-VERSION := $(shell T=$$(git describe --tags 2>/dev/null | sed 's/^v//'); [ -z "$$T" ] && T=0.0.1; echo $$T | tr '-' '.')
+VERSION := $(shell T=$$(hack/current-version 2>/dev/null | sed 's/^v//'); [ -z "$$T" ] && T=0.0.1; echo $$T | tr '-' '.')
 ifeq ($(TEST_OS),)
 TEST_OS = centos-9-stream
 endif
@@ -93,7 +93,7 @@ po/LINGUAS:
 
 $(SPEC): packaging/$(SPEC).in package-lock.json
 	provides=$$(npm ls --omit dev --package-lock-only --depth=Infinity | grep -Eo '[^[:space:]]+@[^[:space:]]+' | sort -u | sed 's/^/Provides: bundled(npm(/; s/\(.*\)@/\1)) = /'); \
-	awk -v p="$$provides" '{gsub(/%{VERSION}/, "$(VERSION)"); gsub(/%{NPM_PROVIDES}/, p)}1' $< > $@
+	awk -v p="$$provides" -v v="$(VERSION)" '{gsub(/%{NPM_PROVIDES}/, p); gsub(/%{VERSION}/, v)}1' $< > $@
 
 packaging/arch/PKGBUILD: packaging/arch/PKGBUILD.in
 	sed 's/VERSION/$(VERSION)/; s/SOURCE/$(TARFILE)/' $< > $@
@@ -109,9 +109,10 @@ watch: $(NODE_MODULES_STAMP) $(COCKPIT_REPO_STAMP)
 
 clean:
 	rm -rf dist/
-	rm -f $(SPEC) packaging/arch/PKGBUILD
+	rm -f packaging/arch/PKGBUILD
 	rm -f $(TARFILE) $(NODE_CACHE)
 	rm -f po/LINGUAS
+	rm -rf bin/rpm
 
 install: $(DIST_TEST) po/LINGUAS
 	mkdir -p $(DESTDIR)$(PREFIX)/share/cockpit/$(PACKAGE_NAME)
@@ -154,31 +155,8 @@ $(NODE_CACHE): $(NODE_MODULES_STAMP)
 
 node-cache: $(NODE_CACHE)
 
-# convenience target for developers
-srpm: $(TARFILE) $(NODE_CACHE) $(SPEC)
-	rpmbuild -bs \
-	  --define "_sourcedir `pwd`" \
-	  --define "_srcrpmdir `pwd`" \
-	  $(SPEC)
-
-# convenience target for developers
-rpm: $(SPEC)
-	rm -f $(TARFILE)
-	$(MAKE) $(TARFILE) $(NODE_CACHE)
-	mkdir -p "`pwd`/output"
-	mkdir -p "`pwd`/rpmbuild"
-	rpmbuild -bb \
-	  --define "_sourcedir `pwd`" \
-	  --define "_specdir `pwd`" \
-	  --define "_builddir `pwd`/rpmbuild" \
-	  --define "_srcrpmdir `pwd`" \
-	  --define "_rpmdir `pwd`/output" \
-	  --define "_buildrootdir `pwd`/build" \
-	  --define "brand_name $(BRAND_NAME)" \
-	  $(SPEC)
-	find `pwd`/output -name '*.rpm' -printf '%f\n' -exec mv {} . \;
-	rm -rf "`pwd`/rpmbuild"
-	rm -rf "`pwd`/output" "`pwd`/build"
+rpm:
+	hack/build_rpms.sh
 
 # build a VM with locally built distro pkgs installed
 # disable networking, VM images have mock/pbuilder with the common build dependencies pre-installed
@@ -300,8 +278,7 @@ help:
 	@echo ""
 	@echo "Packaging targets:"
 	@echo "  dist             Create release tarball"
-	@echo "  srpm             Build source RPM"
-	@echo "  rpm              Build binary RPM"
+	@echo "  rpm              Build RPM via packit in a container (requires podman)"
 	@echo "  node-cache       Create node_modules cache tarball"
 	@echo "  print-version    Print the current version"
 	@echo ""
@@ -322,4 +299,4 @@ help:
 	@echo "i18n targets:"
 	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm srpm prepare-check check check-browser vm print-vm vm-wifi vm-services vm-network-services check-fedora deploy-test-vm install-flightctl-on-vm clean-test-vm help
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check check-browser vm print-vm vm-wifi vm-services vm-network-services check-fedora deploy-test-vm install-flightctl-on-vm clean-test-vm help
