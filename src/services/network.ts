@@ -236,10 +236,14 @@ const DHCP6_FQDN_KEY = "fqdn_fqdn";
 export async function getDhcpHostname(interfaces: Interface[]): Promise<string> {
     try {
         const defaultIface = await getDefaultInterface(interfaces);
-        if (!defaultIface) return "";
+        if (!defaultIface) {
+            return "";
+        }
 
         const iface = interfaces.find((i) => i.Name === defaultIface);
-        if (!iface?.Device?.ActiveConnection) return "";
+        if (!iface?.Device?.ActiveConnection) {
+            return "";
+        }
 
         const ipv4Settings = iface.MainConnection?.Settings.ipv4 as ConnectionIpSettings | undefined;
         const ipv6Settings = iface.MainConnection?.Settings.ipv6 as ConnectionIpSettings | undefined;
@@ -259,28 +263,32 @@ export async function getDhcpHostname(interfaces: Interface[]): Promise<string> 
                 [defaultIface]
             );
 
-            const deviceProxy = await waitForProxyWithTimeout(
-                nmClient.proxy("org.freedesktop.NetworkManager.Device", devicePath),
+            const deviceProxy = await waitForProxyWithTimeout<{ Dhcp4Config?: string; Dhcp6Config?: string }>(
+                nmClient.proxy("org.freedesktop.NetworkManager.Device", devicePath as string),
                 2000
             );
 
             if (ipv4Method !== "manual" && deviceProxy.data.Dhcp4Config && deviceProxy.data.Dhcp4Config !== "/") {
-                const dhcp4Proxy = await waitForProxyWithTimeout(
+                const dhcp4Proxy = await waitForProxyWithTimeout<{ Options?: Record<string, string> }>(
                     nmClient.proxy("org.freedesktop.NetworkManager.DHCP4Config", deviceProxy.data.Dhcp4Config),
                     2000
                 );
                 const options = dhcp4Proxy.data.Options || {};
-                if (options[DHCP4_HOSTNAME_KEY]) return options[DHCP4_HOSTNAME_KEY];
+                if (options[DHCP4_HOSTNAME_KEY]) {
+                    return options[DHCP4_HOSTNAME_KEY];
+                }
             }
 
             if (ipv6Method !== "manual" && ipv6Method !== "ignore" && ipv6Method !== "disabled"
                 && deviceProxy.data.Dhcp6Config && deviceProxy.data.Dhcp6Config !== "/") {
-                const dhcp6Proxy = await waitForProxyWithTimeout(
+                const dhcp6Proxy = await waitForProxyWithTimeout<{ Options?: Record<string, string> }>(
                     nmClient.proxy("org.freedesktop.NetworkManager.DHCP6Config", deviceProxy.data.Dhcp6Config),
                     2000
                 );
                 const options = dhcp6Proxy.data.Options || {};
-                if (options[DHCP6_FQDN_KEY]) return options[DHCP6_FQDN_KEY];
+                if (options[DHCP6_FQDN_KEY]) {
+                    return options[DHCP6_FQDN_KEY];
+                }
             }
 
             return "";
