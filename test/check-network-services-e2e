@@ -448,6 +448,9 @@ class TestEnrollmentThroughProxyE2E(testlib.MachineCase):
             f" connection.autoconnect yes"
         )
         ns.execute("nmcli con up production")
+        ns.execute(
+            f"echo '{SERVICES_IP} {BASE_DOMAIN}' >> /etc/hosts"
+        )
         ns.execute("systemctl start chronyd")
         ns.execute("systemctl start squid")
         ns.execute("truncate -s0 /var/log/squid/access.log")
@@ -572,6 +575,8 @@ class TestEnrollmentThroughProxyE2E(testlib.MachineCase):
         b.click("#tls-custom-ca")
         self.set_react_textarea_value("#ca-cert-pem", self.ca_cert)
 
+        b.click("#auth-ca-server")
+
         click_button_text(b, "Next")
 
         # ── Labels step ───────────────────────────────────────────────
@@ -614,17 +619,26 @@ class TestEnrollmentThroughProxyE2E(testlib.MachineCase):
             timeout=70,
         )
 
-        deadline = time.time() + 60
-        while time.time() < deadline:
-            agent_log = ns.execute("cat /var/log/squid/access.log")
-            if f"CONNECT {SERVICES_IP}:443" in agent_log:
-                break
-            time.sleep(3)
+        m.execute(
+            "timeout 30 bash -c '"
+            'while ! journalctl -u flightctl-agent --no-pager'
+            ' | grep -q "Waiting for enrollment to be approved";'
+            " do sleep 2; done"
+            "'",
+            timeout=35,
+        )
+        m.execute("systemctl stop flightctl-agent")
+
         agent_log = ns.execute("cat /var/log/squid/access.log")
         self.assertIn(
-            f"CONNECT {SERVICES_IP}:443",
+            "CONNECT",
             agent_log,
             "Squid should show CONNECT from flightctl-agent after enrollment",
+        )
+        self.assertIn(
+            BASE_DOMAIN,
+            agent_log,
+            "Squid should show traffic to flightctl domain from agent",
         )
 
         assert_ntp_manual_applied(self, m, NETSERVICES_IP)

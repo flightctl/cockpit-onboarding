@@ -26,8 +26,12 @@ htpasswd -bc /etc/squid/passwd proxyuser proxypass
 cat > /etc/squid/squid.conf <<'EOF'
 acl test_subnet src 10.111.112.0/20
 acl SSL_ports port 443
+acl SSL_ports port 7443
+acl SSL_ports port 7444
 acl Safe_ports port 80
 acl Safe_ports port 443
+acl Safe_ports port 7443
+acl Safe_ports port 7444
 acl CONNECT method CONNECT
 
 http_access deny !Safe_ports
@@ -43,8 +47,12 @@ EOF
 cat > /etc/squid/squid-auth-required.conf <<'EOF'
 acl test_subnet src 10.111.112.0/20
 acl SSL_ports port 443
+acl SSL_ports port 7443
+acl SSL_ports port 7444
 acl Safe_ports port 80
 acl Safe_ports port 443
+acl Safe_ports port 7443
+acl Safe_ports port 7444
 acl CONNECT method CONNECT
 
 auth_param basic program /usr/lib64/squid/basic_ncsa_auth /etc/squid/passwd
