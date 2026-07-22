@@ -146,9 +146,7 @@ Create a signed tag with release notes:
 - fix bug #123
 ```
 
-Pushing the tag triggers the [release-plugin.yaml](.github/workflows/release-plugin.yaml) GitHub Actions workflow, which builds and publishes the release tarball.
-
-Fedora and COPR releases are handled by [Packit](https://packit.dev/) (see [packit.yaml](packit.yaml)).
+Pushing the tag triggers a [Packit](https://packit.dev/) COPR build (see [packit.yaml](packit.yaml)).
 
 ## Automated maintenance
 
