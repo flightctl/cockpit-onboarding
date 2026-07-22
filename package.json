@@ -3,7 +3,7 @@
   "description": "System onboarding wizard",
   "type": "module",
   "main": "index.js",
-  "repository": "git@github.com:cockpit/system-onboarding.git",
+  "repository": "git@github.com:flightctl/cockpit-onboarding.git",
   "author": "",
   "license": "LGPL-2.1",
   "engines": {

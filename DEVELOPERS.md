@@ -57,7 +57,7 @@ To upload to `~/.local/share/cockpit/` (as a normal user) instead of `/usr/local
 
 ## Code quality
 
-Run all static checks (ESLint, Stylelint, TypeScript):
+Run all static checks (ESLint, Stylelint), unit tests (Jest), and shell script tests:
 
     make codecheck
 
@@ -86,7 +86,7 @@ Create a Fedora QEMU/KVM VM pre-provisioned with the onboarding RPM, dual ethern
 make deploy-test-vm
 ```
 
-This downloads a Fedora Cloud image, creates a VM with two ethernet interfaces and two virtual WiFi radios (`mac80211_hwsim`), installs all dependencies, builds and installs the onboarding RPM, installs `flightctl-cli`, `flightctl-agent`, and `flightctl-selinux` from [COPR @redhat-et/flightctl-dev](https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/), and starts the setup service. The VM IP is printed at the end — access the wizard at `https://<ip>:9090`.
+This downloads a Fedora Cloud image, creates a VM with two ethernet interfaces and three virtual WiFi radios (`mac80211_hwsim`), installs all dependencies, builds and installs the onboarding RPM, installs `flightctl-cli`, `flightctl-agent`, and `flightctl-selinux` from [COPR @redhat-et/flightctl-dev](https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/), and starts the setup service. The VM IP is printed at the end — access the wizard at `https://<ip>:9090`.
 
 To install flightctl packages on an existing test VM without redeploying:
 
@@ -109,7 +109,7 @@ To destroy the VM:
 make clean-test-vm
 ```
 
-See the [Testing WiFi Interfaces](README.md#testing-wifi-interfaces) section in the README for details on WiFi simulation and how to enable internet connectivity through the virtual radios.
+See the [Testing WiFi Interfaces](docs/testing-wifi.md) guide for details on WiFi simulation and how to enable internet connectivity through the virtual radios.
 
 ## Running tests
 
@@ -121,7 +121,7 @@ Build an RPM, install into a test VM, and run integration tests:
 
 This uses Cockpit's Chrome DevTools Protocol based browser tests. After the VM is prepared, re-run tests without rebuilding:
 
-    TEST_OS=centos-9-stream test/check-application -tvs
+    TEST_OS=centos-9-stream test/check-network -tvs
 
 Set up the test environment without running tests:
 
@@ -133,7 +133,7 @@ Test against a different OS image:
 
 ### In CI
 
-The project supports [Cirrus CI](https://cirrus-ci.org/) (see [.cirrus.yml](.cirrus.yml)) and [Packit](https://packit.dev/) (see [packit.yaml](packit.yaml)) for automated testing. Packit tests run for all supported Fedora releases using the [FMF metadata format](https://github.com/teemtee/fmf) and the [tmt test management tool](https://docs.fedoraproject.org/en-US/ci/tmt/). Note that Packit tests only run [@nondestructive tests](https://github.com/cockpit-project/cockpit/blob/main/test/common/testlib.py).
+The project supports [Cirrus CI](https://cirrus-ci.org/) (see [.cirrus.yml.disabled](.cirrus.yml.disabled)) and [Packit](https://packit.dev/) (see [packit.yaml](packit.yaml)) for automated testing. Packit tests run for all supported Fedora releases using the [FMF metadata format](https://github.com/teemtee/fmf) and the [tmt test management tool](https://docs.fedoraproject.org/en-US/ci/tmt/). Note that Packit tests only run [@nondestructive tests](https://github.com/cockpit-project/cockpit/blob/main/test/common/testlib.py).
 
 ## Releases
 
@@ -146,7 +146,7 @@ Create a signed tag with release notes:
 - fix bug #123
 ```
 
-Pushing the tag triggers the [release.yml](.github/workflows/release.yml.disabled) GitHub Actions workflow, which builds and publishes the release tarball. The workflow is disabled by default — see the comment at the top of the file to enable it.
+Pushing the tag triggers the [release-plugin.yaml](.github/workflows/release-plugin.yaml) GitHub Actions workflow, which builds and publishes the release tarball.
 
 Fedora and COPR releases are handled by [Packit](https://packit.dev/) (see [packit.yaml](packit.yaml)).
 

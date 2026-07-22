@@ -87,7 +87,7 @@ If you have a keyboard and monitor connected to the device, open `http://localho
 
 ## How It Works
 
-On first boot the setup service creates a temporary `onboarding` user, optionally starts a WiFi access point, and enables the Cockpit web console. The operator connects to Cockpit, steps through the wizard pages (hostname, labels, network, NTP/proxy, enrollment), and clicks "Apply".
+On first boot the setup service creates a temporary `onboarding` user, optionally starts a WiFi access point, and enables the Cockpit web console. The operator connects to Cockpit, steps through the wizard pages (network, network services, enrollment, device labels, review), and clicks "Apply".
 
 The wizard supports two operational flows depending on network topology — see [AGENTS.md](AGENTS.md) for a detailed description of each:
 
@@ -114,6 +114,7 @@ The override file does not need to contain all keys — only the values you want
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `version` | string | `"1.0"` | Config schema version |
+| `brandName` | string | `"Flight Control"` | Brand name shown in the enrollment UI and used for service labels |
 | `runOnce` | bool | `true` | Disable the onboarding service after completion |
 | `keepCockpit` | bool | `false` | Keep Cockpit running post-onboarding (expires the onboarding user's password instead of deleting the user) |
 | `hideModules` | bool | `true` | Hide other Cockpit modules during onboarding |
@@ -127,13 +128,32 @@ The override file does not need to contain all keys — only the values you want
 | `network.wifiAp.dhcpRangeSize` | int | `40` | Number of DHCP leases to offer |
 | `network.wifiAp.channel` | int | `6` | WiFi channel |
 | `network.ethernet.enabled` | bool | `true` | Enable Ethernet setup interface |
+| `network.ethernet.interface` | string | `""` | Ethernet interface for onboarding; empty = auto-detect |
 | `network.ethernet.staticIp` | string | `"192.168.100.1"` | Static IP for the onboarding Ethernet interface |
 | `network.ethernet.subnetPrefix` | int | `24` | Ethernet subnet prefix length |
 | `network.ethernet.dhcpRangeSize` | int | `40` | Number of DHCP leases (requires dnsmasq) |
 | `flightctl.defaultEndpoint` | string | `""` | Pre-populated Flight Control server URL in the enrollment form |
 | `connectivityTest.host` | string | `"cockpit-project.org"` | Host used for DNS/ping connectivity checks after network apply |
+| `connectivityTest.required` | bool | `true` | Block enrollment until connectivity check passes |
+| `connectivityTest.carrierTimeoutSeconds` | int | `300` | Seconds to wait for link carrier before giving up |
+| `connectivityTest.connectivityRetries` | int | `30` | Number of connectivity check retries after carrier is up |
+| `defaults.hostname` | string | `""` | Pre-populated hostname in the wizard |
+| `defaults.proxy.enabled` | bool | `false` | Enable proxy by default in the wizard |
+| `defaults.proxy.protocol` | string | `"http"` | Default proxy protocol (`http`, `https`, or `socks5`) |
+| `defaults.proxy.applyForHttps` | bool | `false` | Also use the proxy for HTTPS traffic |
+| `defaults.proxy.hostname` | string | `""` | Default proxy hostname |
+| `defaults.proxy.port` | int | — | Default proxy port |
+| `defaults.proxy.username` | string | `""` | Default proxy username |
+| `defaults.proxy.password` | string | `""` | Default proxy password |
+| `defaults.proxy.noProxy` | string | `""` | Comma-separated list of hosts to bypass the proxy |
+| `defaults.labels.deviceLabels` | array | `[]` | Pre-populated device labels (`[{key, value}]`) |
+| `defaults.labels.systemInfoMappings` | array | `[]` | Pre-populated system-info label mappings (`[{key, value}]`) |
+| `defaults.alias.mode` | string | — | Default alias mode for the device |
+| `defaults.alias.customValue` | string | `""` | Custom alias value when mode is custom |
 | `onboardingUser.password` | string | `""` | Password for the `onboarding` Cockpit user; empty = passwordless login |
 | `led.enabled` | bool | `false` | Enable LED state signaling during onboarding phases |
+| `led.tool` | string | — | Path to the LED control tool; required when `led.enabled` is `true` |
+| `led.states` | object | `{ready, in-progress, applying, success, error, off}` | Maps onboarding phases to LED state names passed to the tool |
 
 ### Example override
 
@@ -187,6 +207,17 @@ For detailed test environment setup guides, see:
 
 - [Testing WiFi Interfaces](docs/testing-wifi.md) — virtual radios, network namespaces, USB passthrough
 - [Testing VLAN Interfaces](docs/testing-vlan.md) — VLAN trunk setup, wizard configuration, reset scripts
+
+## Further Reading
+
+Flight Control documentation (the management platform this plugin enrolls devices into):
+
+- [Introduction & Concepts](https://github.com/flightctl/flightctl/blob/main/docs/user/introduction.md) — core concepts: devices, fleets, agents, labels
+- [Enrolling Devices](https://github.com/flightctl/flightctl/blob/main/docs/user/using/managing-devices.md) — the enrollment workflow this plugin facilitates
+- [Installing the Agent](https://github.com/flightctl/flightctl/blob/main/docs/user/installing/installing-agent.md) — agent `config.yaml` format and parameters
+- [Agent Architecture](https://github.com/flightctl/flightctl/blob/main/docs/user/references/agent-architecture.md) — agent lifecycle states and enrollment flow
+- [Certificate Architecture](https://github.com/flightctl/flightctl/blob/main/docs/user/references/certificate-architecture.md) — certificate chain of trust and file locations
+- [Building OS Images](https://github.com/flightctl/flightctl/blob/main/docs/user/building/building-images.md) — early vs. late binding enrollment; embedding the agent in bootc images
 
 ## License
 
