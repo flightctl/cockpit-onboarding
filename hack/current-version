@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+# Prefer proper release tags pointing at this exact commit first, prioritizing
+# the highest version tag. If there is no tag at this commit, then fallback to
+# 'git describe' which will construct a "human-readable" artificial tag.
+tag=$(git -c "versionsort.suffix=-rc" tag --points-at HEAD --sort version:refname -l 'v*' | tail -n 1 2>/dev/null)
+
+# When multiple tags exist on the same commit (e.g. v1.3.0-main and v1.2.0-rc1),
+# git describe may pick the wrong one. Re-resolve using version sorting at the
+# base commit and re-attach the distance and hash suffix.
+if [[ -z "$tag" ]]; then
+  full_describe=$(git describe --tags --first-parent --match 'v*' 2>/dev/null)
+  if [[ -n "$full_describe" ]]; then
+    nearest_tag=$(git describe --tags --first-parent --match 'v*' --abbrev=0 2>/dev/null)
+    base_commit=$(git rev-parse "$nearest_tag"^{commit} 2>/dev/null)
+    best_tag=$(git -c "versionsort.suffix=-rc" tag --points-at "$base_commit" --sort version:refname -l 'v*' | tail -n 1 2>/dev/null)
+    if [[ -n "$best_tag" ]]; then
+      tag="${best_tag}${full_describe#"$nearest_tag"}"
+    else
+      tag="$full_describe"
+    fi
+  fi
+fi
+
+if [[ -z "$tag" ]]; then
+  tag="v0.0.1"
+fi
+
+echo -n "$tag"

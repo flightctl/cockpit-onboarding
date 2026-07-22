@@ -1,7 +1,7 @@
 # extract name from package.json
 PACKAGE_NAME := $(shell awk '/"name":/ {gsub(/[",]/, "", $$2); print $$2}' package.json)
 RPM_NAME := flightctl-onboarding
-VERSION := $(shell T=$$(git describe --tags 2>/dev/null | sed 's/^v//'); [ -z "$$T" ] && T=0.0.1; echo $$T | tr '-' '.')
+VERSION := $(shell T=$$(hack/current-version 2>/dev/null | sed 's/^v//'); [ -z "$$T" ] && T=0.0.1; echo $$T | tr '-' '.')
 ifeq ($(TEST_OS),)
 TEST_OS = centos-9-stream
 endif
