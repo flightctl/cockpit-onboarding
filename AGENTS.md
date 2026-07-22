@@ -26,7 +26,7 @@ src/                          React/TypeScript source
   app.tsx                     Main wizard component and flow orchestration
   wizard/                     Wizard step components (one per page)
   services/                   Cockpit API wrappers (D-Bus, spawn, file I/O)
-  hooks/                      React hooks (interface detection, config loading)
+  hooks/                      React hooks (connected-interface detection)
   __tests__/                  Jest unit tests
 
 packaging/
@@ -85,13 +85,9 @@ The operator connects to Cockpit via one interface (e.g. the WiFi AP or a dedica
 3. A watchdog timer is armed (240s for WiFi, 600s for Ethernet).
 4. The wizard detects that the selected interface is **not** the connected one → inline flow.
 5. Steps execute sequentially **in the browser session** via `cockpit.spawn()` and D-Bus:
-   - Apply hostname
-   - Create and activate the NM connection profile
-   - Configure NTP
-   - Apply proxy settings
-   - Write device labels
-   - Run enrollment script (passes credentials via temp file, streams progress)
+   - Apply configuration (hostname, create and activate NM connection profile, NTP, proxy, device labels)
    - Test connectivity (DNS resolution + ping)
+   - Run enrollment script (passes credentials via temp file, streams progress)
    - Finalize (write `.onboarding-complete` marker)
 6. On success: wizard shows results. Operator clicks "Finish" → `cleanup-onboarding.sh` runs.
 7. On failure: `rollback-config.sh` reverts changes. Wizard shows the error. Operator can go back, fix settings, and retry.
@@ -135,7 +131,7 @@ The operator connects and configures the **same** interface — e.g. connecting 
 `src/services/network.ts` → `isConnectedViaInterface()`:
 
 1. If the browser is at `localhost`, returns `false` (local console — never single-NIC).
-2. Runs `ss -Htn sport = :9090` to find the IP addresses of active Cockpit sessions.
+2. Reads the Cockpit port from `/etc/cockpit/cockpit.conf` (default `9090`), then runs `ss -Htn sport = :<port>` to find the IP addresses of active Cockpit sessions.
 3. Runs `ip -o addr show <selectedInterface>` to get addresses on the selected interface.
 4. If any session IP matches an interface IP, the operator is connected through that interface → single-NIC.
 
@@ -160,8 +156,14 @@ All scripts are in `packaging/systemd/scripts/` unless noted otherwise.
 | `check-dependencies.sh` | Validates required and optional dependencies at service startup |
 | `configure-ntp.sh` | Writes NTP server configuration via chrony or timesyncd drop-ins |
 | `apply-proxy.sh` | Writes proxy settings to systemd drop-in and `/etc/environment`, runs `daemon-reexec` |
-| `apply-labels.sh` | Writes device labels to `/etc/flightctl/conf.d/labels.yaml` |
+| `apply-labels.sh` | Writes device labels to `/etc/flightctl/conf.d/50-cockpit-labels.yaml` |
 | `read-flightctl-config.sh` | Reads `/etc/flightctl/config.yaml` to detect existing enrollment credentials |
+| `setup-led.sh` | Initializes LED indicator to 'ready' state at boot (when LED control is enabled in config) |
+| `wifi-ap-prepare.sh` | Releases the WiFi interface from NetworkManager before hostapd takes over |
+| `wifi-ap-activate.sh` | Assigns the AP IP address, starts dnsmasq/captive portal, and adds the interface to the firewalld zone |
+| `wifi-ap-teardown.sh` | Removes the interface from the firewalld zone, flushes addresses, and brings the interface down |
+| `mask-greenboot.sh` | Masks greenboot-healthcheck.service during onboarding to prevent OS rollback while flightctl-agent is gated |
+| `captive-portal.py` | HTTP captive portal responder: handles OS-specific detection probes and redirects clients to the Cockpit wizard |
 | `packaging/system-onboarding.d/flightctl-enroll.sh` | Flight Control enrollment: reads credentials from temp file, runs `flightctl login` + `flightctl certificate request` |
 
 ## Coding Conventions

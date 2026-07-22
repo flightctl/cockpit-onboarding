@@ -172,8 +172,8 @@ if [ $1 -eq 0 ]; then
 
     # Remove the dedicated firewalld zone
     if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
-        if firewall-cmd --permanent --info-zone=flightctl-onboarding-ap >/dev/null 2>&1; then
-            firewall-cmd --permanent --delete-zone=flightctl-onboarding-ap 2>/dev/null || :
+        if firewall-cmd --permanent --info-zone=fc-onboarding-ap >/dev/null 2>&1; then
+            firewall-cmd --permanent --delete-zone=fc-onboarding-ap 2>/dev/null || :
             firewall-cmd --reload 2>/dev/null || :
         fi
     fi
