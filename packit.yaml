@@ -2,6 +2,7 @@
 # To use this, enable Packit-as-a-service in GitHub: https://packit.dev/docs/packit-as-a-service/
 # See https://packit.dev/docs/configuration/ for the format of this file
 
+downstream_package_name: flightctl-onboarding
 specfile_path: flightctl-onboarding.spec
 # use the nicely formatted release description from our upstream release, instead of git shortlog
 copy_upstream_release_description: true
@@ -31,6 +32,10 @@ jobs:
   - job: copr_build
     trigger: pull_request
     targets: *test_targets
+    module_hotfixes: true
+    notifications:
+      failure_comment:
+        message: "/packit build"
 
   - job: copr_build
     trigger: commit

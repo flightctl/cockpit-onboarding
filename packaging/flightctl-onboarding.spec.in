@@ -1,5 +1,5 @@
 Name: flightctl-onboarding
-Version: %{VERSION}
+Version: 0.0.1
 Release: 1%{?dist}
 Summary: Flightctl Onboarding Module
 License: LGPL-2.1-or-later
