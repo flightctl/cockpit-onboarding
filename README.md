@@ -96,7 +96,7 @@ The wizard supports two operational flows depending on network topology — see 
 
 Once complete, the cleanup script removes the temporary user, tears down the WiFi AP, and marks onboarding as finished — the service will not run again.
 
-Enrollment is handled by drop-in shell scripts in `/usr/share/cockpit/system-onboarding/system-onboarding.d/`. The package ships a script for Flight Control; add your own to support other management platforms.
+Enrollment is handled by a drop-in shell script in `/usr/share/cockpit/system-onboarding/system-onboarding.d/`.
 
 ## Configuration
 
@@ -171,35 +171,6 @@ To change the setup Ethernet IP and pre-populate the Flight Control endpoint, cr
   }
 }
 ```
-
-## Captive Portal Detection
-
-The WiFi AP includes a captive portal handler on port 80 that works with wildcard DNS (`address=/#/<AP_IP>`) to trigger the native sign-in prompt on client devices. Each OS uses a different detection mechanism:
-
-| OS | Probe URL | Expected behavior |
-|----|-----------|-------------------|
-| Windows | `http://www.msftconnecttest.com/connecttest.txt` | Wildcard DNS redirects lookup to AP; 302 response triggers captive portal popup |
-| Apple (iOS/macOS) | `http://captive.apple.com/hotspot-detect.html` | 302 redirect to device-info page triggers Captive Network Assistant sheet |
-| Android | `http://connectivitycheck.gstatic.com/generate_204` | 302 response triggers sign-in notification |
-| Linux (GNOME/NM) | `http://fedoraproject.org/static/hotspot.txt` (Fedora) | NM checks for `OK` response; wildcard DNS must intercept the lookup |
-
-### VPN and competing DNS
-
-Captive portal detection depends on the AP's wildcard DNS intercepting the connectivity check URL. When a VPN or another network interface forces DNS through a different server, the check URL resolves to its real IP address, bypassing the AP's wildcard DNS entirely. The client either reaches the real server (reporting full connectivity) or fails to connect (reporting no internet) — neither triggers the captive portal prompt.
-
-Disconnecting the VPN before connecting to the AP resolves this.
-
-## Security Considerations
-
-### Proxy credential handling
-
-When a proxy with authentication is configured, credentials are stored in two places:
-
-- **Systemd drop-in** (`/etc/systemd/system.conf.d/50-flightctl-onboarding-proxy.conf`) — contains the full proxy URL including credentials. This file is mode `0600` (root-only) and is the authoritative source for systemd services (including `flightctl-agent`).
-
-- **`/etc/environment`** — contains the proxy URL **without credentials**. This file must be world-readable (mode `0644`) because `pam_env.so` reads it during login for all users. To prevent credential leakage to non-root users, only the host and port are written here. Interactive tools that need authenticated proxy access must run as root or obtain credentials through other means.
-
-This separation is intentional: the full credentialed URL is only stored in root-owned, root-readable files. The world-readable `/etc/environment` provides proxy discovery (where the proxy is) without exposing authentication details.
 
 ## Testing
 
