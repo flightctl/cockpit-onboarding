@@ -93,7 +93,7 @@ po/LINGUAS:
 
 $(SPEC): packaging/$(SPEC).in package-lock.json
 	provides=$$(npm ls --omit dev --package-lock-only --depth=Infinity | grep -Eo '[^[:space:]]+@[^[:space:]]+' | sort -u | sed 's/^/Provides: bundled(npm(/; s/\(.*\)@/\1)) = /'); \
-	awk -v p="$$provides" '{gsub(/%{NPM_PROVIDES}/, p)}1' $< > $@
+	awk -v p="$$provides" -v v="$(VERSION)" '{gsub(/%{NPM_PROVIDES}/, p); gsub(/%{VERSION}/, v)}1' $< > $@
 
 packaging/arch/PKGBUILD: packaging/arch/PKGBUILD.in
 	sed 's/VERSION/$(VERSION)/; s/SOURCE/$(TARFILE)/' $< > $@
