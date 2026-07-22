@@ -22,16 +22,12 @@ actions:
     - bash -c './hack/current-version | sed "s/^v//; s/-/~/g"'
 
 jobs:
-  - job: tests
-    trigger: pull_request
-    targets: &test_targets
-      - fedora-all
-      - centos-stream-9
-      - centos-stream-10
-
   - job: copr_build
     trigger: pull_request
-    targets: *test_targets
+    targets:
+      - fedora-43-x86_64
+      - epel-9-x86_64
+      - epel-10-x86_64
     module_hotfixes: true
     notifications:
       failure_comment:
@@ -44,9 +40,10 @@ jobs:
     project: flightctl-dev
     preserve_project: true
     targets: &copr_targets
-      - fedora-all
-      - centos-stream-9
-      - centos-stream-10
+      - fedora-42-x86_64
+      - fedora-43-x86_64
+      - epel-9-x86_64
+      - epel-10-x86_64
 
   - job: copr_build
     trigger: release
