@@ -233,6 +233,15 @@ export async function getDefaultInterface(interfaces: Interface[]): Promise<stri
 const DHCP4_HOSTNAME_KEY = "host_name";
 const DHCP6_FQDN_KEY = "fqdn_fqdn";
 
+function variantToString(val: unknown): string {
+    if (typeof val === "string") return val;
+    if (val && typeof val === "object" && "t" in val && "v" in val) {
+        const variant = val as { t: string; v: unknown };
+        if (variant.t === "s" && typeof variant.v === "string") return variant.v;
+    }
+    return "";
+}
+
 export async function getDhcpHostname(interfaces: Interface[]): Promise<string> {
     try {
         const defaultIface = await getDefaultInterface(interfaces);
@@ -275,7 +284,7 @@ export async function getDhcpHostname(interfaces: Interface[]): Promise<string> 
                 );
                 const options = dhcp4Proxy.data.Options || {};
                 if (options[DHCP4_HOSTNAME_KEY]) {
-                    return options[DHCP4_HOSTNAME_KEY];
+                    return variantToString(options[DHCP4_HOSTNAME_KEY]);
                 }
             }
 
@@ -287,7 +296,7 @@ export async function getDhcpHostname(interfaces: Interface[]): Promise<string> 
                 );
                 const options = dhcp6Proxy.data.Options || {};
                 if (options[DHCP6_FQDN_KEY]) {
-                    return options[DHCP6_FQDN_KEY];
+                    return variantToString(options[DHCP6_FQDN_KEY]);
                 }
             }
 
