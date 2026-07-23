@@ -131,7 +131,7 @@ jobs:
           TEST_OS: ${{ matrix.os }}
           TEST_MEMORY_MB: 2048
           TEST_CPUS: 2
-          RUN_TESTS_OPTIONS: -v -j 2
+          RUN_TESTS_OPTIONS: -v
 
       - name: Upload test failure artifacts
         if: failure()
