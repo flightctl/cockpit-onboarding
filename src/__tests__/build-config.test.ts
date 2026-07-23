@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

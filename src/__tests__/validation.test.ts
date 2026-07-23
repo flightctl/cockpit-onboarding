@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import { IPv4Config, IPv6Config } from "../types";
 import { validateURL, validateSystemHostname, validateDns, validateIpv4DnsConfig, validateIpv6DnsConfig } from "../validation";
 

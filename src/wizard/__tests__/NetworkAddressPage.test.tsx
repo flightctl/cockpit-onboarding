@@ -1,4 +1,5 @@
 /**
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  * Unit tests for IP address and network configuration validation logic
  *
  * These tests verify that the validation functions correctly implement

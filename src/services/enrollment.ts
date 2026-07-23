@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import cockpit from "cockpit";
 import { SCRIPT_FINALIZE } from "../paths";
 import type { Model } from "../model-context";
