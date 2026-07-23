@@ -497,6 +497,7 @@ function buildConnectionSettings(
             "address-data": { t: "aa{sv}", v: addressData },
             gateway: { t: "s", v: model.networkAddress.ipv4.gateway || "" },
             dns: { t: "au", v: dnsUint32 },
+            "dns-priority": { t: "i", v: 10 },
             "ignore-auto-dns": { t: "b", v: !model.networkAddress.ipv4.autoDns },
         };
     } else if (model.networkAddress.ipv4.method === "disabled") {
@@ -538,6 +539,7 @@ function buildConnectionSettings(
             "address-data": { t: "aa{sv}", v: ipv6AddressData },
             gateway: { t: "s", v: model.networkAddress.ipv6.gateway || "" },
             dns: { t: "aay", v: dnsBytes },
+            "dns-priority": { t: "i", v: 10 },
             "ignore-auto-dns": { t: "b", v: !model.networkAddress.ipv6.autoDns },
             "may-fail": { t: "b", v: model.networkAddress.ipv6.mayFail },
         };

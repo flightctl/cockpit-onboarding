@@ -90,6 +90,13 @@ jobs:
           path: ~/.cache/cockpit-images
           key: cockpit-images-fedora-43-${{ hashFiles('Makefile') }}
 
+      - name: Flatten services images
+        run: |
+          for img in test/images/fedora-43-services.qcow2 test/images/fedora-43-network-services.qcow2; do
+            qemu-img convert -O qcow2 "$img" "${img%.qcow2}-flat.qcow2"
+            mv "${img%.qcow2}-flat.qcow2" "$img"
+          done
+
       - name: Upload services images
         uses: actions/upload-artifact@v4
         with:
