@@ -234,10 +234,14 @@ const DHCP4_HOSTNAME_KEY = "host_name";
 const DHCP6_FQDN_KEY = "fqdn_fqdn";
 
 function variantToString(val: unknown): string {
-    if (typeof val === "string") return val;
+    if (typeof val === "string") {
+        return val;
+    }
     if (val && typeof val === "object" && "t" in val && "v" in val) {
         const variant = val as { t: string; v: unknown };
-        if (variant.t === "s" && typeof variant.v === "string") return variant.v;
+        if (variant.t === "s" && typeof variant.v === "string") {
+            return variant.v;
+        }
     }
     return "";
 }
