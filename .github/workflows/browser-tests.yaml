@@ -14,10 +14,75 @@ permissions:
   contents: read
 
 jobs:
-  check-fedora:
-    name: Fedora integration tests
+  build-services:
+    name: Build service VMs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            qemu-kvm libvirt-daemon-system libvirt-clients virtinst ovmf \
+            swtpm swtpm-tools python3-libvirt python3-gssapi python3-pil \
+            python3-aiohttp make rpm python-is-python3
+
+      - name: Restore cached base image
+        id: restore-image-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/cockpit-images
+          key: cockpit-images-fedora-43-${{ hashFiles('Makefile') }}
+          restore-keys: |
+            cockpit-images-fedora-43-
+
+      - name: Build services VMs
+        run: |
+          make vm-services
+          make vm-network-services
+        env:
+          PYTHONUNBUFFERED: 1
+
+      - name: Save base image cache
+        if: github.ref == 'refs/heads/main' && steps.restore-image-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/cockpit-images
+          key: cockpit-images-fedora-43-${{ hashFiles('Makefile') }}
+
+      - name: Upload services images
+        uses: actions/upload-artifact@v4
+        with:
+          name: services-images
+          path: |
+            test/images/fedora-43-services.qcow2
+            test/images/fedora-43-network-services.qcow2
+
+  integration-tests:
+    name: "${{ matrix.os }} integration tests"
+    needs: build-services
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [fedora-43, centos-9-stream, centos-10]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,43 +120,54 @@ jobs:
           sudo ln -sf "${{ steps.setup-chrome.outputs.chrome-path }}" /usr/bin/chromium-browser
           echo "$(dirname '${{ steps.setup-chrome.outputs.chromedriver-path }}')" >> "$GITHUB_PATH"
 
-      - name: Restore cached Fedora base image
+      - name: Restore cached base image
         id: restore-image-cache
         uses: actions/cache/restore@v6
         with:
           path: ~/.cache/cockpit-images
-          key: cockpit-images-fedora-43-${{ hashFiles('Makefile') }}
+          key: cockpit-images-${{ matrix.os }}-${{ hashFiles('Makefile') }}
           restore-keys: |
-            cockpit-images-fedora-43-
+            cockpit-images-${{ matrix.os }}-
 
-      - name: Build WiFi test VM image
+      - name: Download services images
+        uses: actions/download-artifact@v4
+        with:
+          name: services-images
+          path: test/images/
+
+      - name: Create services image symlinks
+        run: |
+          cd test/images
+          ln -sf fedora-43-services.qcow2 fedora-43-services
+          ln -sf fedora-43-network-services.qcow2 fedora-43-network-services
+
+      - name: Build agent VM image
         run: make vm-wifi
         env:
           PYTHONUNBUFFERED: 1
+          TEST_OS: ${{ matrix.os }}
 
-      - name: Build Flight Control services VM image
-        run: make vm-services
-        env:
-          PYTHONUNBUFFERED: 1
-
-      - name: Save Fedora base image cache
+      - name: Save base image cache
         if: github.ref == 'refs/heads/main' && steps.restore-image-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: ~/.cache/cockpit-images
-          key: cockpit-images-fedora-43-${{ hashFiles('Makefile') }}
+          key: cockpit-images-${{ matrix.os }}-${{ hashFiles('Makefile') }}
 
       - name: Run integration tests
-        run: make check-fedora
+        run: make check-integration
         env:
           PYTHONUNBUFFERED: 1
+          TEST_OS: ${{ matrix.os }}
+          TEST_MEMORY_MB: 2048
+          TEST_CPUS: 2
           RUN_TESTS_OPTIONS: -v -j 2
 
       - name: Upload test failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-failures
+          name: test-failures-${{ matrix.os }}
           path: |
             Test*.png
             Test*.html

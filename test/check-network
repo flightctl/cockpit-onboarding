@@ -67,6 +67,8 @@ class TestNetworkInterface(testlib.MachineCase):
         if interfaces_count > 1:
             for row in range(1, interfaces_count + 1):
                 row_radio = f"{IFACE_TABLE} tbody tr:nth-child({row}) input[type='radio']"
+                if b.is_present(f"{row_radio}:disabled"):
+                    continue
                 if not b.is_present(f"{row_radio}:checked"):
                     b.click(f"{row_radio}:not(:checked)")
                     break

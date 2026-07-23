@@ -34,6 +34,7 @@ from wizard_navigation import (
     wait_for_nic,
 )
 
+TEST_IMAGE = os.environ.get("TEST_OS", "fedora-43")
 AGENT_CONFIG = "/etc/flightctl/config.yaml"
 LABELS_CONFIG = "/etc/flightctl/conf.d/50-cockpit-labels.yaml"
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
@@ -54,7 +55,7 @@ class TestEnrollmentE2EBase(testlib.MachineCase):
 
     provision = {
         'machine1': {
-            'image': os.path.join(TEST_DIR, 'images', 'fedora-43'),
+            'image': os.path.join(TEST_DIR, 'images', TEST_IMAGE),
             'restrict': False,
         },
         'services': {

@@ -3,7 +3,7 @@ PACKAGE_NAME := $(shell awk '/"name":/ {gsub(/[",]/, "", $$2); print $$2}' packa
 RPM_NAME := flightctl-onboarding
 VERSION := $(shell T=$$(hack/current-version 2>/dev/null | sed 's/^v//'); [ -z "$$T" ] && T=0.0.1; echo $$T | tr '-' '.')
 ifeq ($(TEST_OS),)
-TEST_OS = centos-9-stream
+TEST_OS = fedora-43
 endif
 export TEST_OS
 TARFILE=$(RPM_NAME)-$(VERSION).tar.xz
@@ -174,40 +174,43 @@ vm: $(VM_IMAGE)
 print-vm:
 	@echo $(VM_IMAGE)
 
-# WiFi-enabled Fedora test VM with mac80211_hwsim simulation
-WIFI_TEST_OS = fedora-43
-WIFI_IMAGE = $(CURDIR)/test/images/$(WIFI_TEST_OS)
-$(WIFI_IMAGE): $(TARFILE) $(NODE_CACHE) bots test/vm-wifi.install
+# Full test VM — installs pre-built RPM, flightctl agent/CLI from COPR,
+# and on Fedora sets up mac80211_hwsim WiFi simulation.
+WIFI_IMAGE = $(CURDIR)/test/images/$(TEST_OS)
+$(WIFI_IMAGE): bots test/vm-wifi.install
+	@test -d bin/rpm && ls bin/rpm/flightctl-onboarding-*.noarch.rpm >/dev/null 2>&1 \
+		|| $(MAKE) rpm
 	bots/image-customize --fresh \
-		--upload $(TARFILE):/var/tmp/ \
-		--upload $(NODE_CACHE):/var/tmp/ \
-		--script $(CURDIR)/test/vm-wifi.install $(WIFI_TEST_OS)
+		--upload $$(ls bin/rpm/flightctl-onboarding-*.noarch.rpm | head -1):/var/tmp/ \
+		--script $(CURDIR)/test/vm-wifi.install $(TEST_OS)
 
 vm-wifi: $(WIFI_IMAGE)
 	@echo $(WIFI_IMAGE)
 
 # Flight Control services VM for end-to-end enrollment tests
-SERVICES_IMAGE = $(CURDIR)/test/images/$(WIFI_TEST_OS)-services
+# Always Fedora-based — this is infrastructure, not the OS under test.
+SERVICES_IMAGE = $(CURDIR)/test/images/fedora-43-services
 $(SERVICES_IMAGE): bots test/vm-flightctl-services.install
 	bots/image-customize --fresh \
-		--base-image $(WIFI_TEST_OS) \
-		--script $(CURDIR)/test/vm-flightctl-services.install $(WIFI_TEST_OS)-services
+		--base-image fedora-43 \
+		--script $(CURDIR)/test/vm-flightctl-services.install fedora-43-services
 
 vm-services: $(SERVICES_IMAGE)
 	@echo $(SERVICES_IMAGE)
 
 # Network services VM (Squid proxy + chrony NTP) for e2e network-services tests
-NETWORK_SERVICES_IMAGE = $(CURDIR)/test/images/$(WIFI_TEST_OS)-network-services
+# Always Fedora-based — this is infrastructure, not the OS under test.
+NETWORK_SERVICES_IMAGE = $(CURDIR)/test/images/fedora-43-network-services
 $(NETWORK_SERVICES_IMAGE): bots test/vm-network-services.install
 	bots/image-customize --fresh \
-		--base-image $(WIFI_TEST_OS) \
-		--script $(CURDIR)/test/vm-network-services.install $(WIFI_TEST_OS)-network-services
+		--base-image fedora-43 \
+		--script $(CURDIR)/test/vm-network-services.install fedora-43-network-services
 
 vm-network-services: $(NETWORK_SERVICES_IMAGE)
 	@echo $(NETWORK_SERVICES_IMAGE)
 
-check-fedora: check-browser $(WIFI_IMAGE) $(SERVICES_IMAGE) $(NETWORK_SERVICES_IMAGE) test/common
-	TEST_OS=$(WIFI_TEST_OS) test/common/run-tests --test-glob 'check-*' ${RUN_TESTS_OPTIONS}
+check-integration: check-browser $(WIFI_IMAGE) $(SERVICES_IMAGE) $(NETWORK_SERVICES_IMAGE) test/common
+	test/common/run-tests --test-glob 'check-*' ${RUN_TESTS_OPTIONS}
 
 # fail fast if the browser testlib needs isn't installed, instead of silently
 # timing out and retrying for ~30 minutes
@@ -246,6 +249,10 @@ bots: $(COCKPIT_REPO_STAMP)
 		sed -i '/image, _extension = os.path.splitext/i\        self.image_file = os.path.realpath(self.image_file)' bots/machine/machine_core/machine_virtual.py
 	grep -q '<seclabel type="none"/>' bots/machine/machine_core/machine_virtual.py || \
 		sed -i '/<\/devices>/a\  <seclabel type="none"/>' bots/machine/machine_core/machine_virtual.py
+	grep -q 'TEST_MEMORY_MB' test/common/run-tests || \
+		sed -i 's/memory_mb=memory_mb or 1400/memory_mb=memory_mb or int(os.environ.get("TEST_MEMORY_MB", 0)) or 1400/' test/common/run-tests
+	grep -q 'TEST_CPUS' test/common/run-tests || \
+		sed -i 's/cpus=cpus, memory_mb/cpus=cpus or int(os.environ.get("TEST_CPUS", 0)), memory_mb/' test/common/run-tests
 
 $(NODE_MODULES_STAMP): package.json package-lock.json
 	# unset NODE_ENV, skips devDependencies otherwise
@@ -288,7 +295,7 @@ help:
 	@echo "  vm               Build a test VM image"
 	@echo "  vm-wifi          Build a WiFi-enabled Fedora test VM image"
 	@echo "  vm-services      Build a Flight Control services VM image"
-	@echo "  check-fedora     Run all integration tests on Fedora (includes WiFi)"
+	@echo "  check-integration  Run all integration tests (WiFi tests Fedora-only)"
 	@echo "  print-vm         Print the test VM image path"
 	@echo ""
 	@echo "VM targets:"
@@ -299,4 +306,4 @@ help:
 	@echo "i18n targets:"
 	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check check-browser vm print-vm vm-wifi vm-services vm-network-services check-fedora deploy-test-vm install-flightctl-on-vm clean-test-vm help
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check check-browser vm print-vm vm-wifi vm-services vm-network-services check-integration deploy-test-vm install-flightctl-on-vm clean-test-vm help

@@ -1,26 +1,49 @@
 #!/bin/sh
-# WiFi-enabled image customization for Fedora test VMs
-# Extends the base vm.install with mac80211_hwsim WiFi simulation
+# Test VM image customization — builds the RPM, installs flightctl agent/CLI
+# from COPR, and (on Fedora only) sets up mac80211_hwsim WiFi simulation.
 set -eux
 
-# ── Build and install RPM from uploaded tarball ───────────────────────
-dnf install -y rpm-build make gettext libappstream-glib systemd-rpm-macros nodejs
+# ── Detect OS for conditional behavior ───────────────────────────────
+. /etc/os-release
+OS_MAJOR="${VERSION_ID%%.*}"
 
-SRCTARBALL=$(ls /var/tmp/flightctl-onboarding-[0-9]*.tar.xz)
-tar -xf "$SRCTARBALL" -C /var/tmp --strip-components=1 'flightctl-onboarding/flightctl-onboarding.spec'
+case "$ID" in
+    fedora)
+        COPR_CHROOT="fedora-${VERSION_ID}"
+        USE_DNF5=true
+        ;;
+    centos|rhel)
+        COPR_CHROOT="epel-${OS_MAJOR}"
+        if [ "$OS_MAJOR" -ge 10 ]; then
+            USE_DNF5=true
+        else
+            USE_DNF5=false
+        fi
+        ;;
+esac
 
-mkdir -p /var/tmp/build
-rpmbuild --define "_sourcedir /var/tmp" \
-         --define "_topdir /var/tmp/build" \
-         -bb /var/tmp/flightctl-onboarding.spec
+# ── Install pre-built RPM (uploaded by image-customize) ──────────────
+rpm -U --force --verbose /var/tmp/flightctl-onboarding-*.noarch.rpm
 
-rpm -U --force --verbose /var/tmp/build/RPMS/noarch/flightctl-onboarding-*.noarch.rpm
+# ── Disable Ethernet access point for test VMs ──────────────────────
+# The onboarding setup service reconfigures the first Ethernet interface
+# with a static IP on boot, which can break the QEMU user-mode networking
+# that the test harness uses for SSH. Disable it here; tests that need
+# Ethernet onboarding bring up the second NIC explicitly.
+mkdir -p /etc/cockpit/system-onboarding
+jq '.network.ethernet.enabled = false' \
+    /usr/share/cockpit/system-onboarding/config.json \
+    > /etc/cockpit/system-onboarding/config.json
+
 
 # ── Install flightctl agent + CLI from COPR (needed for e2e enrollment) ──
-FEDORA_VERSION=43
-COPR_REPO_URL="https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-${FEDORA_VERSION}/flightctl-redhat-et-flightctl-dev-fedora-${FEDORA_VERSION}.repo"
-dnf install -y dnf-plugins-core
-dnf config-manager addrepo --from-repofile="${COPR_REPO_URL}"
+COPR_REPO_URL="https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/${COPR_CHROOT}/flightctl-redhat-et-flightctl-dev-${COPR_CHROOT}.repo"
+if [ "$USE_DNF5" = true ]; then
+    dnf config-manager addrepo --from-repofile="${COPR_REPO_URL}"
+else
+    dnf install -y dnf-plugins-core
+    dnf config-manager --add-repo "${COPR_REPO_URL}"
+fi
 dnf install -y flightctl-agent flightctl-cli
 
 # ── Base cockpit setup (same as vm.install) ──────────────────────────
@@ -32,7 +55,15 @@ if systemctl is-active -q firewalld.service; then
 fi
 systemctl enable cockpit.socket
 
-# ── WiFi simulation packages ─────────────────────────────────────────
+# ── Ensure chronyd is enabled ────────────────────────────────────────
+systemctl enable chronyd.service
+
+# ── WiFi simulation (Fedora only) ────────────────────────────────────
+# mac80211_hwsim and the required WiFi stack packages are only available
+# on Fedora. CentOS/RHEL kernels do not ship kernel-modules-internal.
+# Tests guarded by @onlyImage("fedora-*") will be skipped on other OSes.
+if [ "$ID" = "fedora" ]; then
+
 # kernel-modules-internal (which ships mac80211_hwsim.ko) and the rest of the
 # WiFi stack are already present on the Fedora cloud base image, matching the
 # running kernel. Do NOT `dnf install` here: pulling any of these in would
@@ -42,9 +73,6 @@ for pkg in kernel-modules-internal NetworkManager-wifi wpa_supplicant iw \
            wireless-regdb hostapd dnsmasq iptables-nft; do
     rpm -q "$pkg" >/dev/null
 done
-
-# ── Ensure chronyd is enabled (default NTP backend on Fedora) ────
-systemctl enable chronyd.service
 
 # ── mac80211_hwsim module autoload (3 radios) ────────────────────────
 # Radio 1: claimed by flightctl-onboarding-setup.service (onboarding AP)
@@ -147,3 +175,5 @@ fi
 echo "Infra AP stopped"
 TEARDOWN_EOF
 chmod +x /usr/local/bin/test-wifi-infra-teardown.sh
+
+fi # end Fedora-only WiFi setup
