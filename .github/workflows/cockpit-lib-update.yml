@@ -11,20 +11,80 @@ jobs:
       pull-requests: write
       contents: write
     steps:
-      - name: Set up dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y make
-
-      - name: Set up configuration and secrets
-        run: |
-          printf '[user]\n\tname = Cockpit Project\n\temail=cockpituous@gmail.com\n' > ~/.gitconfig
-          echo '${{ secrets.COCKPIT_LIB_UPDATE_TOKEN }}' > ~/.config/github-token
-
       - name: Clone repository
         uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.COCKPIT_LIB_UPDATE_TOKEN }}
 
-      - name: Run cockpit-lib-update
+      - name: Update to next cockpit stable release
+        env:
+          GH_TOKEN: ${{ secrets.COCKPIT_LIB_UPDATE_TOKEN }}
         run: |
-          make bots
-          bots/cockpit-lib-update
+          set -eu
+
+          CURRENT_LINE=$(grep '^COCKPIT_REPO_COMMIT' Makefile)
+          CURRENT_TAG=$(echo "$CURRENT_LINE" | sed -n 's/.*# \([^ ]*\) release/\1/p')
+          if [ -z "$CURRENT_TAG" ]; then
+            echo "ERROR: Could not parse current tag from Makefile line:"
+            echo "  $CURRENT_LINE"
+            exit 1
+          fi
+          echo "Current tag: $CURRENT_TAG"
+
+          ALL_TAGS=$(git ls-remote --tags https://github.com/cockpit-project/cockpit.git \
+            | grep -v '\^{}' \
+            | sed 's|.*refs/tags/||' \
+            | grep -E '^[0-9]+(\.[0-9]+)?$' \
+            | sort -t. -k1,1n -k2,2n)
+
+          NEXT_TAG=$(echo "$ALL_TAGS" | awk -v current="$CURRENT_TAG" '
+            BEGIN { found = 0 }
+            {
+              if (found) { print; exit }
+              if ($0 == current) found = 1
+            }
+          ')
+
+          if [ -z "$NEXT_TAG" ]; then
+            echo "Already at latest tag ($CURRENT_TAG). Nothing to do."
+            exit 0
+          fi
+          echo "Next tag: $NEXT_TAG"
+
+          BRANCH="cockpit-lib-update-${NEXT_TAG}"
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Open PR #$EXISTING_PR already exists for $NEXT_TAG. Skipping."
+            exit 0
+          fi
+
+          NEXT_SHA=$(git ls-remote --tags https://github.com/cockpit-project/cockpit.git \
+            "refs/tags/${NEXT_TAG}^{}" | awk '{print $1}')
+          if [ -z "$NEXT_SHA" ]; then
+            NEXT_SHA=$(git ls-remote --tags https://github.com/cockpit-project/cockpit.git \
+              "refs/tags/${NEXT_TAG}" | awk '{print $1}')
+          fi
+          if [ -z "$NEXT_SHA" ]; then
+            echo "ERROR: Could not resolve SHA for tag $NEXT_TAG"
+            exit 1
+          fi
+          echo "Next SHA: $NEXT_SHA"
+
+          sed -i "s|^COCKPIT_REPO_COMMIT = .*|COCKPIT_REPO_COMMIT = ${NEXT_SHA} # ${NEXT_TAG} release|" Makefile
+          echo "Updated Makefile:"
+          grep '^COCKPIT_REPO_COMMIT' Makefile
+
+          git config user.name "Cockpit Project"
+          git config user.email "cockpituous@gmail.com"
+
+          git checkout -b "$BRANCH"
+          git add Makefile
+          git commit -m "Makefile: Update Cockpit lib to ${NEXT_TAG}"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --title "Makefile: Update Cockpit lib to ${NEXT_TAG}" \
+            --body "Update cockpit-project/cockpit vendored lib from tag ${CURRENT_TAG} to ${NEXT_TAG}.
+
+          Commit: cockpit-project/cockpit@${NEXT_SHA}
+          Release: https://github.com/cockpit-project/cockpit/releases/tag/${NEXT_TAG}"
