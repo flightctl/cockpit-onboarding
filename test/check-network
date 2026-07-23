@@ -17,9 +17,11 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with Cockpit; If not, see <http://www.gnu.org/licenses/>.
 
+import time
+
 import testlib
 
-from wizard_navigation import IFACE_TABLE, add_single_nic_interface, iface_row_selector
+from wizard_navigation import IFACE_TABLE, add_single_nic_interface, iface_row_selector, navigate_to_labels_step
 
 
 @testlib.nondestructive
