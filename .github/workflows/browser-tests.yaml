@@ -186,7 +186,7 @@ jobs:
           key: cockpit-images-${{ matrix.os }}-${{ hashFiles('Makefile') }}
 
       - name: Run integration tests
-        run: make check-integration
+        run: make check-integration-ci
         env:
           PYTHONUNBUFFERED: 1
           TEST_OS: ${{ matrix.os }}
