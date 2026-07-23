@@ -213,7 +213,11 @@ for i in $(seq 1 $CONNECTIVITY_TIMEOUT); do
             log "Network connectivity confirmed (ping)"
             break
         fi
-    elif resolvectl query --interface="$EFFECTIVE_IFACE" "$CONNECTIVITY_TEST_HOST" >/dev/null 2>&1; then
+    elif systemctl is-active --quiet systemd-resolved 2>/dev/null \
+         && resolvectl query --interface="$EFFECTIVE_IFACE" "$CONNECTIVITY_TEST_HOST" >/dev/null 2>&1; then
+        log "Network connectivity confirmed (DNS via resolvectl)"
+        break
+    elif getent hosts "$CONNECTIVITY_TEST_HOST" >/dev/null 2>&1; then
         log "Network connectivity confirmed (DNS)"
         break
     fi

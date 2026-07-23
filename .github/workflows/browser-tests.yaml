@@ -14,6 +14,30 @@ permissions:
   contents: read
 
 jobs:
+  build-rpm:
+    name: Build RPM
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build RPM
+        run: make rpm
+
+      - name: Upload RPM
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm
+          path: bin/rpm/flightctl-onboarding-*.noarch.rpm
+
   build-services:
     name: Build service VMs
     runs-on: ubuntu-latest
@@ -76,7 +100,7 @@ jobs:
 
   integration-tests:
     name: "${{ matrix.os }} integration tests"
-    needs: build-services
+    needs: [build-rpm, build-services]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -129,6 +153,12 @@ jobs:
           restore-keys: |
             cockpit-images-${{ matrix.os }}-
 
+      - name: Download RPM
+        uses: actions/download-artifact@v4
+        with:
+          name: rpm
+          path: bin/rpm/
+
       - name: Download services images
         uses: actions/download-artifact@v4
         with:
@@ -142,7 +172,7 @@ jobs:
           ln -sf fedora-43-network-services.qcow2 fedora-43-network-services
 
       - name: Build agent VM image
-        run: make vm-wifi
+        run: make vm-agent
         env:
           PYTHONUNBUFFERED: 1
           TEST_OS: ${{ matrix.os }}

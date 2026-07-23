@@ -38,8 +38,10 @@ jq '.network.ethernet.enabled = false' \
 
 # ── Install flightctl agent + CLI from COPR (needed for e2e enrollment) ──
 COPR_REPO_URL="https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/${COPR_CHROOT}/flightctl-redhat-et-flightctl-dev-${COPR_CHROOT}.repo"
-if [ "$USE_DNF5" = true ]; then
+if [ "$ID" = "fedora" ]; then
     dnf config-manager addrepo --from-repofile="${COPR_REPO_URL}"
+elif [ "$USE_DNF5" = true ]; then
+    dnf config-manager --add-repo "${COPR_REPO_URL}"
 else
     dnf install -y dnf-plugins-core
     dnf config-manager --add-repo "${COPR_REPO_URL}"

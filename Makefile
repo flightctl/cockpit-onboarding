@@ -176,16 +176,16 @@ print-vm:
 
 # Full test VM — installs pre-built RPM, flightctl agent/CLI from COPR,
 # and on Fedora sets up mac80211_hwsim WiFi simulation.
-WIFI_IMAGE = $(CURDIR)/test/images/$(TEST_OS)
-$(WIFI_IMAGE): bots test/vm-wifi.install
+AGENT_IMAGE = $(CURDIR)/test/images/$(TEST_OS)
+$(AGENT_IMAGE): bots test/vm-agent.install
 	@test -d bin/rpm && ls bin/rpm/flightctl-onboarding-*.noarch.rpm >/dev/null 2>&1 \
 		|| $(MAKE) rpm
 	bots/image-customize --fresh \
 		--upload $$(ls bin/rpm/flightctl-onboarding-*.noarch.rpm | head -1):/var/tmp/ \
-		--script $(CURDIR)/test/vm-wifi.install $(TEST_OS)
+		--script $(CURDIR)/test/vm-agent.install $(TEST_OS)
 
-vm-wifi: $(WIFI_IMAGE)
-	@echo $(WIFI_IMAGE)
+vm-agent: $(AGENT_IMAGE)
+	@echo $(AGENT_IMAGE)
 
 # Flight Control services VM for end-to-end enrollment tests
 # Always Fedora-based — this is infrastructure, not the OS under test.
@@ -209,7 +209,7 @@ $(NETWORK_SERVICES_IMAGE): bots test/vm-network-services.install
 vm-network-services: $(NETWORK_SERVICES_IMAGE)
 	@echo $(NETWORK_SERVICES_IMAGE)
 
-check-integration: check-browser $(WIFI_IMAGE) $(SERVICES_IMAGE) $(NETWORK_SERVICES_IMAGE) test/common
+check-integration: check-browser $(AGENT_IMAGE) $(SERVICES_IMAGE) $(NETWORK_SERVICES_IMAGE) test/common
 	test/common/run-tests --test-glob 'check-*' ${RUN_TESTS_OPTIONS}
 
 # fail fast if the browser testlib needs isn't installed, instead of silently
@@ -293,7 +293,7 @@ help:
 	@echo "  check            Run browser integration tests"
 	@echo "  prepare-check    Set up test VM and dependencies without running tests"
 	@echo "  vm               Build a test VM image"
-	@echo "  vm-wifi          Build a WiFi-enabled Fedora test VM image"
+	@echo "  vm-agent         Build the agent/onboarding test VM image"
 	@echo "  vm-services      Build a Flight Control services VM image"
 	@echo "  check-integration  Run all integration tests (WiFi tests Fedora-only)"
 	@echo "  print-vm         Print the test VM image path"
@@ -306,4 +306,4 @@ help:
 	@echo "i18n targets:"
 	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check check-browser vm print-vm vm-wifi vm-services vm-network-services check-integration deploy-test-vm install-flightctl-on-vm clean-test-vm help
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check check-browser vm print-vm vm-agent vm-services vm-network-services check-integration deploy-test-vm install-flightctl-on-vm clean-test-vm help

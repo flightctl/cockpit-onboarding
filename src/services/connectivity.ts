@@ -39,7 +39,16 @@ export async function testNetworkConnectivity(
                 const dnsLabel = iface ? `${testHost} via ${iface}` : testHost;
                 const resolveTitle = `Resolving ${dnsLabel} via DNS`;
                 emit({ id: ENROLLMENT_ACTION_IDS.DNS_RESOLVE, actionTitle: resolveTitle, result: "pending" });
-                const dnsArgs = iface
+                let useResolvectl = false;
+                if (iface) {
+                    try {
+                        await cockpit.spawn(["systemctl", "is-active", "--quiet", "systemd-resolved"], { err: "ignore" });
+                        useResolvectl = true;
+                    } catch {
+                        // systemd-resolved not running (e.g. CentOS/RHEL)
+                    }
+                }
+                const dnsArgs = useResolvectl
                     ? ["resolvectl", "query", `--interface=${iface}`, testHost]
                     : ["getent", "hosts", testHost];
                 const dnsProc = cockpit.spawn(dnsArgs, { err: "ignore" });

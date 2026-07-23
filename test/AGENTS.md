@@ -24,7 +24,7 @@ Tests run against QEMU VMs built with `bots/image-customize`. Each image is a qc
 | Make target          | Image file                          | What it provides                                                                                   |
 |----------------------|-------------------------------------|----------------------------------------------------------------------------------------------------|
 | `make vm`            | `test/images/centos-9-stream`       | Base CentOS 9 Stream VM with Cockpit and the onboarding RPM installed. Used by `make check`.       |
-| `make vm-wifi`       | `test/images/fedora-43`             | Fedora 43 VM with the onboarding RPM, flightctl agent/CLI, mac80211_hwsim (3 simulated radios), WiFi stack (hostapd, dnsmasq, wpa_supplicant), and chronyd. Used by `make check-fedora`. |
+| `make vm-agent`      | `test/images/$(TEST_OS)`            | Agent/onboarding VM with the pre-built RPM, flightctl agent/CLI from COPR, and on Fedora mac80211_hwsim (3 simulated radios), WiFi stack (hostapd, dnsmasq, wpa_supplicant), and chronyd. Used by `make check-integration`. |
 | `make vm-services`   | `test/images/fedora-43-services`    | Fedora 43 VM with flightctl-services (API, DB, KV, PAM issuer) pre-pulled via podman. Provides a self-contained Flight Control backend for enrollment e2e tests. |
 | `make vm-network-services` | `test/images/fedora-43-network-services` | Fedora 43 VM with Squid HTTP proxy and chrony NTP server. Used by network-services e2e tests. |
 
@@ -40,7 +40,7 @@ Nondestructive tests share a single VM and don't modify its state, so they're fa
 
 ```sh
 # Build the Fedora VM (one-time, ~5 min)
-make vm-wifi
+make vm-agent
 
 # Run all nondestructive tests from a single file
 PYTHONUNBUFFERED=1 TEST_OS=fedora-43 test/common/run-tests --nondestructive --test-glob 'check-network'
@@ -59,7 +59,7 @@ Individual tests are fast — each nondestructive test typically completes in 6�
 This is what the `Fedora integration tests` CI job runs. Requires all three Fedora VM images.
 
 ```sh
-make vm-wifi vm-services vm-network-services
+make vm-agent vm-services vm-network-services
 PYTHONUNBUFFERED=1 make check-fedora
 ```
 
@@ -110,7 +110,7 @@ Each `test/check-*` file contains one or more test classes. The table below show
 - **`test/common/`** — Cockpit's shared test library (`testlib.py`, `run-tests`, etc.), checked out from upstream via `make bots`.
 - **`test/wizard_navigation.py`** — Shared helpers for navigating the onboarding wizard (step advancement, button clicks, interface selection).
 - **`test/vm.install`** — Base VM setup (Cockpit socket, firewall).
-- **`test/vm-wifi.install`** — WiFi VM: RPM build, flightctl agent, mac80211_hwsim, infra AP scripts.
+- **`test/vm-agent.install`** — Agent/onboarding VM: pre-built RPM, flightctl agent, and on Fedora mac80211_hwsim + infra AP scripts.
 - **`test/vm-flightctl-services.install`** — Services VM: flightctl-services via COPR, DNS, PAM user, container pre-pull.
 - **`test/vm-network-services.install`** — Network services VM: Squid proxy and chrony NTP server.
 - **`test/browser/`** — CI entry point scripts for Testing Farm (TMT).

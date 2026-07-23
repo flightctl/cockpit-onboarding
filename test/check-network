@@ -346,7 +346,7 @@ class TestIPConfiguration(testlib.MachineCase):
 class TestWifi(testlib.MachineCase):
     """Test WiFi configuration on the Network wizard step
 
-    Requires a WiFi-enabled Fedora VM image built with test/vm-wifi.install.
+    Requires a WiFi-enabled Fedora VM image built with test/vm-agent.install.
     Uses mac80211_hwsim to simulate 3 WiFi radios and an infrastructure AP
     (SSID: test-infra-wifi) for scan testing.
     """
