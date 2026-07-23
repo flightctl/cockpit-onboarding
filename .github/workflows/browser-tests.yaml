@@ -170,6 +170,7 @@ jobs:
           cd test/images
           ln -sf fedora-43-services.qcow2 fedora-43-services
           ln -sf fedora-43-network-services.qcow2 fedora-43-network-services
+          touch fedora-43-services.qcow2 fedora-43-network-services.qcow2
 
       - name: Build agent VM image
         run: make vm-agent
