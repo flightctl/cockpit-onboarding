@@ -30,6 +30,7 @@ from wizard_navigation import (
     wait_for_nic,
 )
 
+TEST_IMAGE = os.environ.get("TEST_OS", "fedora-43")
 AGENT_CONFIG = "/etc/flightctl/config.yaml"
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 TEST_DIR = os.path.dirname(__file__)
@@ -84,7 +85,7 @@ class TestNetworkServicesE2EBase(testlib.MachineCase):
 
     provision = {
         'machine1': {
-            'image': os.path.join(TEST_DIR, 'images', 'fedora-43'),
+            'image': os.path.join(TEST_DIR, 'images', TEST_IMAGE),
             'restrict': False,
         },
         'network_services': {
@@ -462,7 +463,7 @@ class TestEnrollmentThroughProxyE2E(testlib.MachineCase):
 
     provision = {
         'machine1': {
-            'image': os.path.join(TEST_DIR, 'images', 'fedora-43'),
+            'image': os.path.join(TEST_DIR, 'images', TEST_IMAGE),
             'restrict': False,
         },
         'network_services': {

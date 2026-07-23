@@ -67,6 +67,8 @@ class TestNetworkInterface(testlib.MachineCase):
         if interfaces_count > 1:
             for row in range(1, interfaces_count + 1):
                 row_radio = f"{IFACE_TABLE} tbody tr:nth-child({row}) input[type='radio']"
+                if b.is_present(f"{row_radio}:disabled"):
+                    continue
                 if not b.is_present(f"{row_radio}:checked"):
                     b.click(f"{row_radio}:not(:checked)")
                     break
@@ -344,7 +346,7 @@ class TestIPConfiguration(testlib.MachineCase):
 class TestWifi(testlib.MachineCase):
     """Test WiFi configuration on the Network wizard step
 
-    Requires a WiFi-enabled Fedora VM image built with test/vm-wifi.install.
+    Requires a WiFi-enabled Fedora VM image built with test/vm-agent.install.
     Uses mac80211_hwsim to simulate 3 WiFi radios and an infrastructure AP
     (SSID: test-infra-wifi) for scan testing.
     """
@@ -433,7 +435,7 @@ class TestWifi(testlib.MachineCase):
         self.assertEqual(b.val("#wifi-password"), "testpassword123")
 
 
-@testlib.onlyImage("DHCP hostname test requires dnsmasq", "fedora-*")
+@testlib.onlyImage("DHCP hostname test requires dnsmasq", "fedora-*", "centos-*")
 class TestDhcpHostname(testlib.MachineCase):
     """Test that a DHCP-provided hostname (option 12) pre-populates the wizard
 

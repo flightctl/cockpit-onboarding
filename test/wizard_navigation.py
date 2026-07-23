@@ -175,7 +175,7 @@ def iface_row_selector(browser, table, interface, timeout=15):
 def complete_network_step(b):
     b.wait_visible("#networkStep")
     b.wait_visible(IFACE_TABLE)
-    b.click(f"{IFACE_TABLE} tbody tr:first-child input[type='radio']")
+    b.wait_visible(f"{IFACE_TABLE} tbody input[type='radio']:checked")
     click_button_text(b, "Next")
 
 

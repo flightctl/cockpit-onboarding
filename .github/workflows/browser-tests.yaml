@@ -14,10 +14,39 @@ permissions:
   contents: read
 
 jobs:
-  check-fedora:
-    name: Fedora integration tests
+  build-rpm:
+    name: Build RPM
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build RPM
+        run: make rpm
+
+      - name: Upload RPM
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm
+          path: bin/rpm/flightctl-onboarding-*.noarch.rpm
+
+  integration-tests:
+    name: "${{ matrix.os }} integration tests"
+    needs: [build-rpm]
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [fedora-43, centos-9-stream, centos-10]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,8 +84,17 @@ jobs:
           sudo ln -sf "${{ steps.setup-chrome.outputs.chrome-path }}" /usr/bin/chromium-browser
           echo "$(dirname '${{ steps.setup-chrome.outputs.chromedriver-path }}')" >> "$GITHUB_PATH"
 
-      - name: Restore cached Fedora base image
+      - name: Restore cached base image
         id: restore-image-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/cockpit-images
+          key: cockpit-images-${{ matrix.os }}-${{ hashFiles('Makefile') }}
+          restore-keys: |
+            cockpit-images-${{ matrix.os }}-
+
+      - name: Restore cached Fedora base image (for service VMs)
+        if: matrix.os != 'fedora-43'
         uses: actions/cache/restore@v6
         with:
           path: ~/.cache/cockpit-images
@@ -64,34 +102,42 @@ jobs:
           restore-keys: |
             cockpit-images-fedora-43-
 
-      - name: Build WiFi test VM image
-        run: make vm-wifi
+      - name: Download RPM
+        uses: actions/download-artifact@v4
+        with:
+          name: rpm
+          path: bin/rpm/
+
+      - name: Build VM images
+        run: |
+          make vm-services
+          make vm-network-services
+          make vm-agent
         env:
           PYTHONUNBUFFERED: 1
+          TEST_OS: ${{ matrix.os }}
 
-      - name: Build Flight Control services VM image
-        run: make vm-services
-        env:
-          PYTHONUNBUFFERED: 1
-
-      - name: Save Fedora base image cache
+      - name: Save base image cache
         if: github.ref == 'refs/heads/main' && steps.restore-image-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: ~/.cache/cockpit-images
-          key: cockpit-images-fedora-43-${{ hashFiles('Makefile') }}
+          key: cockpit-images-${{ matrix.os }}-${{ hashFiles('Makefile') }}
 
       - name: Run integration tests
-        run: make check-fedora
+        run: make check-integration
         env:
           PYTHONUNBUFFERED: 1
+          TEST_OS: ${{ matrix.os }}
+          TEST_MEMORY_MB: 2048
+          TEST_CPUS: 2
           RUN_TESTS_OPTIONS: -v -j 2
 
       - name: Upload test failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-failures
+          name: test-failures-${{ matrix.os }}
           path: |
             Test*.png
             Test*.html

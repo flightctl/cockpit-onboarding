@@ -1,11 +1,27 @@
 #!/bin/sh
-# Image customization script for a Fedora VM running Flight Control services.
+# Image customization script for a VM running Flight Control services.
 # Used by bots/image-customize to build a qcow2 with all services pre-pulled
 # and ready to start via `systemctl start flightctl.target`.
 set -eux
 
-FEDORA_VERSION=43
-COPR_REPO_URL="https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-${FEDORA_VERSION}/flightctl-redhat-et-flightctl-dev-fedora-${FEDORA_VERSION}.repo"
+# ── Detect OS for COPR repo and dnf syntax ───────────────────────────
+. /etc/os-release
+OS_MAJOR="${VERSION_ID%%.*}"
+
+case "$ID" in
+    fedora)
+        COPR_CHROOT="fedora-${VERSION_ID}"
+        USE_DNF5=true
+        ;;
+    centos|rhel)
+        COPR_CHROOT="epel-${OS_MAJOR}"
+        if [ "$OS_MAJOR" -ge 10 ]; then
+            USE_DNF5=true
+        else
+            USE_DNF5=false
+        fi
+        ;;
+esac
 
 # Fixed production-network identity for this image. check-enrollment-e2e
 # brings up a second NIC at this address before starting flightctl.target.
@@ -13,8 +29,13 @@ SERVICES_IP="10.111.118.1"
 BASE_DOMAIN="e2e-flightctl.test"
 
 # ── Install flightctl-services and CLI from COPR ────────────────────────
-dnf install -y dnf-plugins-core
-dnf config-manager addrepo --from-repofile="${COPR_REPO_URL}"
+COPR_REPO_URL="https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/${COPR_CHROOT}/flightctl-redhat-et-flightctl-dev-${COPR_CHROOT}.repo"
+if [ "$USE_DNF5" = true ]; then
+    dnf config-manager addrepo --from-repofile="${COPR_REPO_URL}"
+else
+    dnf install -y dnf-plugins-core
+    dnf config-manager --add-repo "${COPR_REPO_URL}"
+fi
 dnf install -y flightctl-services flightctl-cli dnsmasq
 
 # ── Firewall: allow HTTPS gateway port and DNS ───────────────────────────
@@ -59,22 +80,31 @@ timeout 120 bash -c '
     while true; do
         if podman ps --quiet --filter "name=flightctl-db" | grep -q . && \
            podman exec flightctl-db pg_isready -U postgres >/dev/null 2>&1; then
-            echo "Database is ready"
+            echo "Database is ready" >&2
             break
         fi
-        echo "Waiting for database..."
+        echo "Waiting for database..." >&2
         sleep 3
     done
 '
 
-# Wait for database migration
+# Wait for database migration — this is a oneshot service, so check for
+# successful completion (inactive + Result=success) as well as active
 timeout 120 bash -c '
     while true; do
-        if systemctl is-active --quiet flightctl-db-migrate.service; then
-            echo "Database migration completed"
+        STATE=$(systemctl show flightctl-db-migrate.service -p ActiveState --value 2>/dev/null)
+        RESULT=$(systemctl show flightctl-db-migrate.service -p Result --value 2>/dev/null)
+        if [ "$STATE" = "active" ] || { [ "$STATE" = "inactive" ] && [ "$RESULT" = "success" ]; }; then
+            echo "Database migration completed (state=$STATE result=$RESULT)" >&2
             break
         fi
-        echo "Waiting for database migration..."
+        if [ "$STATE" = "failed" ]; then
+            echo "ERROR: Database migration FAILED" >&2
+            systemctl status flightctl-db-migrate.service >&2 || true
+            journalctl -u flightctl-db-migrate.service --no-pager -n 30 >&2 || true
+            exit 1
+        fi
+        echo "Waiting for database migration (state=$STATE result=$RESULT)..." >&2
         sleep 3
     done
 '
@@ -84,10 +114,10 @@ timeout 60 bash -c '
     while true; do
         if podman ps --quiet --filter "name=flightctl-kv" | grep -q . && \
            podman exec flightctl-kv redis-cli ping >/dev/null 2>&1; then
-            echo "Key-value service is ready"
+            echo "Key-value service is ready" >&2
             break
         fi
-        echo "Waiting for key-value service..."
+        echo "Waiting for key-value service..." >&2
         sleep 2
     done
 '
@@ -96,22 +126,34 @@ timeout 60 bash -c '
 timeout 120 bash -c '
     ALL_SERVICES=$(systemctl show flightctl.target -p Wants --value \
         | tr " " "\n" | grep -E "^flightctl-.*\.service$" | sort)
+    echo "Services under flightctl.target: $ALL_SERVICES" >&2
     while true; do
         all_active=true
         for svc in $ALL_SERVICES; do
-            if ! systemctl is-active --quiet "$svc"; then
-                echo "Waiting for $svc..."
+            STATE=$(systemctl show "$svc" -p ActiveState --value 2>/dev/null)
+            RESULT=$(systemctl show "$svc" -p Result --value 2>/dev/null)
+            if [ "$STATE" != "active" ]; then
+                echo "Waiting for $svc (state=$STATE result=$RESULT)..." >&2
                 all_active=false
                 break
             fi
         done
         if $all_active; then
-            echo "All services are active"
+            echo "All services are active" >&2
             break
         fi
         sleep 3
     done
-'
+' || {
+    echo "=== TIMEOUT: Dumping service states ===" >&2
+    systemctl list-units 'flightctl-*' --no-pager >&2 || true
+    for svc in $(systemctl show flightctl.target -p Wants --value | tr " " "\n" | grep -E "^flightctl-.*\.service$"); do
+        echo "--- $svc ---" >&2
+        systemctl status "$svc" --no-pager >&2 || true
+    done
+    podman ps -a >&2 || true
+    exit 1
+}
 
 # ── Create default PAM user for test authentication ─────────────────────
 PAM_USER="admin"
