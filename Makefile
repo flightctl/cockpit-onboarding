@@ -181,7 +181,7 @@ $(AGENT_IMAGE): bots test/vm-agent.install
 	@test -d bin/rpm && ls bin/rpm/flightctl-onboarding-*.noarch.rpm >/dev/null 2>&1 \
 		|| $(MAKE) rpm
 	bots/image-customize --fresh \
-		--upload $$(ls bin/rpm/flightctl-onboarding-*.noarch.rpm | head -1):/var/tmp/ \
+		--upload $$(ls -t bin/rpm/flightctl-onboarding-*.noarch.rpm | head -1):/var/tmp/ \
 		--script $(CURDIR)/test/vm-agent.install $(TEST_OS)
 
 vm-agent: $(AGENT_IMAGE)
@@ -211,10 +211,6 @@ vm-network-services: $(NETWORK_SERVICES_IMAGE)
 
 # Run integration tests — builds all VM images first (agent + services).
 check-integration: check-browser $(AGENT_IMAGE) $(SERVICES_IMAGE) $(NETWORK_SERVICES_IMAGE) test/common
-	test/common/run-tests --test-glob 'check-*' ${RUN_TESTS_OPTIONS}
-
-# CI variant — skips service VM builds (they are pre-built and downloaded as artifacts).
-check-integration-ci: check-browser $(AGENT_IMAGE) test/common
 	test/common/run-tests --test-glob 'check-*' ${RUN_TESTS_OPTIONS}
 
 # fail fast if the browser testlib needs isn't installed, instead of silently
@@ -301,7 +297,6 @@ help:
 	@echo "  vm-agent         Build the agent/onboarding test VM image"
 	@echo "  vm-services      Build a Flight Control services VM image"
 	@echo "  check-integration  Run all integration tests (builds all VM images first)"
-	@echo "  check-integration-ci  Run integration tests (skips service VM builds)"
 	@echo "  print-vm         Print the test VM image path"
 	@echo ""
 	@echo "VM targets:"
@@ -312,4 +307,4 @@ help:
 	@echo "i18n targets:"
 	@echo "  po/$(PACKAGE_NAME).pot  Extract translatable strings"
 
-.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check check-browser vm print-vm vm-agent vm-services vm-network-services check-integration check-integration-ci deploy-test-vm install-flightctl-on-vm clean-test-vm help
+.PHONY: all clean install devel-install devel-uninstall print-version dist node-cache rpm prepare-check check check-browser vm print-vm vm-agent vm-services vm-network-services check-integration deploy-test-vm install-flightctl-on-vm clean-test-vm help

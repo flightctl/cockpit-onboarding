@@ -435,7 +435,7 @@ class TestWifi(testlib.MachineCase):
         self.assertEqual(b.val("#wifi-password"), "testpassword123")
 
 
-@testlib.onlyImage("DHCP hostname test requires dnsmasq", "fedora-*")
+@testlib.onlyImage("DHCP hostname test requires dnsmasq", "fedora-*", "centos-*")
 class TestDhcpHostname(testlib.MachineCase):
     """Test that a DHCP-provided hostname (option 12) pre-populates the wizard
 

@@ -38,76 +38,9 @@ jobs:
           name: rpm
           path: bin/rpm/flightctl-onboarding-*.noarch.rpm
 
-  build-services:
-    name: Build service VMs
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Enable KVM group perms
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Install host dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            qemu-kvm libvirt-daemon-system libvirt-clients virtinst ovmf \
-            swtpm swtpm-tools python3-libvirt python3-gssapi python3-pil \
-            python3-aiohttp make rpm python-is-python3
-
-      - name: Restore cached base image
-        id: restore-image-cache
-        uses: actions/cache/restore@v6
-        with:
-          path: ~/.cache/cockpit-images
-          key: cockpit-images-fedora-43-${{ hashFiles('Makefile') }}
-          restore-keys: |
-            cockpit-images-fedora-43-
-
-      - name: Build services VMs
-        run: |
-          make vm-services
-          make vm-network-services
-        env:
-          PYTHONUNBUFFERED: 1
-
-      - name: Save base image cache
-        if: github.ref == 'refs/heads/main' && steps.restore-image-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: ~/.cache/cockpit-images
-          key: cockpit-images-fedora-43-${{ hashFiles('Makefile') }}
-
-      - name: Flatten services images
-        run: |
-          for img in test/images/fedora-43-services.qcow2 test/images/fedora-43-network-services.qcow2; do
-            qemu-img convert -O qcow2 "$img" "${img%.qcow2}-flat.qcow2"
-            mv "${img%.qcow2}-flat.qcow2" "$img"
-          done
-
-      - name: Upload services images
-        uses: actions/upload-artifact@v4
-        with:
-          name: services-images
-          path: |
-            test/images/fedora-43-services.qcow2
-            test/images/fedora-43-network-services.qcow2
-
   integration-tests:
     name: "${{ matrix.os }} integration tests"
-    needs: [build-rpm, build-services]
+    needs: [build-rpm]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -160,27 +93,26 @@ jobs:
           restore-keys: |
             cockpit-images-${{ matrix.os }}-
 
+      - name: Restore cached Fedora base image (for service VMs)
+        if: matrix.os != 'fedora-43'
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/cockpit-images
+          key: cockpit-images-fedora-43-${{ hashFiles('Makefile') }}
+          restore-keys: |
+            cockpit-images-fedora-43-
+
       - name: Download RPM
         uses: actions/download-artifact@v4
         with:
           name: rpm
           path: bin/rpm/
 
-      - name: Download services images
-        uses: actions/download-artifact@v4
-        with:
-          name: services-images
-          path: test/images/
-
-      - name: Create services image symlinks
+      - name: Build VM images
         run: |
-          cd test/images
-          ln -sf fedora-43-services.qcow2 fedora-43-services
-          ln -sf fedora-43-network-services.qcow2 fedora-43-network-services
-          touch fedora-43-services.qcow2 fedora-43-network-services.qcow2
-
-      - name: Build agent VM image
-        run: make vm-agent
+          make vm-services
+          make vm-network-services
+          make vm-agent
         env:
           PYTHONUNBUFFERED: 1
           TEST_OS: ${{ matrix.os }}
@@ -193,7 +125,7 @@ jobs:
           key: cockpit-images-${{ matrix.os }}-${{ hashFiles('Makefile') }}
 
       - name: Run integration tests
-        run: make check-integration-ci
+        run: make check-integration
         env:
           PYTHONUNBUFFERED: 1
           TEST_OS: ${{ matrix.os }}

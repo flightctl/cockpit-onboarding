@@ -57,6 +57,9 @@ if systemctl is-active -q firewalld.service; then
 fi
 systemctl enable cockpit.socket
 
+# ── Install dnsmasq (used by DHCP hostname tests, network namespace setups) ──
+dnf install -y dnsmasq
+
 # ── Ensure chronyd is enabled ────────────────────────────────────────
 systemctl enable chronyd.service
 
