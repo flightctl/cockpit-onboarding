@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { systemConfigurationService } from "./system-config.js";
 import { Interface, NetworkManagerModel } from "../pkg/networkmanager/interfaces.js";

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import { Interface, NetworkManagerModel } from "../pkg/networkmanager/interfaces.js";
 import { Model } from "./model-context";
 import { getHostnameInfo, getFormattedHostname, setHostname } from "./services/hostname";

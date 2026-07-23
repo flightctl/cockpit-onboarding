@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import { renderHook, waitFor } from "@testing-library/react";
 
 import { useIsConnectedViaInterface } from "../hooks/useIsConnectedViaInterface";

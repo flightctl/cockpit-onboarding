@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 export const MARKER_DIR = "/var/lib/flightctl-onboarding";
 export const MARKER_COMPLETE = `${MARKER_DIR}/.onboarding-complete`;
 export const MARKER_ATTEMPTED = `${MARKER_DIR}/.onboarding-attempted`;

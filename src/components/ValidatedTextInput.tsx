@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import * as React from "react";
 
 import { TextInput, TextInputProps } from "@patternfly/react-core/dist/esm/components/TextInput";
