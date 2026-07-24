@@ -21,7 +21,7 @@ import time
 
 import testlib
 
-from wizard_navigation import IFACE_TABLE, add_single_nic_interface, iface_row_selector, navigate_to_labels_step
+from wizard_navigation import IFACE_TABLE, add_single_nic_interface, iface_row_selector, navigate_to_labels_step, wait_onboarding_setup
 
 
 @testlib.nondestructive
@@ -30,6 +30,7 @@ class TestNetworkInterface(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
+        wait_onboarding_setup(self.machine)
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.browser.wait_visible("#networkStep")
         self.browser.wait_visible(IFACE_TABLE)
@@ -118,7 +119,7 @@ class TestSingleNic(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
-        self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+        wait_onboarding_setup(self.machine)
         self.setup_iface = add_single_nic_interface(self)
 
     def testSingleNicWarningOnNetworkStep(self):
@@ -144,6 +145,7 @@ class TestIPConfiguration(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
+        wait_onboarding_setup(self.machine)
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         self.browser.wait_visible("#networkStep")
         self.browser.wait_visible(IFACE_TABLE)
@@ -357,7 +359,7 @@ class TestWifi(testlib.MachineCase):
     def setUp(self):
         super().setUp()
         m = self.machine
-        m.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+        wait_onboarding_setup(m)
 
         m.execute("modprobe mac80211_hwsim radios=3 2>/dev/null || true")
 
@@ -455,6 +457,7 @@ class TestDhcpHostname(testlib.MachineCase):
     def setUp(self):
         super().setUp()
         m = self.machine
+        wait_onboarding_setup(m)
 
         m.execute("hostnamectl set-hostname localhost")
 

@@ -18,6 +18,7 @@ from wizard_navigation import (
     click_button_text,
     complete_enrollment_step,
     iface_row_selector,
+    wait_onboarding_setup,
 )
 
 REVIEW_NETWORK = "#review-network"
@@ -29,6 +30,10 @@ REVIEW_LABELS = "#review-device-labels"
 @testlib.nondestructive
 class TestReview(testlib.MachineCase):
     """Test configuration review and navigation in System Onboarding wizard"""
+
+    def setUp(self):
+        super().setUp()
+        wait_onboarding_setup(self.machine)
 
     def testReviewPageDisplay(self):
         """Test that review page displays all configuration sections"""
@@ -172,7 +177,7 @@ class TestReviewSingleNic(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
-        self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+        wait_onboarding_setup(self.machine)
         self.setup_iface = add_single_nic_interface(self)
 
     def testSingleNicReviewWarning(self):

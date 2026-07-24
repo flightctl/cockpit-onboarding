@@ -28,6 +28,7 @@ from wizard_navigation import (
     click_button_text,
     iface_row_selector,
     wait_for_nic,
+    wait_onboarding_setup,
 )
 
 TEST_IMAGE = os.environ.get("TEST_OS", "fedora-43")
@@ -120,10 +121,7 @@ class TestNetworkServicesE2EBase(testlib.MachineCase):
         ns.execute("systemctl start squid")
 
         m.execute("systemctl start chronyd")
-        m.execute(
-            "systemctl start flightctl-onboarding-setup.service || true",
-            timeout=60,
-        )
+        wait_onboarding_setup(m)
 
         self.config = {
             "version": "1.0",
@@ -536,10 +534,7 @@ class TestEnrollmentThroughProxyE2E(testlib.MachineCase):
         self.endpoint = f"https://{SERVICES_IP}"
 
         # ── machine1 ─────────────────────────────────────────────────
-        m.execute(
-            "systemctl start flightctl-onboarding-setup.service || true",
-            timeout=60,
-        )
+        wait_onboarding_setup(m)
 
         self.config = {
             "version": "1.0",

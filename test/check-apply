@@ -23,6 +23,7 @@ from wizard_navigation import (
     complete_enrollment_step,
     iface_row_selector,
     wait_for_nic,
+    wait_onboarding_setup,
 )
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 
@@ -37,7 +38,7 @@ class TestApplyConfiguration(testlib.MachineCase):
     def setUp(self):
         super().setUp()
         m = self.machine
-        m.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+        wait_onboarding_setup(m)
 
         m._qemu_monitor(
             f"netdev_add user,id=multinic_net,net=10.111.114.0/24"
@@ -110,7 +111,7 @@ class TestApplySingleNic(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
-        self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+        wait_onboarding_setup(self.machine)
         self.setup_iface = add_single_nic_interface(self)
 
     def select_setup_interface_and_navigate_to_review(self, hostname):
@@ -185,7 +186,7 @@ class TestApplySingleNicRollback(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
-        self.machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+        wait_onboarding_setup(self.machine)
         self.setup_iface = add_single_nic_interface(self)
         m = self.machine
 

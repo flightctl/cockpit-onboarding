@@ -19,7 +19,7 @@
 
 import testlib
 
-from wizard_navigation import click_button_text, navigate_to_network_services_step
+from wizard_navigation import click_button_text, navigate_to_network_services_step, wait_onboarding_setup
 
 
 @testlib.nondestructive
@@ -28,6 +28,7 @@ class TestNtp(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
+        wait_onboarding_setup(self.machine)
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_network_services_step(self.browser)
 
@@ -110,6 +111,7 @@ class TestProxy(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
+        wait_onboarding_setup(self.machine)
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_network_services_step(self.browser)
 
