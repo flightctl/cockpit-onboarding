@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [fedora-43, centos-9-stream, centos-10]
+        os: [fedora-43, fedora-44, centos-9-stream, centos-10]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
