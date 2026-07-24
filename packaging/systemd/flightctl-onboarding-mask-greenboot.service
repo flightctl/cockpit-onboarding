@@ -9,6 +9,3 @@ ConditionPathExists=!/var/lib/flightctl-onboarding/.onboarding-complete
 Type=oneshot
 ExecStart=/usr/libexec/flightctl-onboarding/mask-greenboot.sh
 RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target

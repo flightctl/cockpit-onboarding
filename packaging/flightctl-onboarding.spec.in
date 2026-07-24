@@ -133,7 +133,6 @@ systemctl daemon-reload >/dev/null 2>&1 || :
 # Only enable if not already run (marker file doesn't exist)
 if [ ! -f /var/lib/flightctl-onboarding/.onboarding-complete ]; then
     systemctl enable flightctl-onboarding-setup.service >/dev/null 2>&1 || :
-    systemctl enable flightctl-onboarding-mask-greenboot.service >/dev/null 2>&1 || :
     /usr/libexec/flightctl-onboarding/mask-greenboot.sh 2>/dev/null || :
 fi
 
@@ -143,7 +142,6 @@ fi
 # Remove the flightctl-agent gate drop-in on package removal
 if [ $1 -eq 0 ]; then
     systemctl unmask greenboot-healthcheck.service 2>/dev/null || :
-    systemctl disable flightctl-onboarding-mask-greenboot.service 2>/dev/null || :
     rm -f %{_unitdir}/flightctl-agent.service.d/onboarding-gate.conf || :
     rmdir %{_unitdir}/flightctl-agent.service.d 2>/dev/null || :
     systemctl daemon-reload >/dev/null 2>&1 || :
