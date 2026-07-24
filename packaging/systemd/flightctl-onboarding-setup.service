@@ -3,6 +3,7 @@ Description=Flightctl Onboarding Setup
 Documentation=https://github.com/flightctl/cockpit-onboarding
 After=network-online.target
 Wants=network-online.target
+Wants=flightctl-onboarding-mask-greenboot.service
 ConditionPathExists=!/var/lib/flightctl-onboarding/.onboarding-complete
 
 [Service]
