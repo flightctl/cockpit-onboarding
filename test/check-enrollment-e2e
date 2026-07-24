@@ -32,6 +32,7 @@ from wizard_navigation import (
     click_button_text,
     iface_row_selector,
     wait_for_nic,
+    wait_onboarding_setup,
 )
 
 TEST_IMAGE = os.environ.get("TEST_OS", "fedora-43")
@@ -448,10 +449,7 @@ class TestEnrollmentE2ESingleNic(TestEnrollmentE2EBase):
         self.browser.port = tunnel_port
         self.addCleanup(lambda: setattr(self.browser, 'port', original_port))
 
-        m.execute(
-            "systemctl start flightctl-onboarding-setup.service || true",
-            timeout=60,
-        )
+        wait_onboarding_setup(m)
 
         self.config["connectivityTest"] = {
             "carrierTimeoutSeconds": 10,

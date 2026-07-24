@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import testlib
 
-from wizard_navigation import click_button_text, navigate_to_labels_step, wait_button_text
+from wizard_navigation import click_button_text, navigate_to_labels_step, wait_button_text, wait_onboarding_setup
 
 HOSTNAME_ERROR = "#hostname-input-helper-error"
 
@@ -21,6 +21,7 @@ class TestHostname(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
+        wait_onboarding_setup(self.machine)
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_labels_step(self.browser)
 
@@ -98,6 +99,7 @@ class TestAlias(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
+        wait_onboarding_setup(self.machine)
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_labels_step(self.browser)
 
@@ -148,6 +150,7 @@ class TestCustomLabels(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
+        wait_onboarding_setup(self.machine)
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_labels_step(self.browser)
 

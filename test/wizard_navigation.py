@@ -3,6 +3,11 @@ import time
 
 IFACE_TABLE = "table[aria-label='Network interface selector']"
 
+
+def wait_onboarding_setup(machine):
+    """Wait for flightctl-onboarding-setup.service to finish creating the onboarding user."""
+    machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+
 SINGLE_NIC_MAC = "52:54:00:99:00:01"
 SINGLE_NIC_NETDEV_ID = "singlenic_net"
 SINGLE_NIC_DEV_ID = "singlenic_dev"

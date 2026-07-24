@@ -17,6 +17,8 @@ import time
 
 import testlib
 
+from wizard_navigation import wait_onboarding_setup
+
 MARKER_DIR = "/var/lib/flightctl-onboarding"
 MARKER_COMPLETE = f"{MARKER_DIR}/.onboarding-complete"
 MARKER_ATTEMPTED = f"{MARKER_DIR}/.onboarding-attempted"
@@ -79,10 +81,7 @@ class TestWatchdog(testlib.MachineCase):
         super().setUp()
         m = self.machine
 
-        m.execute(
-            "systemctl start flightctl-onboarding-setup.service || true",
-            timeout=60,
-        )
+        wait_onboarding_setup(m)
 
         m.execute(f"rm -f {MARKER_COMPLETE} {WATCHDOG_STATUS} {WATCHDOG_ACTIVE}")
         m.write(MARKER_ATTEMPTED, ATTEMPTED_MARKER)
