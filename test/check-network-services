@@ -19,11 +19,11 @@
 
 import testlib
 
-from wizard_navigation import click_button_text, navigate_to_network_services_step
+from wizard_navigation import OnboardingMachineCase, click_button_text, navigate_to_network_services_step
 
 
 @testlib.nondestructive
-class TestNtp(testlib.MachineCase):
+class TestNtp(OnboardingMachineCase):
     """Test NTP configuration on the Network Services wizard step"""
 
     def setUp(self):
@@ -105,7 +105,7 @@ class TestNtp(testlib.MachineCase):
 
 
 @testlib.nondestructive
-class TestProxy(testlib.MachineCase):
+class TestProxy(OnboardingMachineCase):
     """Test HTTP proxy configuration on the Network Services wizard step"""
 
     def setUp(self):

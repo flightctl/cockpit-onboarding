@@ -17,6 +17,8 @@ import time
 
 import testlib
 
+from wizard_navigation import OnboardingMachineCase
+
 MARKER_DIR = "/var/lib/flightctl-onboarding"
 MARKER_COMPLETE = f"{MARKER_DIR}/.onboarding-complete"
 MARKER_ATTEMPTED = f"{MARKER_DIR}/.onboarding-attempted"
@@ -72,17 +74,12 @@ ATTEMPTED_MARKER = json.dumps({
 })
 
 
-class TestWatchdog(testlib.MachineCase):
+class TestWatchdog(OnboardingMachineCase):
     """Test the connectivity watchdog rollback mechanism"""
 
     def setUp(self):
         super().setUp()
         m = self.machine
-
-        m.execute(
-            "systemctl start flightctl-onboarding-setup.service || true",
-            timeout=60,
-        )
 
         m.execute(f"rm -f {MARKER_COMPLETE} {WATCHDOG_STATUS} {WATCHDOG_ACTIVE}")
         m.write(MARKER_ATTEMPTED, ATTEMPTED_MARKER)

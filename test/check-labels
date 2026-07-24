@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import testlib
 
-from wizard_navigation import click_button_text, navigate_to_labels_step, wait_button_text
+from wizard_navigation import OnboardingMachineCase, click_button_text, navigate_to_labels_step, wait_button_text
 
 HOSTNAME_ERROR = "#hostname-input-helper-error"
 
 
 @testlib.nondestructive
-class TestHostname(testlib.MachineCase):
+class TestHostname(OnboardingMachineCase):
     """Test hostname input and validation on the labels step"""
 
     def setUp(self):
@@ -93,7 +93,7 @@ class TestHostname(testlib.MachineCase):
 
 
 @testlib.nondestructive
-class TestAlias(testlib.MachineCase):
+class TestAlias(OnboardingMachineCase):
     """Test alias toggle and mode selection on the labels step"""
 
     def setUp(self):
@@ -143,7 +143,7 @@ class TestAlias(testlib.MachineCase):
 
 
 @testlib.nondestructive
-class TestCustomLabels(testlib.MachineCase):
+class TestCustomLabels(OnboardingMachineCase):
     """Test custom device label management on the labels step"""
 
     def setUp(self):

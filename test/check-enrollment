@@ -12,11 +12,11 @@ import json
 
 import testlib
 
-from wizard_navigation import navigate_to_enrollment_step
+from wizard_navigation import OnboardingMachineCase, navigate_to_enrollment_step
 
 
 @testlib.nondestructive
-class TestEnrollment(testlib.MachineCase):
+class TestEnrollment(OnboardingMachineCase):
     """Test Flight Control enrollment selection and credential input"""
 
     def setUp(self):

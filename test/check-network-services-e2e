@@ -24,6 +24,7 @@ import testlib
 
 from wizard_navigation import (
     IFACE_TABLE,
+    OnboardingMachineCase,
     add_netiface_with_localaddr,
     click_button_text,
     iface_row_selector,
@@ -76,7 +77,7 @@ def assert_ntp_auto_applied(test, machine):
         test.assertEqual(rc, "absent")
 
 
-class TestNetworkServicesE2EBase(testlib.MachineCase):
+class TestNetworkServicesE2EBase(OnboardingMachineCase):
     """Shared setup for NTP/proxy e2e tests (2 VMs: device + network_services).
 
     Hot-plugs a production NIC on machine1 and brings up chrony + squid
@@ -120,10 +121,6 @@ class TestNetworkServicesE2EBase(testlib.MachineCase):
         ns.execute("systemctl start squid")
 
         m.execute("systemctl start chronyd")
-        m.execute(
-            "systemctl start flightctl-onboarding-setup.service || true",
-            timeout=60,
-        )
 
         self.config = {
             "version": "1.0",
@@ -458,7 +455,7 @@ class TestProxyE2E(TestNetworkServicesE2EBase):
         )
 
 
-class TestEnrollmentThroughProxyE2E(testlib.MachineCase):
+class TestEnrollmentThroughProxyE2E(OnboardingMachineCase):
     """Enroll against Flight Control through a real Squid proxy (3 VMs)"""
 
     provision = {
@@ -536,11 +533,6 @@ class TestEnrollmentThroughProxyE2E(testlib.MachineCase):
         self.endpoint = f"https://{SERVICES_IP}"
 
         # ── machine1 ─────────────────────────────────────────────────
-        m.execute(
-            "systemctl start flightctl-onboarding-setup.service || true",
-            timeout=60,
-        )
-
         self.config = {
             "version": "1.0",
             "runOnce": False,

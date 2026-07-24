@@ -1,7 +1,32 @@
 import socket
 import time
 
+import testlib
+
 IFACE_TABLE = "table[aria-label='Network interface selector']"
+
+
+def wait_onboarding_setup(machine):
+    """Wait for flightctl-onboarding-setup.service to finish creating the onboarding user."""
+    machine.execute("systemctl start flightctl-onboarding-setup.service || true", timeout=60)
+
+
+class OnboardingMachineCase(testlib.MachineCase):
+    """Base class that ensures the onboarding user exists before tests run.
+
+    For @nondestructive tests, the wait runs before nonDestructiveSetup()
+    backs up /etc/passwd so the backup includes the onboarding user.
+    For destructive tests, the wait runs after super().setUp().
+    """
+
+    def nonDestructiveSetup(self):
+        wait_onboarding_setup(self.machine)
+        super().nonDestructiveSetup()
+
+    def setUp(self):
+        super().setUp()
+        if not self.is_nondestructive():
+            wait_onboarding_setup(self.machine)
 
 SINGLE_NIC_MAC = "52:54:00:99:00:01"
 SINGLE_NIC_NETDEV_ID = "singlenic_net"
