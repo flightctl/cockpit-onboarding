@@ -12,16 +12,15 @@ import json
 
 import testlib
 
-from wizard_navigation import navigate_to_enrollment_step, wait_onboarding_setup
+from wizard_navigation import OnboardingMachineCase, navigate_to_enrollment_step
 
 
 @testlib.nondestructive
-class TestEnrollment(testlib.MachineCase):
+class TestEnrollment(OnboardingMachineCase):
     """Test Flight Control enrollment selection and credential input"""
 
     def setUp(self):
         super().setUp()
-        wait_onboarding_setup(self.machine)
 
         self.config = {
             "version": "1.0",

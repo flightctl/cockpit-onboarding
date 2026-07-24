@@ -28,11 +28,11 @@ import testlib
 
 from wizard_navigation import (
     IFACE_TABLE,
+    OnboardingMachineCase,
     add_netiface_with_localaddr,
     click_button_text,
     iface_row_selector,
     wait_for_nic,
-    wait_onboarding_setup,
 )
 
 TEST_IMAGE = os.environ.get("TEST_OS", "fedora-43")
@@ -42,7 +42,7 @@ APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 TEST_DIR = os.path.dirname(__file__)
 
 
-class TestEnrollmentE2EBase(testlib.MachineCase):
+class TestEnrollmentE2EBase(OnboardingMachineCase):
     """Shared setup and helpers for e2e enrollment tests.
 
     Provisions two VMs and hot-plugs a production NIC on machine1.
@@ -448,8 +448,6 @@ class TestEnrollmentE2ESingleNic(TestEnrollmentE2EBase):
         original_port = self.browser.port
         self.browser.port = tunnel_port
         self.addCleanup(lambda: setattr(self.browser, 'port', original_port))
-
-        wait_onboarding_setup(m)
 
         self.config["connectivityTest"] = {
             "carrierTimeoutSeconds": 10,

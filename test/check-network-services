@@ -19,16 +19,15 @@
 
 import testlib
 
-from wizard_navigation import click_button_text, navigate_to_network_services_step, wait_onboarding_setup
+from wizard_navigation import OnboardingMachineCase, click_button_text, navigate_to_network_services_step
 
 
 @testlib.nondestructive
-class TestNtp(testlib.MachineCase):
+class TestNtp(OnboardingMachineCase):
     """Test NTP configuration on the Network Services wizard step"""
 
     def setUp(self):
         super().setUp()
-        wait_onboarding_setup(self.machine)
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_network_services_step(self.browser)
 
@@ -106,12 +105,11 @@ class TestNtp(testlib.MachineCase):
 
 
 @testlib.nondestructive
-class TestProxy(testlib.MachineCase):
+class TestProxy(OnboardingMachineCase):
     """Test HTTP proxy configuration on the Network Services wizard step"""
 
     def setUp(self):
         super().setUp()
-        wait_onboarding_setup(self.machine)
         self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
         navigate_to_network_services_step(self.browser)
 

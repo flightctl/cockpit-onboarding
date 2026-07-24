@@ -17,7 +17,7 @@ import time
 
 import testlib
 
-from wizard_navigation import wait_onboarding_setup
+from wizard_navigation import OnboardingMachineCase
 
 MARKER_DIR = "/var/lib/flightctl-onboarding"
 MARKER_COMPLETE = f"{MARKER_DIR}/.onboarding-complete"
@@ -74,14 +74,12 @@ ATTEMPTED_MARKER = json.dumps({
 })
 
 
-class TestWatchdog(testlib.MachineCase):
+class TestWatchdog(OnboardingMachineCase):
     """Test the connectivity watchdog rollback mechanism"""
 
     def setUp(self):
         super().setUp()
         m = self.machine
-
-        wait_onboarding_setup(m)
 
         m.execute(f"rm -f {MARKER_COMPLETE} {WATCHDOG_STATUS} {WATCHDOG_ACTIVE}")
         m.write(MARKER_ATTEMPTED, ATTEMPTED_MARKER)
