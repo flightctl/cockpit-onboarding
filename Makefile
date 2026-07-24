@@ -7,7 +7,7 @@ TEST_OS = fedora-43
 endif
 export TEST_OS
 TARFILE=$(RPM_NAME)-$(VERSION).tar.xz
-NODE_CACHE=$(RPM_NAME)-node-$(VERSION).tar.xz
+NODE_CACHE=$(RPM_NAME)-node.tar.xz
 SPEC=$(RPM_NAME).spec
 PREFIX ?= /usr/local
 BRAND_NAME ?= Flight Control
