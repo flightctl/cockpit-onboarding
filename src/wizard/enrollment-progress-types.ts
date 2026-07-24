@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 export type StepStatus = "pending" | "running" | "success" | "failed" | "warning" | "delegated";
 
 export type ActionResult = "pending" | "info" | "success" | "warning" | "error";

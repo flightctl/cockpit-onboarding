@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 /* eslint-disable no-use-before-define */
 import cockpit from 'cockpit';
 

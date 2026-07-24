@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import { ALIAS_LABEL_KEY, validateAliasConfig } from "../services/alias";
 import { Model } from "../model-context";
 import { validateFlightctlCredentials } from "../flightctl-enrollment";

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import React from "react";
 import { Alert, AlertActionCloseButton, AlertVariant } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Content, ContentVariants } from "@patternfly/react-core/dist/esm/components/Content/index.js";

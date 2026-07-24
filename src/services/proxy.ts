@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import { SCRIPT_PROXY } from "../paths";
 import type { ProxyConfig } from "../types";
 import { spawnWithParamsFile } from "./spawn-helpers";

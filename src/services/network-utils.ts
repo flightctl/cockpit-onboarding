@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 export function ipv6ToBytes(ip: string): number[] {
     // Expand :: notation and convert to 16 bytes
     const parts = ip.split(":");

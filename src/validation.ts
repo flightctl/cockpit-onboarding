@@ -1,4 +1,5 @@
 /**
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  * Validation utilities for system onboarding
  *
  * These functions implement validation logic per data-model.md specifications

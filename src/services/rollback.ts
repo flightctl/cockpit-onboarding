@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import cockpit from "cockpit";
 import { SCRIPT_ROLLBACK } from "../paths";
 import { createSecureTempFile, createStreamParser } from "./spawn-helpers";

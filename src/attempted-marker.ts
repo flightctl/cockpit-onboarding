@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import cockpit from "cockpit";
 import { Model } from "./model-context";
 import { serializeEnrollmentForMarker } from "./enrollment-state";

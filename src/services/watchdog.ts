@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import cockpit from "cockpit";
 import type { WatchdogStatusData } from "../wizard/RestoredConfigurationSection";
 import { WATCHDOG_ACTIVE, WATCHDOG_STATUS, SCRIPT_RUN_WATCHDOG } from "../paths";

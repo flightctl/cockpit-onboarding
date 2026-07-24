@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import cockpit from "cockpit";
 import { SCRIPT_NTP } from "../paths";
 import { ServerTime } from "../../pkg/lib/serverTime.js";

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: LGPL-2.1-or-later */
 import * as React from "react";
 import { Card, CardBody, Divider, Switch } from "@patternfly/react-core/dist/esm/components/index.js";
 import { Flex, FlexItem } from "@patternfly/react-core/dist/esm/layouts/Flex/index.js";
