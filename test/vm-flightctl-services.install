@@ -132,11 +132,16 @@ timeout 120 bash -c '
         for svc in $ALL_SERVICES; do
             STATE=$(systemctl show "$svc" -p ActiveState --value 2>/dev/null)
             RESULT=$(systemctl show "$svc" -p Result --value 2>/dev/null)
-            if [ "$STATE" != "active" ]; then
-                echo "Waiting for $svc (state=$STATE result=$RESULT)..." >&2
-                all_active=false
-                break
+            if [ "$STATE" = "active" ]; then
+                continue
             fi
+            # Oneshot services (e.g. flightctl-db-wait) go inactive after success
+            if [ "$STATE" = "inactive" ] && [ "$RESULT" = "success" ]; then
+                continue
+            fi
+            echo "Waiting for $svc (state=$STATE result=$RESULT)..." >&2
+            all_active=false
+            break
         done
         if $all_active; then
             echo "All services are active" >&2
