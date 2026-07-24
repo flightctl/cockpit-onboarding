@@ -17,13 +17,13 @@ import testlib
 
 from wizard_navigation import (
     IFACE_TABLE,
+    OnboardingMachineCase,
     add_single_nic_interface,
     advance_past_optional_steps_to_review,
     click_button_text,
     complete_enrollment_step,
     iface_row_selector,
     wait_for_nic,
-    wait_onboarding_setup,
 )
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 
@@ -31,14 +31,13 @@ APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 MULTI_NIC_MAC = "52:54:00:88:00:01"
 
 
-class TestApplyConfiguration(testlib.MachineCase):
+class TestApplyConfiguration(OnboardingMachineCase):
     """Test the enrollment progress page UI (multi-NIC path)"""
     provision = {'machine1': {'restrict': False}}
 
     def setUp(self):
         super().setUp()
         m = self.machine
-        wait_onboarding_setup(m)
 
         m._qemu_monitor(
             f"netdev_add user,id=multinic_net,net=10.111.114.0/24"
@@ -106,12 +105,11 @@ class TestApplyConfiguration(testlib.MachineCase):
             )
 
 
-class TestApplySingleNic(testlib.MachineCase):
+class TestApplySingleNic(OnboardingMachineCase):
     """Test apply behavior when configuring the same NIC serving the browser"""
 
     def setUp(self):
         super().setUp()
-        wait_onboarding_setup(self.machine)
         self.setup_iface = add_single_nic_interface(self)
 
     def select_setup_interface_and_navigate_to_review(self, hostname):
@@ -173,7 +171,7 @@ class TestApplySingleNic(testlib.MachineCase):
             )
 
 
-class TestApplySingleNicRollback(testlib.MachineCase):
+class TestApplySingleNicRollback(OnboardingMachineCase):
     """Test that single-NIC apply rolls back when connectivity fails.
 
     Forces a connectivity failure by setting connectivityTest.host to an
@@ -186,7 +184,6 @@ class TestApplySingleNicRollback(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
-        wait_onboarding_setup(self.machine)
         self.setup_iface = add_single_nic_interface(self)
         m = self.machine
 
