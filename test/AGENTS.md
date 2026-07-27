@@ -109,6 +109,7 @@ Each `test/check-*` file contains one or more test classes. The table below show
 | `check-labels`              | `TestHostname` / `TestAlias` / `TestCustomLabels` | yes | vm-agent       | all            | Labels/hostname step UI                      |
 | `check-apply`               | `TestApplyConfiguration`          | no             | vm-agent               | all            | Full wizard apply (multi-NIC)                |
 | `check-apply`               | `TestApplySingleNic` / `TestApplySingleNicRollback` | no | vm-agent     | all            | Apply in single-NIC mode, rollback           |
+| `check-apply`               | `TestApplyVlan`                                     | no | vm-agent     | all            | VLAN apply: NM profile, subinterface, connectivity |
 | `check-watchdog`            | `TestWatchdog`                    | no             | vm-agent               | all            | Watchdog timer configuration                 |
 | `check-enrollment-e2e`      | `TestEnrollmentE2E` / `TestEnrollmentE2ESingleNic` | no | vm-agent + vm-services | all    | Full enrollment against flightctl backend    |
 | `check-network-services-e2e`| `TestNtpE2E` / `TestProxyE2E`    | no             | vm-agent + vm-network-services | all    | NTP/proxy applied and verified in NM         |
