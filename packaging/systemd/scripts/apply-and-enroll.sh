@@ -233,7 +233,10 @@ for i in $(seq 1 $CONNECTIVITY_TIMEOUT); do
     sleep 2
 done
 
-# Step 2.5: Wait for NTP time synchronization before enrollment
+# Step 2.5: Wait for NTP time synchronization before enrollment.
+# During the cable swap the NTP daemon may have marked its sources as
+# unreachable. Nudge it so it retries now that connectivity is back.
+/usr/libexec/flightctl-onboarding/configure-ntp.sh nudge 2>&1 | while IFS= read -r line; do log "$line"; done || true
 NTP_ACTIVE=$(timedatectl show --property=NTP --value 2>/dev/null || echo "no")
 if [ "$NTP_ACTIVE" = "yes" ]; then
     NTP_SYNC_TIMEOUT=30

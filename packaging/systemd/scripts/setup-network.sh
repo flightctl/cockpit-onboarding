@@ -45,6 +45,10 @@ if ! nmcli device show "$ETHERNET_INTERFACE" >/dev/null 2>&1; then
     exit 1
 fi
 
+# Create the firewall zone before the NM connection so that NM can assign
+# the interface to it on activation.
+ensure_firewall_zone
+
 # Create NetworkManager connection for onboarding access
 CONNECTION_NAME="$ONBOARDING_SETUP_CONNECTION"
 
@@ -53,7 +57,10 @@ if nmcli connection show "$CONNECTION_NAME" >/dev/null 2>&1; then
     nmcli connection delete "$CONNECTION_NAME" || true
 fi
 
-# Create new connection with static IP
+# Create new connection with static IP.
+# connection.zone tells NM to place the interface in the onboarding firewalld
+# zone on activation — manual firewall-cmd --add-interface is overridden by NM
+# for interfaces it manages.
 nmcli connection add \
     type ethernet \
     con-name "$CONNECTION_NAME" \
@@ -62,17 +69,13 @@ nmcli connection add \
     ipv4.addresses "$STATIC_IP/$SUBNET_PREFIX" \
     ipv6.method disabled \
     connection.autoconnect yes \
-    connection.autoconnect-priority 100
+    connection.autoconnect-priority 100 \
+    connection.zone "$ONBOARDING_FW_ZONE"
 
 # Activate the connection
 nmcli connection up "$CONNECTION_NAME" || true
 
 echo "Configured $ETHERNET_INTERFACE with IP $STATIC_IP"
-
-if ensure_firewall_zone; then
-    firewall-cmd --zone="$ONBOARDING_FW_ZONE" --add-interface="$ETHERNET_INTERFACE" 2>/dev/null || true
-    echo "Added $ETHERNET_INTERFACE to firewalld zone '$ONBOARDING_FW_ZONE'"
-fi
 
 # Optionally start a DHCP server so directly-connected laptops auto-get an IP
 if command -v dnsmasq >/dev/null 2>&1; then
