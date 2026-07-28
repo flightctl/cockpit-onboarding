@@ -4,6 +4,7 @@
 # Usage:
 #   configure-ntp.sh auto          - Clear custom servers, use system defaults
 #   configure-ntp.sh set srv1 srv2 - Set custom NTP servers
+#   configure-ntp.sh nudge         - Tell the NTP daemon to retry (after network change)
 
 set -e
 
@@ -126,9 +127,19 @@ case "$ACTION" in
         done
         echo "NTP servers set: $* (backends: $BACKENDS)"
         ;;
+    nudge)
+        for backend in $BACKENDS; do
+            if [ "$backend" = "timesyncd" ]; then
+                systemctl restart systemd-timesyncd.service >/dev/null 2>&1 || true
+            elif [ "$backend" = "chronyd" ]; then
+                chronyc online >/dev/null 2>&1 || true
+            fi
+        done
+        echo "NTP daemon nudged (backends: $BACKENDS)"
+        ;;
     *)
         echo "Unknown action: $ACTION" >&2
-        echo "Usage: configure-ntp.sh auto|set [servers...]" >&2
+        echo "Usage: configure-ntp.sh auto|set|nudge [servers...]" >&2
         exit 1
         ;;
 esac

@@ -85,6 +85,8 @@ export async function waitForNtpSync(): Promise<boolean> {
         return false;
     }
 
+    await cockpit.spawn(["sudo", SCRIPT_NTP, "nudge"], { err: "ignore" }).catch(() => {});
+
     for (let i = 0; i < NTP_SYNC_TIMEOUT_SECONDS; i++) {
         if (await isNtpSynchronized()) {
             return true;
