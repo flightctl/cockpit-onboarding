@@ -159,26 +159,9 @@ WIFI_AP_NETMASK=${AP_SUBNET_PREFIX}
 WIFI_AP_INTERFACE=${WIFI_INTERFACE}
 EOF
 
-# Create a dedicated firewalld zone for the AP interface if firewalld is active.
-# The zone only permits DHCP, DNS, Cockpit (9090/tcp), and captive portal (80/tcp).
-# All other inbound traffic on the AP interface is rejected.
-ONBOARDING_FW_ZONE="fc-onboarding-ap"
-if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
-    if ! firewall-cmd --permanent --info-zone="$ONBOARDING_FW_ZONE" >/dev/null 2>&1; then
-        firewall-cmd --permanent --new-zone="$ONBOARDING_FW_ZONE"
-        firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --set-target=REJECT
-        firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-service=dhcp
-        firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-service=dns
-        firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=9090/tcp
-        firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=80/tcp
-        firewall-cmd --reload
-        echo "Created firewalld zone '$ONBOARDING_FW_ZONE' (DHCP, DNS, Cockpit, captive portal only)"
-    else
-        echo "Firewalld zone '$ONBOARDING_FW_ZONE' already exists"
-    fi
-else
-    echo "firewalld is not active, skipping firewall zone setup"
-fi
+# Ensure the onboarding firewalld zone exists. The interface is added later
+# in wifi-ap-activate.sh when the service starts.
+ensure_firewall_zone
 
 # Disable IPv6 on the AP interface to prevent stray link-local addresses.
 # The Ethernet path uses NM's ipv6.method=disabled; here we use sysctl

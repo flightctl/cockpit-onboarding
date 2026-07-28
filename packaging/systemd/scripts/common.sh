@@ -107,6 +107,30 @@ detect_interface() {
     return 0
 }
 
+ONBOARDING_FW_ZONE="fc-onboarding-ap"
+
+# Ensure the dedicated onboarding firewalld zone exists.
+# Idempotent — safe to call from multiple setup scripts regardless of ordering.
+# Returns 0 if firewalld is active (zone ready), 1 if firewalld is not active.
+ensure_firewall_zone() {
+    if ! command -v firewall-cmd >/dev/null 2>&1 || ! systemctl is-active --quiet firewalld; then
+        echo "firewalld is not active, skipping firewall zone setup"
+        return 1
+    fi
+    if firewall-cmd --permanent --info-zone="$ONBOARDING_FW_ZONE" >/dev/null 2>&1; then
+        echo "Firewalld zone '$ONBOARDING_FW_ZONE' already exists"
+        return 0
+    fi
+    firewall-cmd --permanent --new-zone="$ONBOARDING_FW_ZONE"
+    firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --set-target=REJECT
+    firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-service=dhcp
+    firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-service=dns
+    firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=9090/tcp
+    firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=80/tcp
+    firewall-cmd --reload
+    echo "Created firewalld zone '$ONBOARDING_FW_ZONE'"
+}
+
 compute_dhcp_range() {
     local base_ip=$1
     local prefix=$2
