@@ -103,7 +103,7 @@ export async function testNetworkConnectivity(
             console.warn(`Ping failed for ${testHost}:`, pingError);
             const warningTitle = "Ping failed. However, pings may be simply blocked by firewall.";
             emit({ id: ENROLLMENT_ACTION_IDS.PING, actionTitle: warningTitle, result: "warning" });
-            return { success: true, actions: getActions() };
+            return { success: false, actions: getActions() };
         }
     } catch (error) {
         if (signal) {
