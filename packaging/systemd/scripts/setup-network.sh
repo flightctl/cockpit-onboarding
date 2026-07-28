@@ -69,6 +69,11 @@ nmcli connection up "$CONNECTION_NAME" || true
 
 echo "Configured $ETHERNET_INTERFACE with IP $STATIC_IP"
 
+if ensure_firewall_zone; then
+    firewall-cmd --zone="$ONBOARDING_FW_ZONE" --add-interface="$ETHERNET_INTERFACE" 2>/dev/null || true
+    echo "Added $ETHERNET_INTERFACE to firewalld zone '$ONBOARDING_FW_ZONE'"
+fi
+
 # Optionally start a DHCP server so directly-connected laptops auto-get an IP
 if command -v dnsmasq >/dev/null 2>&1; then
     mkdir -p "$RUNTIME_DIR"
