@@ -39,6 +39,20 @@ class TestApplyConfiguration(OnboardingMachineCase):
         super().setUp()
         m = self.machine
 
+        config = {
+            "version": "1.0",
+            "runOnce": False,
+            "hideModules": False,
+            "connectivityTest": {
+                "host": "cockpit-project.org",
+                "required": False,
+            }
+        }
+        m.write(
+            "/etc/cockpit/system-onboarding/config.json",
+            json.dumps(config)
+        )
+
         m._qemu_monitor(
             f"netdev_add user,id=multinic_net,net=10.111.114.0/24"
         )
