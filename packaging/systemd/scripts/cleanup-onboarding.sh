@@ -81,6 +81,28 @@ if [ -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf ]; then
     echo "Removed SSH denial for onboarding user"
 fi
 
+# Create the gate file so flightctl-agent's ConditionPathExists is satisfied.
+# This must happen before user deletion — terminating the onboarding user severs
+# the Cockpit session that spawned this script, which can kill it via SIGPIPE.
+touch "${ONBOARDING_MARKER_DIR}/.onboarding-confirmed"
+echo "Created agent startup gate file"
+
+systemctl unmask greenboot-healthcheck.service 2>/dev/null || true
+systemctl stop flightctl-onboarding-mask-greenboot.service 2>/dev/null || true
+systemctl disable flightctl-onboarding-mask-greenboot.service 2>/dev/null || true
+systemctl daemon-reload 2>/dev/null || true
+systemctl start greenboot-healthcheck.service 2>/dev/null || true
+echo "Restored greenboot-healthcheck.service"
+
+if systemctl list-unit-files flightctl-agent.service | grep -q flightctl-agent; then
+    systemctl enable flightctl-agent 2>/dev/null || true
+    if systemctl start flightctl-agent; then
+        echo "Started flightctl-agent"
+    else
+        echo "WARNING: flightctl-agent did not start; check journalctl -u flightctl-agent" >&2
+    fi
+fi
+
 if [ "$RUN_ONCE" = "true" ]; then
     echo "runOnce is enabled - performing full cleanup"
 
@@ -101,19 +123,6 @@ if [ "$RUN_ONCE" = "true" ]; then
             echo "Forced password change for $ONBOARDING_USER on next login"
         fi
     else
-        # Delete the onboarding user entirely
-        if id "$ONBOARDING_USER" >/dev/null 2>&1; then
-            # Terminate the user's login session and systemd --user instance
-            loginctl terminate-user "$ONBOARDING_USER" 2>/dev/null || true
-            # Kill any remaining user processes
-            pkill -u "$ONBOARDING_USER" 2>/dev/null || true
-            sleep 2
-
-            # Remove user and home directory
-            userdel -r "$ONBOARDING_USER" 2>/dev/null || true
-            echo "Deleted onboarding user and home directory"
-        fi
-
         # Remove Cockpit configuration changes made during setup
         # Only remove AllowUnencrypted if we added it
         if [ -f /etc/cockpit/cockpit.conf ]; then
@@ -126,29 +135,21 @@ if [ "$RUN_ONCE" = "true" ]; then
             fi
             echo "Cleaned up Cockpit configuration"
         fi
+
+        # Delete the onboarding user last — terminating the user severs the
+        # Cockpit session that spawned this script, so all critical work
+        # (gate file, greenboot, agent start) must already be done.
+        if id "$ONBOARDING_USER" >/dev/null 2>&1; then
+            loginctl terminate-user "$ONBOARDING_USER" 2>/dev/null || true
+            pkill -u "$ONBOARDING_USER" 2>/dev/null || true
+            sleep 2
+
+            userdel -r "$ONBOARDING_USER" 2>/dev/null || true
+            echo "Deleted onboarding user and home directory"
+        fi
     fi
 else
     echo "runOnce is disabled - skipping user and service cleanup"
-fi
-
-# Create the gate file so flightctl-agent's ConditionPathExists is satisfied
-touch "${ONBOARDING_MARKER_DIR}/.onboarding-confirmed"
-echo "Created agent startup gate file"
-
-systemctl unmask greenboot-healthcheck.service 2>/dev/null || true
-systemctl stop flightctl-onboarding-mask-greenboot.service 2>/dev/null || true
-systemctl disable flightctl-onboarding-mask-greenboot.service 2>/dev/null || true
-systemctl daemon-reload 2>/dev/null || true
-systemctl start greenboot-healthcheck.service 2>/dev/null || true
-echo "Restored greenboot-healthcheck.service"
-
-if systemctl list-unit-files flightctl-agent.service | grep -q flightctl-agent; then
-    systemctl enable flightctl-agent 2>/dev/null || true
-    if systemctl start flightctl-agent; then
-        echo "Started flightctl-agent"
-    else
-        echo "WARNING: flightctl-agent did not start; check journalctl -u flightctl-agent" >&2
-    fi
 fi
 
 echo "Post-onboarding cleanup complete"
