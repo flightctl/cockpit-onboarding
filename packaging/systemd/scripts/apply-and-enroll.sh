@@ -233,6 +233,26 @@ for i in $(seq 1 $CONNECTIVITY_TIMEOUT); do
     sleep 2
 done
 
+# Step 2.5: Wait for NTP time synchronization before enrollment
+NTP_ACTIVE=$(timedatectl show --property=NTP --value 2>/dev/null || echo "no")
+if [ "$NTP_ACTIVE" = "yes" ]; then
+    NTP_SYNC_TIMEOUT=30
+    log "Waiting for NTP time synchronization (up to ${NTP_SYNC_TIMEOUT}s)..."
+    ntp_elapsed=0
+    while [ "$ntp_elapsed" -lt "$NTP_SYNC_TIMEOUT" ]; do
+        NTP_SYNCED=$(timedatectl show --property=NTPSynchronized --value 2>/dev/null || echo "no")
+        if [ "$NTP_SYNCED" = "yes" ]; then
+            log "NTP time synchronized after ${ntp_elapsed}s"
+            break
+        fi
+        sleep 1
+        ntp_elapsed=$((ntp_elapsed + 1))
+    done
+    if [ "$NTP_SYNCED" != "yes" ]; then
+        log "WARNING: NTP time synchronization timed out after ${NTP_SYNC_TIMEOUT}s, proceeding with enrollment"
+    fi
+fi
+
 # Step 3: Run enrollment scripts
 SCRIPT_COUNT=$(jq '.enrollmentScripts | length' "$PARAMS_FILE")
 if [ "$SCRIPT_COUNT" -gt 0 ]; then

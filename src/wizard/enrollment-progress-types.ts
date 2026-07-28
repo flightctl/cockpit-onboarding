@@ -33,6 +33,7 @@ export const CONFIG_ACTION_IDS = {
     NETWORK_UNAVAILABLE: "config-network-unavailable",
     NETWORK_NO_INTERFACE: "config-network-no-interface",
     NTP: "config-ntp",
+    NTP_SYNC: "config-ntp-sync",
     PROXY: "config-proxy",
     LABELS: "config-labels",
 } as const;
