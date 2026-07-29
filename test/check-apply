@@ -333,14 +333,16 @@ class TestApplyTcpFallback(OnboardingMachineCase):
             f" {TCP_NS_IP6}/64 dev {TCP_VETH_NS}"
         )
 
-        # Block all ICMP — ping will fail
+        # Block ICMP (v4 + v6 echo-request) via nft — works on all target
+        # distros regardless of whether iptables/ip6tables extensions are
+        # available in the kernel.
         m.execute(
-            f"ip netns exec {TCP_NS}"
-            f" iptables -A INPUT -p icmp -j DROP"
-        )
-        m.execute(
-            f"ip netns exec {TCP_NS}"
-            f" ip6tables -A INPUT -p icmpv6 --icmpv6-type echo-request -j DROP"
+            f"ip netns exec {TCP_NS} nft '"
+            f"add table inet icmp_block; "
+            f"add chain inet icmp_block input"
+            f" {{ type filter hook input priority 0; policy accept; }}; "
+            f"add rule inet icmp_block input meta l4proto icmp drop; "
+            f"add rule inet icmp_block input icmpv6 type echo-request drop'"
         )
 
         # Start a TCP listener
