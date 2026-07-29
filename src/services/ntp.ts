@@ -8,6 +8,7 @@ import {
     indexedActionId,
     makeStepAction,
     sleep,
+    type OnStepAction,
     type StepAction,
 } from "../wizard/enrollment-progress-types";
 
@@ -97,14 +98,23 @@ export async function waitForNtpSync(): Promise<boolean> {
     return false;
 }
 
-export async function configureNtpServers(servers: string[], autoConfig: boolean): Promise<StepAction[]> {
+export async function configureNtpServers(
+    servers: string[],
+    autoConfig: boolean,
+    skipSync?: boolean,
+    onAction?: OnStepAction
+): Promise<StepAction[]> {
     const actions: StepAction[] = [];
+    const emit = (action: StepAction) => {
+        actions.push(action);
+        onAction?.(action);
+    };
     let ntpConfigured = false;
 
     try {
         if (autoConfig) {
             await cockpit.spawn(["sudo", SCRIPT_NTP, "auto"], { err: "message" });
-            actions.push(
+            emit(
                 makeStepAction(
                     indexedActionId(CONFIG_ACTION_IDS.NTP, 0),
                     "NTP enabled with automatic server selection",
@@ -121,7 +131,7 @@ export async function configureNtpServers(servers: string[], autoConfig: boolean
                 }
             }
             await cockpit.spawn(["sudo", SCRIPT_NTP, "set", ...filteredServers], { err: "message" });
-            actions.push(
+            emit(
                 makeStepAction(
                     indexedActionId(CONFIG_ACTION_IDS.NTP, 0),
                     `NTP configured with custom servers: ${filteredServers.join(", ")}`,
@@ -130,7 +140,7 @@ export async function configureNtpServers(servers: string[], autoConfig: boolean
             );
             ntpConfigured = true;
         } else {
-            actions.push(
+            emit(
                 makeStepAction(
                     indexedActionId(CONFIG_ACTION_IDS.NTP, 0),
                     "NTP enabled with default configuration",
@@ -142,17 +152,17 @@ export async function configureNtpServers(servers: string[], autoConfig: boolean
         throw new Error(`NTP configuration failed: ${String(error)}`);
     }
 
-    if (ntpConfigured) {
-        actions.push(
+    if (ntpConfigured && !skipSync) {
+        emit(
             makeStepAction(CONFIG_ACTION_IDS.NTP_SYNC, "Waiting for NTP time synchronization...", "pending")
         );
         const synced = await waitForNtpSync();
         if (synced) {
-            actions.push(
+            emit(
                 makeStepAction(CONFIG_ACTION_IDS.NTP_SYNC, "NTP time synchronized", "success")
             );
         } else {
-            actions.push(
+            emit(
                 makeStepAction(
                     CONFIG_ACTION_IDS.NTP_SYNC,
                     "NTP time synchronization timed out, proceeding with enrollment",

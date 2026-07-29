@@ -10,6 +10,7 @@ import {
     indexedActionId,
     makeStepAction,
     type ActionResult,
+    type OnStepAction,
     type StepAction,
 } from "../wizard/enrollment-progress-types";
 
@@ -19,8 +20,15 @@ export interface NetworkApplyResult {
 
 const NETWORK_ACTION_PREFIX = "config-network";
 
-function pushNetworkAction(actions: StepAction[], actionTitle: string, result: ActionResult = "success"): void {
-    actions.push(makeStepAction(indexedActionId(NETWORK_ACTION_PREFIX, actions.length), actionTitle, result));
+function pushNetworkAction(
+    actions: StepAction[],
+    actionTitle: string,
+    result: ActionResult = "success",
+    onAction?: OnStepAction
+): void {
+    const action = makeStepAction(indexedActionId(NETWORK_ACTION_PREFIX, actions.length), actionTitle, result);
+    actions.push(action);
+    onAction?.(action);
 }
 
 export interface ConnectionIpSettings {
@@ -566,17 +574,18 @@ function buildConnectionSettings(
 export async function applyNetworkConfiguration(
     networkManager: NetworkManagerModel | undefined,
     model: Model,
-    skipActivation = false
+    skipActivation = false,
+    onAction?: OnStepAction
 ): Promise<NetworkApplyResult> {
     const actions: StepAction[] = [];
 
     if (!networkManager) {
-        pushNetworkAction(actions, "NetworkManager unavailable", "error");
+        pushNetworkAction(actions, "NetworkManager unavailable", "error", onAction);
         return { actions };
     }
 
     if (!model.networkInterface.selectedInterface) {
-        pushNetworkAction(actions, "No network interface selected", "error");
+        pushNetworkAction(actions, "No network interface selected", "error", onAction);
         return { actions };
     }
 
@@ -654,11 +663,11 @@ export async function applyNetworkConfiguration(
                 [settings]
             );
 
-            pushNetworkAction(actions, `Created new connection profile: ${connectionId}`);
+            pushNetworkAction(actions, `Created new connection profile: ${connectionId}`, "success", onAction);
             console.log("New connection path:", newConnectionPath);
 
             if (skipActivation) {
-                pushNetworkAction(actions, `Created profile ${connectionId} (activation deferred to systemd-run)`);
+                pushNetworkAction(actions, `Created profile ${connectionId} (activation deferred to systemd-run)`, "success", onAction);
             } else {
                 let devicePath = "/";
                 if (!isVlan) {
@@ -683,7 +692,7 @@ export async function applyNetworkConfiguration(
                 const activeConnPath = dbusPathResult(activeConnResult);
                 await waitForActivation(nmClient, activeConnPath);
 
-                pushNetworkAction(actions, `Activated connection ${connectionId} on ${effectiveIfaceName}`);
+                pushNetworkAction(actions, `Activated connection ${connectionId} on ${effectiveIfaceName}`, "success", onAction);
             }
         } catch (networkError) {
             const errorMsg = String(networkError);
@@ -707,21 +716,21 @@ export async function applyNetworkConfiguration(
             const prefixLength = model.networkAddress.ipv4.subnetMask
                 ? subnetMaskToPrefixLength(model.networkAddress.ipv4.subnetMask)
                 : 24;
-            pushNetworkAction(actions, `IPv4 configured: ${model.networkAddress.ipv4.address}/${prefixLength}`);
+            pushNetworkAction(actions, `IPv4 configured: ${model.networkAddress.ipv4.address}/${prefixLength}`, "success", onAction);
         } else if (model.networkAddress.ipv4.method === "disabled") {
-            pushNetworkAction(actions, "IPv4 disabled");
+            pushNetworkAction(actions, "IPv4 disabled", "success", onAction);
         } else {
-            pushNetworkAction(actions, "IPv4 configured for automatic (DHCP)");
+            pushNetworkAction(actions, "IPv4 configured for automatic (DHCP)", "success", onAction);
         }
 
         if (model.networkAddress.ipv6.method === "static") {
-            pushNetworkAction(actions, `IPv6 configured: ${model.networkAddress.ipv6.address}`);
+            pushNetworkAction(actions, `IPv6 configured: ${model.networkAddress.ipv6.address}`, "success", onAction);
         } else if (model.networkAddress.ipv6.method === "disabled") {
-            pushNetworkAction(actions, "IPv6 disabled");
+            pushNetworkAction(actions, "IPv6 disabled", "success", onAction);
         } else if (model.networkAddress.ipv6.method === "dhcp") {
-            pushNetworkAction(actions, "IPv6 configured for stateful DHCPv6");
+            pushNetworkAction(actions, "IPv6 configured for stateful DHCPv6", "success", onAction);
         } else {
-            pushNetworkAction(actions, "IPv6 configured for automatic (SLAAC)");
+            pushNetworkAction(actions, "IPv6 configured for automatic (SLAAC)", "success", onAction);
         }
     } catch (error) {
         throw new Error(`Network configuration failed: ${String(error)}`);

@@ -11,6 +11,7 @@ import {
     indexedActionId,
     makeStepAction,
     type AppliedItems,
+    type OnStepAction,
     type StepAction,
     type SystemConfigurationApplyResult,
 } from "./wizard/enrollment-progress-types";
@@ -61,10 +62,14 @@ export class SystemConfigurationService {
     async applySystemConfiguration(
         networkManager: NetworkManagerModel | undefined,
         model: Model,
-        options?: { skipNetwork?: boolean; skipActivation?: boolean }
+        options?: { skipNetwork?: boolean; skipActivation?: boolean; onAction?: OnStepAction }
     ): Promise<SystemConfigurationApplyResult> {
         const actions: StepAction[] = [];
         let hasErrors = false;
+        const emit = (action: StepAction) => {
+            actions.push(action);
+            options?.onAction?.(action);
+        };
         const appliedItems: AppliedItems = {
             hostname: false,
             network: false,
@@ -79,22 +84,22 @@ export class SystemConfigurationService {
         if (model.hostname.value && model.hostname.value.trim()) {
             try {
                 await setHostname(model.hostname.value);
-                actions.push(
+                emit(
                     makeStepAction(CONFIG_ACTION_IDS.HOSTNAME, `Hostname set to: ${model.hostname.value}`, "success")
                 );
                 appliedItems.hostname = true;
             } catch (error) {
-                actions.push(makeStepAction(CONFIG_ACTION_IDS.HOSTNAME, String(error), "error"));
+                emit(makeStepAction(CONFIG_ACTION_IDS.HOSTNAME, String(error), "error"));
                 hasErrors = true;
             }
         } else {
-            actions.push(
+            emit(
                 makeStepAction(CONFIG_ACTION_IDS.HOSTNAME_UNCHANGED, "Hostname: No changes required", "success")
             );
         }
 
         if (options?.skipNetwork) {
-            actions.push(
+            emit(
                 makeStepAction(
                     CONFIG_ACTION_IDS.NETWORK_DEFERRED,
                     "Network: deferred to systemd-run transient unit",
@@ -103,19 +108,19 @@ export class SystemConfigurationService {
             );
         } else if (model.networkInterface.selectedInterface && networkManager) {
             try {
-                const networkApplyResult = await applyNetworkConfiguration(
+                await applyNetworkConfiguration(
                     networkManager,
                     model,
-                    options?.skipActivation
+                    options?.skipActivation,
+                    emit
                 );
-                actions.push(...networkApplyResult.actions);
                 appliedItems.network = true;
             } catch (error) {
-                actions.push(makeStepAction(CONFIG_ACTION_IDS.NETWORK_UNAVAILABLE, String(error), "error"));
+                emit(makeStepAction(CONFIG_ACTION_IDS.NETWORK_UNAVAILABLE, String(error), "error"));
                 hasErrors = true;
             }
         } else {
-            actions.push(
+            emit(
                 makeStepAction(
                     CONFIG_ACTION_IDS.NETWORK_NO_INTERFACE,
                     "Network: No interface selected or NetworkManager unavailable",
@@ -125,32 +130,33 @@ export class SystemConfigurationService {
         }
 
         try {
-            const ntpActions = await configureNtpServers(
+            await configureNtpServers(
                 model.networkServices.ntp.servers,
-                model.networkServices.ntp.autoConfig
+                model.networkServices.ntp.autoConfig,
+                options?.skipNetwork,
+                emit
             );
-            actions.push(...ntpActions);
             appliedItems.ntp = true;
         } catch (error) {
-            actions.push(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.NTP, 0), String(error), "error"));
+            emit(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.NTP, 0), String(error), "error"));
             hasErrors = true;
         }
 
         try {
             const proxyActions = await applyProxyConfiguration(model.networkServices.proxy);
-            actions.push(...proxyActions);
+            proxyActions.forEach(emit);
             appliedItems.proxy = true;
         } catch (error) {
-            actions.push(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.PROXY, 0), String(error), "error"));
+            emit(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.PROXY, 0), String(error), "error"));
             hasErrors = true;
         }
 
         try {
             const labelActions = await applyLabelsConfiguration(model.labels, model.alias, model.hostname.value);
-            actions.push(...labelActions);
+            labelActions.forEach(emit);
             appliedItems.labels = true;
         } catch (error) {
-            actions.push(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.LABELS, 0), String(error), "error"));
+            emit(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.LABELS, 0), String(error), "error"));
             hasErrors = true;
         }
 
