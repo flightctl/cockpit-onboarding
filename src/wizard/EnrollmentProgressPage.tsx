@@ -625,6 +625,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             enrollmentReachabilityHost: reachabilityHost || "",
             enrollmentReachabilityPort: reachabilityPort || 443,
             ipv4Method: model.networkAddress.ipv4.method,
+            ipv6Method: model.networkAddress.ipv6.method,
         };
         const masterParamsFile = await createSecureTempFile(JSON.stringify(masterParams), ".onboarding-apply-");
         tempFilesToCleanup.push(masterParamsFile);

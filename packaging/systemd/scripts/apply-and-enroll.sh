@@ -102,6 +102,7 @@ CONNECTIVITY_REQUIRED=$(jq -r 'if .connectivityTestRequired == false then "false
 ENROLLMENT_REACHABILITY_HOST=$(jq -r '.enrollmentReachabilityHost // empty' "$PARAMS_FILE")
 ENROLLMENT_REACHABILITY_PORT=$(jq -r '.enrollmentReachabilityPort // 443' "$PARAMS_FILE")
 IPV4_METHOD=$(jq -r '.ipv4Method // "auto"' "$PARAMS_FILE")
+IPV6_METHOD=$(jq -r '.ipv6Method // "auto"' "$PARAMS_FILE")
 CONNECTIVITY_BUDGET=$(jq -r '.connectivityTimeoutSeconds // 300' "$PARAMS_FILE")
 
 validate_iface_name() {
@@ -198,12 +199,25 @@ log "Waiting for connectivity (budget: ${CONNECTIVITY_BUDGET}s, hosts: ${CHECK_H
 elapsed=0
 connectivity_ok=false
 while [ "$elapsed" -lt "$CONNECTIVITY_BUDGET" ]; do
-    if [ "$IPV4_METHOD" = "auto" ]; then
-        has_ip=$(ip -4 addr show dev "$EFFECTIVE_IFACE" 2>/dev/null \
-            | grep -v 'inet 169.254' | grep -c 'inet ' || true)
-        has_route=$(ip -4 route show default dev "$EFFECTIVE_IFACE" 2>/dev/null | grep -c . || true)
-        if [ "$has_ip" -eq 0 ] || [ "$has_route" -eq 0 ]; then
-            log "DHCP not complete on $EFFECTIVE_IFACE (ip=${has_ip} route=${has_route}), retrying in 5s..."
+    needs_dhcp=false
+    if [ "$IPV4_METHOD" = "auto" ] || [ "$IPV6_METHOD" = "auto" ] || [ "$IPV6_METHOD" = "dhcp" ]; then
+        needs_dhcp=true
+    fi
+    if [ "$needs_dhcp" = true ]; then
+        has_v4_ip=0
+        has_v6_ip=0
+        has_route=0
+        if [ "$IPV4_METHOD" != "disabled" ]; then
+            has_v4_ip=$(ip -4 addr show dev "$EFFECTIVE_IFACE" 2>/dev/null \
+                | grep -v 'inet 169.254' | grep -c 'inet ' || true)
+        fi
+        if [ "$IPV6_METHOD" != "disabled" ]; then
+            has_v6_ip=$(ip -6 addr show dev "$EFFECTIVE_IFACE" scope global 2>/dev/null \
+                | grep -c 'inet6 ' || true)
+        fi
+        has_route=$(ip route show default dev "$EFFECTIVE_IFACE" 2>/dev/null | grep -c . || true)
+        if [ "$((has_v4_ip + has_v6_ip))" -eq 0 ] || [ "$has_route" -eq 0 ]; then
+            log "DHCP/SLAAC not complete on $EFFECTIVE_IFACE (v4=${has_v4_ip} v6=${has_v6_ip} route=${has_route}), retrying in 5s..."
             sleep 5
             elapsed=$((elapsed + 5))
             continue
