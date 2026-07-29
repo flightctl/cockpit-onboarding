@@ -194,14 +194,11 @@ provision_vm() {
     make -C "${PROJECT_DIR}" rpm
 
     local rpm_file
-    shopt -s nullglob
-    local rpms=("${PROJECT_DIR}"/bin/rpm/flightctl-onboarding-*.noarch.rpm)
-    shopt -u nullglob
-    if [[ ${#rpms[@]} -eq 0 ]]; then
+    rpm_file=$(ls -t "${PROJECT_DIR}"/bin/rpm/flightctl-onboarding-*.noarch.rpm 2>/dev/null | head -1)
+    if [[ -z "$rpm_file" ]]; then
         echo "ERROR: RPM build failed - no .rpm file found" >&2
         exit 1
     fi
-    rpm_file="${rpms[0]}"
 
     echo "Copying RPM to VM..."
     scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
