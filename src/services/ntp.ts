@@ -97,7 +97,7 @@ export async function waitForNtpSync(): Promise<boolean> {
     return false;
 }
 
-export async function configureNtpServers(servers: string[], autoConfig: boolean): Promise<StepAction[]> {
+export async function configureNtpServers(servers: string[], autoConfig: boolean, skipSync?: boolean): Promise<StepAction[]> {
     const actions: StepAction[] = [];
     let ntpConfigured = false;
 
@@ -142,7 +142,7 @@ export async function configureNtpServers(servers: string[], autoConfig: boolean
         throw new Error(`NTP configuration failed: ${String(error)}`);
     }
 
-    if (ntpConfigured) {
+    if (ntpConfigured && !skipSync) {
         actions.push(
             makeStepAction(CONFIG_ACTION_IDS.NTP_SYNC, "Waiting for NTP time synchronization...", "pending")
         );

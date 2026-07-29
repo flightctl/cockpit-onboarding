@@ -127,7 +127,8 @@ export class SystemConfigurationService {
         try {
             const ntpActions = await configureNtpServers(
                 model.networkServices.ntp.servers,
-                model.networkServices.ntp.autoConfig
+                model.networkServices.ntp.autoConfig,
+                options?.skipNetwork
             );
             actions.push(...ntpActions);
             appliedItems.ntp = true;
