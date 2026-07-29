@@ -99,7 +99,8 @@ HOSTNAME=$(jq -r '.hostname // empty' "$PARAMS_FILE")
 ORIGINAL_HOSTNAME=$(jq -r '.originalHostname // empty' "$PARAMS_FILE")
 CONNECTIVITY_TEST_HOST=$(jq -r '.connectivityTestHost // empty' "$PARAMS_FILE")
 CONNECTIVITY_REQUIRED=$(jq -r 'if .connectivityTestRequired == false then "false" else "true" end' "$PARAMS_FILE")
-ENROLLMENT_ENDPOINT=$(jq -r '.enrollmentEndpoint // empty' "$PARAMS_FILE")
+ENROLLMENT_REACHABILITY_HOST=$(jq -r '.enrollmentReachabilityHost // empty' "$PARAMS_FILE")
+ENROLLMENT_REACHABILITY_PORT=$(jq -r '.enrollmentReachabilityPort // 443' "$PARAMS_FILE")
 IPV4_METHOD=$(jq -r '.ipv4Method // "auto"' "$PARAMS_FILE")
 CONNECTIVITY_BUDGET=$(jq -r '.connectivityTimeoutSeconds // 300' "$PARAMS_FILE")
 
@@ -183,21 +184,9 @@ nmcli connection up "$CONNECTION_ID"
 CHECK_SCRIPT="/usr/libexec/flightctl-onboarding/check-connectivity.sh"
 
 CHECK_HOSTS="$CONNECTIVITY_TEST_HOST"
-CHECK_PORT="443"
-if [ -n "$ENROLLMENT_ENDPOINT" ]; then
-    ep_hostport="${ENROLLMENT_ENDPOINT#*://}"
-    ep_hostport="${ep_hostport%%/*}"
-    ep_host="${ep_hostport%%:*}"
-    ep_port="${ep_hostport##*:}"
-    if [ "$ep_port" = "$ep_host" ]; then
-        ep_port=""
-    fi
-    if [ -n "$ep_host" ] && [ "$ep_host" != "$CONNECTIVITY_TEST_HOST" ]; then
-        CHECK_HOSTS="${CHECK_HOSTS},${ep_host}"
-    fi
-    if [ -n "$ep_port" ]; then
-        CHECK_PORT="$ep_port"
-    fi
+CHECK_PORT="$ENROLLMENT_REACHABILITY_PORT"
+if [ -n "$ENROLLMENT_REACHABILITY_HOST" ] && [ "$ENROLLMENT_REACHABILITY_HOST" != "$CONNECTIVITY_TEST_HOST" ]; then
+    CHECK_HOSTS="${CHECK_HOSTS},${ENROLLMENT_REACHABILITY_HOST}"
 fi
 
 CHECK_ARGS=(--hosts "$CHECK_HOSTS" --interface "$EFFECTIVE_IFACE" --port "$CHECK_PORT")

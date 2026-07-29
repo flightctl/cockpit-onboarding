@@ -26,7 +26,7 @@ import {
     PendingIcon,
 } from "@patternfly/react-icons";
 
-import { useModelContext } from "../model-context";
+import { useModelContext, type Model } from "../model-context";
 import { useConfig } from "../app";
 import { BUILT_IN_DEFAULTS } from "../config-loader";
 import { systemConfigurationService } from "../system-config";
@@ -65,6 +65,32 @@ interface Step {
 }
 
 const _ = cockpit.gettext;
+
+function getEnrollmentReachabilityTarget(model: Model): { host: string; port: number | undefined } {
+    const proxy = model.networkServices.proxy;
+    if (proxy.enabled && proxy.hostname) {
+        return { host: proxy.hostname, port: proxy.port ?? undefined };
+    }
+
+    if (!model.enrollment.selected) {
+        return { host: "", port: undefined };
+    }
+
+    const endpoint = model.enrollment.useExisting ? model.detectedServerUrl : model.enrollment.endpoint;
+    if (!endpoint) {
+        return { host: "", port: undefined };
+    }
+
+    try {
+        const url = new URL(endpoint);
+        return {
+            host: url.hostname,
+            port: url.port ? parseInt(url.port, 10) : undefined,
+        };
+    } catch {
+        return { host: "", port: undefined };
+    }
+}
 
 const getActionResultIcon = (result: ActionResult) => {
     switch (result) {
@@ -471,28 +497,12 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 ? `${parentIface}.${vlanId}`
                 : parentIface;
 
-        let enrollmentHost: string | undefined;
-        let enrollmentPort: number | undefined;
-        if (model.enrollment.selected) {
-            const endpoint = model.enrollment.useExisting ? model.detectedServerUrl : model.enrollment.endpoint;
-            if (endpoint) {
-                try {
-                    const url = new URL(endpoint);
-                    if (url.hostname !== testHost) {
-                        enrollmentHost = url.hostname;
-                    }
-                    if (url.port) {
-                        enrollmentPort = parseInt(url.port, 10);
-                    }
-                } catch {
-                    /* not a valid URL, skip enrollment host check */
-                }
-            }
-        }
+        const { host: reachabilityHost, port: reachabilityPort } =
+            getEnrollmentReachabilityTarget(model);
 
         return testNetworkConnectivity(testHost, iface, signalRef.current, onAction, {
-            enrollmentHost,
-            port: enrollmentPort,
+            enrollmentHost: reachabilityHost !== testHost ? reachabilityHost : undefined,
+            port: reachabilityPort,
             required: model.connectivityTestRequired,
         });
     };
@@ -598,11 +608,8 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         const isVlan =
             model.networkInterface.vlanEnabled && vlanId !== null && model.networkInterface.interfaceType !== "wifi";
         const effectiveIfaceName = isVlan ? `${ifaceName}.${vlanId}` : ifaceName;
-        let enrollmentEndpoint = "";
-        if (model.enrollment.selected) {
-            enrollmentEndpoint =
-                (model.enrollment.useExisting ? model.detectedServerUrl : model.enrollment.endpoint) || "";
-        }
+        const { host: reachabilityHost, port: reachabilityPort } =
+            getEnrollmentReachabilityTarget(model);
 
         const masterParams = {
             connectionId: `flightctl-onboarding-${effectiveIfaceName}`,
@@ -615,7 +622,8 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             connectivityTimeoutSeconds: config?.connectivityTest?.carrierTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.carrierTimeoutSeconds!,
             connectivityTestRequired: model.connectivityTestRequired,
             ntpSyncTimeoutSeconds: config?.connectivityTest?.ntpSyncTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.ntpSyncTimeoutSeconds!,
-            enrollmentEndpoint,
+            enrollmentReachabilityHost: reachabilityHost || "",
+            enrollmentReachabilityPort: reachabilityPort || 443,
             ipv4Method: model.networkAddress.ipv4.method,
         };
         const masterParamsFile = await createSecureTempFile(JSON.stringify(masterParams), ".onboarding-apply-");
