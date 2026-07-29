@@ -292,6 +292,10 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
 
     const isSingleNic = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
 
+    useEffect(() => {
+        updateModel("isSingleNic", isSingleNic);
+    }, [isSingleNic]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const aliasSummary =
         model.alias.mode === AliasMode.NONE
             ? _("Not set")
