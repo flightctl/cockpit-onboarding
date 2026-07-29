@@ -170,7 +170,7 @@ provision_vm() {
     run_ssh "${vm_ip}" "sudo systemctl enable --now chronyd"
 
     echo "Installing WiFi simulation packages..."
-    run_ssh "${vm_ip}" "sudo dnf install -y kernel-modules-internal kernel-modules-extra iw wireless-regdb linux-firmware"
+    run_ssh "${vm_ip}" "sudo dnf install -y kernel-modules-internal kernel-modules-extra NetworkManager-wifi iw wireless-regdb linux-firmware"
 
     echo "Restarting NetworkManager to load WiFi plugin..."
     run_ssh "${vm_ip}" "sudo systemctl restart NetworkManager"
