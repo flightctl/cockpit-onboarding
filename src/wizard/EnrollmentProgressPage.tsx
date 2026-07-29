@@ -30,7 +30,7 @@ import { useModelContext } from "../model-context";
 import { useConfig } from "../app";
 import { systemConfigurationService } from "../system-config";
 import { getHostnameInfo } from "../services/hostname";
-import { isConnectedViaInterface, applyNetworkConfiguration } from "../services/network";
+import { applyNetworkConfiguration } from "../services/network";
 import { executeRollbackScript, type RollbackManifest } from "../services/rollback";
 import { writeAttemptedMarker } from "../attempted-marker";
 import { SCRIPT_RUN_APPLY_ENROLL, MARKER_COMPLETE } from "../paths";
@@ -468,15 +468,6 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         return testNetworkConnectivity(testHost, iface, signalRef.current, onAction);
     };
 
-    // Detect whether the user is configuring the same NIC that serves this
-    // browser session (single-NIC scenario).
-    const detectSingleNic = async (): Promise<boolean> => {
-        if (!model.networkInterface.selectedInterface) {
-            return false;
-        }
-        return isConnectedViaInterface(model.networkInterface.selectedInterface);
-    };
-
     // Single-NIC delegation: apply hostname/NTP in-process, create the NM
     // profile without activating, write params files, and hand off network
     // activation + enrollment to a systemd-run transient unit that survives
@@ -652,7 +643,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         const resultsBuffer: EnrollmentProgressResultItem[] = [];
 
         // Single-NIC: delegate network activation + enrollment to systemd-run
-        if (await detectSingleNic()) {
+        if (model.isSingleNic) {
             await executeSingleNicDelegation(resultsBuffer);
             return;
         }
