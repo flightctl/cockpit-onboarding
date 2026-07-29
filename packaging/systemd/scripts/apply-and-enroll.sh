@@ -99,6 +99,9 @@ HOSTNAME=$(jq -r '.hostname // empty' "$PARAMS_FILE")
 ORIGINAL_HOSTNAME=$(jq -r '.originalHostname // empty' "$PARAMS_FILE")
 CONNECTIVITY_TEST_HOST=$(jq -r '.connectivityTestHost // empty' "$PARAMS_FILE")
 CONNECTIVITY_REQUIRED=$(jq -r 'if .connectivityTestRequired == false then "false" else "true" end' "$PARAMS_FILE")
+ENROLLMENT_ENDPOINT=$(jq -r '.enrollmentEndpoint // empty' "$PARAMS_FILE")
+IPV4_METHOD=$(jq -r '.ipv4Method // "auto"' "$PARAMS_FILE")
+CONNECTIVITY_BUDGET=$(jq -r '.connectivityTimeoutSeconds // 300' "$PARAMS_FILE")
 
 validate_iface_name() {
     local name="$1"
@@ -171,69 +174,74 @@ fi
 log "Activating connection: $CONNECTION_ID"
 nmcli connection up "$CONNECTION_ID"
 
-# Step 2: Wait for link carrier, then connectivity
-# In ethernet single-NIC scenarios the operator must physically move the cable
-# from the configuration laptop to the production switch. Wait up to 5 minutes
-# for carrier, then 30 retries at 2s intervals (~60 seconds) for connectivity.
-# Carrier is checked on the physical interface, not the VLAN subinterface.
-CARRIER_FILE="/sys/class/net/${INTERFACE_NAME}/carrier"
-CARRIER_TIMEOUT=$(jq -r '.carrierTimeoutSeconds // 300' "$PARAMS_FILE")
-CONNECTIVITY_TIMEOUT=$(jq -r '.connectivityRetries // 30' "$PARAMS_FILE")
+# Step 2: Wait for connectivity
+# In single-NIC scenarios the operator physically moves the cable from the
+# configuration laptop to the production switch. Instead of a separate carrier
+# wait, we loop: if carrier is down or DHCP hasn't completed, the connectivity
+# check will fail and we retry. This merges carrier wait, DHCP wait, and
+# reachability check into one time-budgeted loop.
+CHECK_SCRIPT="/usr/libexec/flightctl-onboarding/check-connectivity.sh"
 
-if [ -n "$INTERFACE_NAME" ] && [ -f "$CARRIER_FILE" ]; then
-    log "Waiting for link carrier on $INTERFACE_NAME (up to ${CARRIER_TIMEOUT}s)..."
-    elapsed=0
-    while [ "$elapsed" -lt "$CARRIER_TIMEOUT" ]; do
-        if [ "$(cat "$CARRIER_FILE" 2>/dev/null)" = "1" ]; then
-            log "Link carrier detected on $INTERFACE_NAME after ${elapsed}s"
-            break
-        fi
-        if [ "$elapsed" -eq "$CARRIER_TIMEOUT" ]; then
-            break
-        fi
-        sleep 5
-        elapsed=$((elapsed + 5))
-    done
-    if [ "$(cat "$CARRIER_FILE" 2>/dev/null)" != "1" ]; then
-        log "ERROR: No link carrier on $INTERFACE_NAME after ${CARRIER_TIMEOUT}s"
-        exit 1
+CHECK_HOSTS="$CONNECTIVITY_TEST_HOST"
+CHECK_PORT="443"
+if [ -n "$ENROLLMENT_ENDPOINT" ]; then
+    ep_hostport="${ENROLLMENT_ENDPOINT#*://}"
+    ep_hostport="${ep_hostport%%/*}"
+    ep_host="${ep_hostport%%:*}"
+    ep_port="${ep_hostport##*:}"
+    if [ "$ep_port" = "$ep_host" ]; then
+        ep_port=""
     fi
-else
-    log "No carrier file for $INTERFACE_NAME, skipping carrier wait"
+    if [ -n "$ep_host" ] && [ "$ep_host" != "$CONNECTIVITY_TEST_HOST" ]; then
+        CHECK_HOSTS="${CHECK_HOSTS},${ep_host}"
+    fi
+    if [ -n "$ep_port" ]; then
+        CHECK_PORT="$ep_port"
+    fi
 fi
 
-is_ip_address() {
-    [[ "$1" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || [[ "$1" =~ ^[0-9a-fA-F:]+$ ]]
-}
+CHECK_ARGS=(--hosts "$CHECK_HOSTS" --interface "$EFFECTIVE_IFACE" --port "$CHECK_PORT")
+if [ "$CONNECTIVITY_REQUIRED" = "true" ]; then
+    CHECK_ARGS+=(--required)
+fi
 
-PING_TIMEOUT=$(jq -r '.pingTimeoutSeconds // 10' "$PARAMS_FILE")
-PING_WAIT=$(jq -r '.pingWaitSeconds // 5' "$PARAMS_FILE")
-log "Waiting for network connectivity (up to ${CONNECTIVITY_TIMEOUT} retries)..."
-for i in $(seq 1 $CONNECTIVITY_TIMEOUT); do
-    if is_ip_address "$CONNECTIVITY_TEST_HOST"; then
-        if ping -c1 -W${PING_WAIT} "$CONNECTIVITY_TEST_HOST" >/dev/null 2>&1; then
-            log "Network connectivity confirmed (ping)"
-            break
-        fi
-    elif systemctl is-active --quiet systemd-resolved 2>/dev/null \
-         && resolvectl query --interface="$EFFECTIVE_IFACE" "$CONNECTIVITY_TEST_HOST" >/dev/null 2>&1; then
-        log "Network connectivity confirmed (DNS via resolvectl)"
-        break
-    elif getent hosts "$CONNECTIVITY_TEST_HOST" >/dev/null 2>&1; then
-        log "Network connectivity confirmed (DNS)"
-        break
-    fi
-    if [ "$i" -eq "$CONNECTIVITY_TIMEOUT" ]; then
-        if [ "$CONNECTIVITY_REQUIRED" = "true" ]; then
-            log "ERROR: Network connectivity not available after $CONNECTIVITY_TIMEOUT attempts"
-            exit 1
-        else
-            log "WARNING: Network connectivity not available after $CONNECTIVITY_TIMEOUT attempts (not required, continuing)"
-            break
+log "Waiting for connectivity (budget: ${CONNECTIVITY_BUDGET}s, hosts: ${CHECK_HOSTS})..."
+elapsed=0
+connectivity_ok=false
+while [ "$elapsed" -lt "$CONNECTIVITY_BUDGET" ]; do
+    if [ "$IPV4_METHOD" = "auto" ]; then
+        has_ip=$(ip -4 addr show dev "$EFFECTIVE_IFACE" 2>/dev/null \
+            | grep -v 'inet 169.254' | grep -c 'inet ' || true)
+        has_route=$(ip -4 route show default dev "$EFFECTIVE_IFACE" 2>/dev/null | grep -c . || true)
+        if [ "$has_ip" -eq 0 ] || [ "$has_route" -eq 0 ]; then
+            log "DHCP not complete on $EFFECTIVE_IFACE (ip=${has_ip} route=${has_route}), retrying in 5s..."
+            sleep 5
+            elapsed=$((elapsed + 5))
+            continue
         fi
     fi
-    sleep 2
+
+    check_output=$("$CHECK_SCRIPT" "${CHECK_ARGS[@]}" 2>&1) && check_rc=0 || check_rc=$?
+    echo "$check_output" | while IFS= read -r line; do log "$line"; done
+
+    if [ "$check_rc" -eq 0 ]; then
+        connectivity_ok=true
+        log "Connectivity confirmed after ${elapsed}s"
+        break
+    fi
+
+    sleep 5
+    elapsed=$((elapsed + 5))
 done
+
+if [ "$connectivity_ok" != true ]; then
+    if [ "$CONNECTIVITY_REQUIRED" = "true" ]; then
+        log "ERROR: Connectivity not available after ${CONNECTIVITY_BUDGET}s"
+        exit 1
+    else
+        log "WARNING: Connectivity not available after ${CONNECTIVITY_BUDGET}s (not required, continuing)"
+    fi
+fi
 
 # Step 2.5: Wait for NTP time synchronization before enrollment.
 # During the cable swap the NTP daemon may have marked its sources as

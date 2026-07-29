@@ -87,6 +87,7 @@ install -m 755 packaging/systemd/scripts/apply-proxy.sh %{buildroot}%{_libexecdi
 install -m 755 packaging/systemd/scripts/finalize-onboarding.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/watchdog-rollback.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/check-network.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/check-connectivity.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/rollback-config.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/run-watchdog.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/mask-greenboot.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/

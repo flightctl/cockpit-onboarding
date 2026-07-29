@@ -470,12 +470,31 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             model.networkInterface.interfaceType !== "wifi"
                 ? `${parentIface}.${vlanId}`
                 : parentIface;
-        return testNetworkConnectivity(
-            testHost, iface,
-            config?.connectivityTest?.pingTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingTimeoutSeconds!,
-            config?.connectivityTest?.pingWaitSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingWaitSeconds!,
-            signalRef.current, onAction,
-        );
+
+        let enrollmentHost: string | undefined;
+        let enrollmentPort: number | undefined;
+        if (model.enrollment.selected) {
+            const endpoint = model.enrollment.useExisting ? model.detectedServerUrl : model.enrollment.endpoint;
+            if (endpoint) {
+                try {
+                    const url = new URL(endpoint);
+                    if (url.hostname !== testHost) {
+                        enrollmentHost = url.hostname;
+                    }
+                    if (url.port) {
+                        enrollmentPort = parseInt(url.port, 10);
+                    }
+                } catch {
+                    /* not a valid URL, skip enrollment host check */
+                }
+            }
+        }
+
+        return testNetworkConnectivity(testHost, iface, signalRef.current, onAction, {
+            enrollmentHost,
+            port: enrollmentPort,
+            required: model.connectivityTestRequired,
+        });
     };
 
     // Single-NIC delegation: apply hostname/NTP in-process, create the NM
@@ -579,6 +598,12 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         const isVlan =
             model.networkInterface.vlanEnabled && vlanId !== null && model.networkInterface.interfaceType !== "wifi";
         const effectiveIfaceName = isVlan ? `${ifaceName}.${vlanId}` : ifaceName;
+        let enrollmentEndpoint = "";
+        if (model.enrollment.selected) {
+            enrollmentEndpoint =
+                (model.enrollment.useExisting ? model.detectedServerUrl : model.enrollment.endpoint) || "";
+        }
+
         const masterParams = {
             connectionId: `flightctl-onboarding-${effectiveIfaceName}`,
             interfaceName: ifaceName,
@@ -587,12 +612,11 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             hostname: model.hostname.value,
             originalHostname,
             connectivityTestHost: model.connectivityTestHost,
-            carrierTimeoutSeconds: config?.connectivityTest?.carrierTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.carrierTimeoutSeconds!,
-            connectivityRetries: config?.connectivityTest?.connectivityRetries ?? BUILT_IN_DEFAULTS.connectivityTest!.connectivityRetries!,
+            connectivityTimeoutSeconds: config?.connectivityTest?.carrierTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.carrierTimeoutSeconds!,
             connectivityTestRequired: model.connectivityTestRequired,
             ntpSyncTimeoutSeconds: config?.connectivityTest?.ntpSyncTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.ntpSyncTimeoutSeconds!,
-            pingTimeoutSeconds: config?.connectivityTest?.pingTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingTimeoutSeconds!,
-            pingWaitSeconds: config?.connectivityTest?.pingWaitSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingWaitSeconds!,
+            enrollmentEndpoint,
+            ipv4Method: model.networkAddress.ipv4.method,
         };
         const masterParamsFile = await createSecureTempFile(JSON.stringify(masterParams), ".onboarding-apply-");
         tempFilesToCleanup.push(masterParamsFile);
