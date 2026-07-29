@@ -96,7 +96,7 @@ check_tcp() {
     local port="$2"
 
     echo "STEP: TCP connect to ${host}:${port}"
-    if timeout 5 bash -c "cat < /dev/null > /dev/tcp/${host}/${port}" 2>/dev/null; then
+    if timeout 10 bash -c "cat < /dev/null > /dev/tcp/${host}/${port}" 2>/dev/null; then
         echo "OK: TCP connect succeeded to ${host}:${port}"
         return 0
     fi
