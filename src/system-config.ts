@@ -130,12 +130,12 @@ export class SystemConfigurationService {
         }
 
         try {
-            const ntpActions = await configureNtpServers(
+            await configureNtpServers(
                 model.networkServices.ntp.servers,
                 model.networkServices.ntp.autoConfig,
-                options?.skipNetwork
+                options?.skipNetwork,
+                emit
             );
-            ntpActions.forEach(emit);
             appliedItems.ntp = true;
         } catch (error) {
             emit(makeStepAction(indexedActionId(CONFIG_ACTION_IDS.NTP, 0), String(error), "error"));

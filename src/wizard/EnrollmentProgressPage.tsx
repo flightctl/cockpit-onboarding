@@ -407,7 +407,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
 
         try {
             const result = await systemConfigurationService.applySystemConfiguration(networkManager, model, {
-                onAction,
+                ...(onAction && { onAction }),
             });
 
             networkAppliedRef.current = true;
