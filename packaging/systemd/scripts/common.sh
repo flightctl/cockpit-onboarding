@@ -17,19 +17,20 @@ ONBOARDING_SETUP_CONNECTION="flightctl-onboarding-ethernet"
 load_config() {
     local key="$1"
     local default="$2"
+    local value_type
 
     if [ -f "$ONBOARDING_USER_CONFIG" ]; then
-        value=$(jq -r "$key" "$ONBOARDING_USER_CONFIG" 2>/dev/null)
-        if [ -n "$value" ] && [ "$value" != "null" ]; then
-            echo "$value"
+        value_type=$(jq -r "$key | type" "$ONBOARDING_USER_CONFIG" 2>/dev/null)
+        if [ "$value_type" != "null" ]; then
+            jq -r "$key" "$ONBOARDING_USER_CONFIG" 2>/dev/null
             return
         fi
     fi
 
     if [ -f "$ONBOARDING_DEFAULT_CONFIG" ]; then
-        value=$(jq -r "$key" "$ONBOARDING_DEFAULT_CONFIG" 2>/dev/null)
-        if [ -n "$value" ] && [ "$value" != "null" ]; then
-            echo "$value"
+        value_type=$(jq -r "$key | type" "$ONBOARDING_DEFAULT_CONFIG" 2>/dev/null)
+        if [ "$value_type" != "null" ]; then
+            jq -r "$key" "$ONBOARDING_DEFAULT_CONFIG" 2>/dev/null
             return
         fi
     fi
