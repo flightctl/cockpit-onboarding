@@ -108,12 +108,12 @@ export class SystemConfigurationService {
             );
         } else if (model.networkInterface.selectedInterface && networkManager) {
             try {
-                const networkApplyResult = await applyNetworkConfiguration(
+                await applyNetworkConfiguration(
                     networkManager,
                     model,
-                    options?.skipActivation
+                    options?.skipActivation,
+                    emit
                 );
-                networkApplyResult.actions.forEach(emit);
                 appliedItems.network = true;
             } catch (error) {
                 emit(makeStepAction(CONFIG_ACTION_IDS.NETWORK_UNAVAILABLE, String(error), "error"));
