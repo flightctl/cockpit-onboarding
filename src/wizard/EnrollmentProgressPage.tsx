@@ -406,7 +406,9 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         emit({ id: ENROLLMENT_ACTION_IDS.APPLY_CONFIGURATION, actionTitle: applyTitle, result: "pending" });
 
         try {
-            const result = await systemConfigurationService.applySystemConfiguration(networkManager, model);
+            const result = await systemConfigurationService.applySystemConfiguration(networkManager, model, {
+                onAction,
+            });
 
             networkAppliedRef.current = true;
 
@@ -437,7 +439,6 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 actionTitle: applyTitle,
                 result: result.success ? "success" : "error",
             });
-            result.actions.forEach((action) => emit(action));
 
             return {
                 success: result.success,
@@ -503,6 +504,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             });
             const configResult = await systemConfigurationService.applySystemConfiguration(networkManager, model, {
                 skipNetwork: true,
+                onAction,
             });
             if (configResult.success) {
                 onAction({
@@ -521,8 +523,6 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 updateModel("enrollmentProgress", { executionState: "failed" });
                 return;
             }
-
-            configResult.actions.forEach((action) => onAction(action));
 
             const deferredTitle = _("Creating network profile (activation deferred)");
             onAction({
