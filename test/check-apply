@@ -258,8 +258,8 @@ class TestApplySingleNicRollback(OnboardingMachineCase):
                 "Onboarding continues in the background",
             )
 
-        # The background script waits for carrier (up to 5s) then retries
-        # connectivity 2 times at 2s intervals before rolling back.
+        # The background script runs check-connectivity.sh in a loop
+        # within the connectivity timeout budget (1s) before rolling back.
         deadline = time.time() + 60
         rollback_confirmed = False
         while time.time() < deadline:
@@ -279,7 +279,7 @@ class TestApplySingleNicRollback(OnboardingMachineCase):
         )
 
         log_contents = m.execute(f"cat {APPLY_LOG}")
-        self.assertIn("Network connectivity not available", log_contents)
+        self.assertIn("Connectivity not available after", log_contents)
         self.assertIn("Rolling back", log_contents)
 
         # Verify the onboarding NM profile was cleaned up
