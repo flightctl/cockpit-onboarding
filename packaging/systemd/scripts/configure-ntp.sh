@@ -133,6 +133,13 @@ case "$ACTION" in
                 systemctl restart systemd-timesyncd.service >/dev/null 2>&1 || true
             elif [ "$backend" = "chronyd" ]; then
                 chronyc online >/dev/null 2>&1 || true
+                if ! chronyc burst 4/4 >/dev/null 2>&1; then
+                    echo "chronyc burst failed (non-fatal)" >&2
+                fi
+                sleep 5
+                if ! chronyc makestep >/dev/null 2>&1; then
+                    echo "chronyc makestep failed (non-fatal)" >&2
+                fi
             fi
         done
         echo "NTP daemon nudged (backends: $BACKENDS)"
