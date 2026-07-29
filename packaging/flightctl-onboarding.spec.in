@@ -27,6 +27,8 @@ Recommends: hostapd
 Recommends: dnsmasq
 Recommends: firewalld
 Recommends: policycoreutils
+Recommends: NetworkManager-wifi
+Recommends: wpa_supplicant
 
 Suggests: flightctl-cli
 

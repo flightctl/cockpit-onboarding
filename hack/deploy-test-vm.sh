@@ -160,8 +160,8 @@ provision_vm() {
     sleep 5
     wait_for_ssh "${vm_ip}"
 
-    echo "Installing required packages..."
-    run_ssh "${vm_ip}" "sudo dnf install -y cockpit cockpit-ws cockpit-bridge jq chrony"
+    echo "Installing chrony for NTP sync..."
+    run_ssh "${vm_ip}" "sudo dnf install -y chrony"
 
     echo "Preparing development rsync target..."
     run_ssh "${vm_ip}" "sudo mkdir -p /usr/local/share/cockpit && sudo chown fedora:fedora /usr/local/share/cockpit"
@@ -170,7 +170,7 @@ provision_vm() {
     run_ssh "${vm_ip}" "sudo systemctl enable --now chronyd"
 
     echo "Installing WiFi simulation packages..."
-    run_ssh "${vm_ip}" "sudo dnf install -y kernel-modules-internal kernel-modules-extra NetworkManager-wifi wpa_supplicant iw wireless-regdb hostapd linux-firmware"
+    run_ssh "${vm_ip}" "sudo dnf install -y kernel-modules-internal kernel-modules-extra iw wireless-regdb linux-firmware"
 
     echo "Restarting NetworkManager to load WiFi plugin..."
     run_ssh "${vm_ip}" "sudo systemctl restart NetworkManager"
