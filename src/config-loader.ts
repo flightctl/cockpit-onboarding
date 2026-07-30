@@ -61,8 +61,7 @@ export const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
     },
     connectivityTest: {
         host: "cockpit-project.org",
-        carrierTimeoutSeconds: 300,
-        connectivityRetries: 30,
+        connectivityTimeoutSeconds: 300,
         required: true,
         ntpSyncTimeoutSeconds: 30,
         pingTimeoutSeconds: 10,
@@ -378,6 +377,13 @@ export function validateConfig(config: SystemOnboardingConfig): void {
     }
 
     // Validate connectivity test configuration
+    if (config.connectivityTest?.connectivityTimeoutSeconds !== undefined) {
+        const val = config.connectivityTest.connectivityTimeoutSeconds;
+        if (typeof val !== "number" || val <= 0) {
+            throw new Error("connectivityTest.connectivityTimeoutSeconds must be a number greater than 0");
+        }
+    }
+
     if (config.connectivityTest?.ntpSyncTimeoutSeconds !== undefined) {
         const val = config.connectivityTest.ntpSyncTimeoutSeconds;
         if (typeof val !== "number" || val <= 0) {

@@ -191,8 +191,7 @@ The override file does not need to contain all keys — only the values you want
 | `flightctl.certificateExpiration` | string | `"365d"` | Enrollment certificate expiration duration (e.g. `365d`, `24h`) |
 | `connectivityTest.host` | string | `"cockpit-project.org"` | Host used for DNS/ping connectivity checks after network apply |
 | `connectivityTest.required` | bool | `true` | Block enrollment until connectivity check passes |
-| `connectivityTest.carrierTimeoutSeconds` | int | `300` | Seconds to wait for link carrier before giving up |
-| `connectivityTest.connectivityRetries` | int | `30` | Number of connectivity check retries after carrier is up |
+| `connectivityTest.connectivityTimeoutSeconds` | int | `300` | Total time budget in seconds for the connectivity loop (carrier detection, DHCP/SLAAC, and reachability check) |
 | `connectivityTest.ntpSyncTimeoutSeconds` | int | `30` | Seconds to wait for NTP clock synchronization before proceeding |
 | `connectivityTest.pingTimeoutSeconds` | int | `10` | Overall timeout in seconds for each ping connectivity check |
 | `connectivityTest.pingWaitSeconds` | int | `5` | Seconds to wait for a single ping reply |

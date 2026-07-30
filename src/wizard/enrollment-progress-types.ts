@@ -17,6 +17,7 @@ export const ENROLLMENT_ACTION_IDS = {
     NETWORK_PROFILE_CREATED: "network-profile-created",
     DNS_RESOLVE: "dns-resolve",
     PING: "ping",
+    TCP_CONNECT: "tcp-connect",
     CREDENTIAL_SELECTION: "credential-selection",
     CONNECT_ENDPOINT: "connect-endpoint",
     ENROLLMENT_SCRIPT: "enrollment-script",

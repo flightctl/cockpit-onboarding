@@ -27,8 +27,7 @@ export interface SystemOnboardingConfig {
 
 export interface ConnectivityTestConfig {
     host?: string;
-    carrierTimeoutSeconds?: number;
-    connectivityRetries?: number;
+    connectivityTimeoutSeconds?: number;
     required?: boolean;
     ntpSyncTimeoutSeconds?: number;
     pingTimeoutSeconds?: number;

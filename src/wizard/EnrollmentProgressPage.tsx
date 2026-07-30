@@ -26,7 +26,7 @@ import {
     PendingIcon,
 } from "@patternfly/react-icons";
 
-import { useModelContext } from "../model-context";
+import { useModelContext, type Model } from "../model-context";
 import { useConfig } from "../app";
 import { BUILT_IN_DEFAULTS } from "../config-loader";
 import { systemConfigurationService } from "../system-config";
@@ -65,6 +65,32 @@ interface Step {
 }
 
 const _ = cockpit.gettext;
+
+function getEnrollmentReachabilityTarget(model: Model): { host: string; port: number | undefined } {
+    const proxy = model.networkServices.proxy;
+    if (proxy.enabled && proxy.hostname) {
+        return { host: proxy.hostname, port: proxy.port ?? undefined };
+    }
+
+    if (!model.enrollment.selected) {
+        return { host: "", port: undefined };
+    }
+
+    const endpoint = model.enrollment.useExisting ? model.detectedServerUrl : model.enrollment.endpoint;
+    if (!endpoint) {
+        return { host: "", port: undefined };
+    }
+
+    try {
+        const url = new URL(endpoint);
+        return {
+            host: url.hostname,
+            port: url.port ? parseInt(url.port, 10) : undefined,
+        };
+    } catch {
+        return { host: "", port: undefined };
+    }
+}
 
 const getActionResultIcon = (result: ActionResult) => {
     switch (result) {
@@ -470,12 +496,17 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             model.networkInterface.interfaceType !== "wifi"
                 ? `${parentIface}.${vlanId}`
                 : parentIface;
-        return testNetworkConnectivity(
-            testHost, iface,
-            config?.connectivityTest?.pingTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingTimeoutSeconds!,
-            config?.connectivityTest?.pingWaitSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingWaitSeconds!,
-            signalRef.current, onAction,
-        );
+
+        const { host: reachabilityHost, port: reachabilityPort } =
+            getEnrollmentReachabilityTarget(model);
+
+        return testNetworkConnectivity(testHost, iface, signalRef.current, onAction, {
+            enrollmentHost: reachabilityHost !== testHost ? reachabilityHost : undefined,
+            port: reachabilityPort,
+            required: model.connectivityTestRequired,
+            pingTimeoutSeconds: config?.connectivityTest?.pingTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingTimeoutSeconds!,
+            pingWaitSeconds: config?.connectivityTest?.pingWaitSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingWaitSeconds!,
+        });
     };
 
     // Single-NIC delegation: apply hostname/NTP in-process, create the NM
@@ -579,6 +610,9 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         const isVlan =
             model.networkInterface.vlanEnabled && vlanId !== null && model.networkInterface.interfaceType !== "wifi";
         const effectiveIfaceName = isVlan ? `${ifaceName}.${vlanId}` : ifaceName;
+        const { host: reachabilityHost, port: reachabilityPort } =
+            getEnrollmentReachabilityTarget(model);
+
         const masterParams = {
             connectionId: `flightctl-onboarding-${effectiveIfaceName}`,
             interfaceName: ifaceName,
@@ -587,10 +621,13 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             hostname: model.hostname.value,
             originalHostname,
             connectivityTestHost: model.connectivityTestHost,
-            carrierTimeoutSeconds: config?.connectivityTest?.carrierTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.carrierTimeoutSeconds!,
-            connectivityRetries: config?.connectivityTest?.connectivityRetries ?? BUILT_IN_DEFAULTS.connectivityTest!.connectivityRetries!,
+            connectivityTimeoutSeconds: config?.connectivityTest?.connectivityTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.connectivityTimeoutSeconds!,
             connectivityTestRequired: model.connectivityTestRequired,
             ntpSyncTimeoutSeconds: config?.connectivityTest?.ntpSyncTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.ntpSyncTimeoutSeconds!,
+            enrollmentReachabilityHost: reachabilityHost || "",
+            enrollmentReachabilityPort: reachabilityPort || 443,
+            ipv4Method: model.networkAddress.ipv4.method,
+            ipv6Method: model.networkAddress.ipv6.method,
             pingTimeoutSeconds: config?.connectivityTest?.pingTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingTimeoutSeconds!,
             pingWaitSeconds: config?.connectivityTest?.pingWaitSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingWaitSeconds!,
         };

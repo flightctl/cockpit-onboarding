@@ -8,6 +8,9 @@
 # IP address conflict detection and gateway reachability (restricted wrapper)
 onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/check-network.sh *
 
+# Connectivity check (DNS, ping, TCP fallback)
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/check-connectivity.sh *
+
 # Reboot after onboarding completes
 onboarding ALL=(ALL) NOPASSWD: /usr/sbin/shutdown -r now
 
