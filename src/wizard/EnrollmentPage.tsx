@@ -7,7 +7,6 @@
 
 import React, { useState, useEffect } from "react";
 import cockpit from "cockpit";
-import ExternalLinkAltIcon from "@patternfly/react-icons/dist/esm/icons/external-link-alt-icon";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Divider } from "@patternfly/react-core/dist/esm/components/Divider/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
@@ -222,15 +221,68 @@ export const EnrollmentPage = () => {
                                                                                         rows={2}
                                                                                         isRequired
                                                                                     />
-                                                                                    <Button
-                                                                                        variant="link"
-                                                                                        isInline
-                                                                                        className="pf-v6-u-mt-sm"
-                                                                                        iconPosition="end"
-                                                                                        icon={<ExternalLinkAltIcon />}
+                                                                                    <Popover
+                                                                                        minWidth="500px"
+                                                                                        headerContent={_("Getting your token")}
+                                                                                        bodyContent={
+                                                                                            <Stack hasGutter>
+                                                                                                <StackItem>
+                                                                                                    <strong>{_("OpenShift:")}</strong>
+                                                                                                    <ClipboardCopy
+                                                                                                        isReadOnly
+                                                                                                        hoverTip={_("Copy")}
+                                                                                                        clickTip={_("Copied")}
+                                                                                                        className="pf-v6-u-mt-sm pf-v6-u-font-family-monospace"
+                                                                                                    >
+                                                                                                        oc whoami -t
+                                                                                                    </ClipboardCopy>
+                                                                                                </StackItem>
+                                                                                                <StackItem>
+                                                                                                    <strong>{_("Kubernetes (Helm):")}</strong>
+                                                                                                    <ClipboardCopy
+                                                                                                        isReadOnly
+                                                                                                        hoverTip={_("Copy")}
+                                                                                                        clickTip={_("Copied")}
+                                                                                                        className="pf-v6-u-mt-sm pf-v6-u-font-family-monospace"
+                                                                                                    >
+                                                                                                        {`kubectl -n <namespace> create token <service-account> --duration=8h`}
+                                                                                                    </ClipboardCopy>
+                                                                                                </StackItem>
+                                                                                                <StackItem>
+                                                                                                    <strong>{_("Quadlet / external OIDC:")}</strong>
+                                                                                                    <p className="pf-v6-u-mt-sm">
+                                                                                                        {_("Log in from a machine with a browser, then copy the token from the client config:")}
+                                                                                                    </p>
+                                                                                                    <ClipboardCopy
+                                                                                                        isReadOnly
+                                                                                                        hoverTip={_("Copy")}
+                                                                                                        clickTip={_("Copied")}
+                                                                                                        className="pf-v6-u-mt-sm pf-v6-u-font-family-monospace"
+                                                                                                    >
+                                                                                                        flightctl login &lt;server-url&gt; --web
+                                                                                                    </ClipboardCopy>
+                                                                                                    <ClipboardCopy
+                                                                                                        isReadOnly
+                                                                                                        hoverTip={_("Copy")}
+                                                                                                        clickTip={_("Copied")}
+                                                                                                        className="pf-v6-u-mt-sm pf-v6-u-font-family-monospace"
+                                                                                                    >
+                                                                                                        {"grep '^  token:' ~/.config/flightctl/client.yaml | awk '{print $2}'"}
+                                                                                                    </ClipboardCopy>
+                                                                                                </StackItem>
+                                                                                            </Stack>
+                                                                                        }
                                                                                     >
-                                                                                        {_("Where can I get my token?")}
-                                                                                    </Button>
+                                                                                        <Button
+                                                                                            variant="link"
+                                                                                            isInline
+                                                                                            className="pf-v6-u-mt-sm"
+                                                                                            icon={<HelpIcon />}
+                                                                                            iconPosition="start"
+                                                                                        >
+                                                                                            {_("Where can I get my token?")}
+                                                                                        </Button>
+                                                                                    </Popover>
                                                                                 </FormGroup>
                                                                             )
                                                                         }
