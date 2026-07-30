@@ -40,7 +40,7 @@ AP_CHANNEL=$(load_config '.network.wifiAp.channel' '6')
 DHCP_LEASE=$(load_config '.network.wifiAp.dhcpLeaseDuration' '1h')
 WIFI_DRIVER=$(load_config '.network.wifiAp.driver' 'nl80211')
 WIFI_HW_MODE=$(load_config '.network.wifiAp.hwMode' 'g')
-COCKPIT_PORT=$(load_config '.network.cockpitPort' '9090')
+COCKPIT_PORT=$(get_cockpit_port)
 
 compute_dhcp_range "$AP_ADDRESS" "$AP_SUBNET_PREFIX" "$AP_DHCP_RANGE_SIZE"
 

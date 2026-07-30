@@ -29,7 +29,7 @@ STATIC_IP=$(load_config '.network.ethernet.staticIp' '192.168.100.1')
 SUBNET_PREFIX=$(load_config '.network.ethernet.subnetPrefix' '24')
 DHCP_RANGE_SIZE=$(load_config '.network.ethernet.dhcpRangeSize' '40')
 DHCP_LEASE=$(load_config '.network.ethernet.dhcpLeaseDuration' '1h')
-COCKPIT_PORT=$(load_config '.network.cockpitPort' '9090')
+COCKPIT_PORT=$(get_cockpit_port)
 
 compute_dhcp_range "$STATIC_IP" "$SUBNET_PREFIX" "$DHCP_RANGE_SIZE"
 

@@ -28,7 +28,6 @@ export const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
     },
     network: {
         activationTimeoutSeconds: 30,
-        cockpitPort: 9090,
         ethernet: {
             enabled: true,
             staticIp: "192.168.100.1",
@@ -362,12 +361,6 @@ export function validateConfig(config: SystemOnboardingConfig): void {
             }
         }
 
-        if (config.network.cockpitPort !== undefined) {
-            const val = config.network.cockpitPort;
-            if (typeof val !== "number" || val < 1 || val > 65535) {
-                throw new Error("network.cockpitPort must be a number between 1 and 65535");
-            }
-        }
     }
 
     if (config.onboardingUser?.password !== undefined) {

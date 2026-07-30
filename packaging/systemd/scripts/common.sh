@@ -108,6 +108,14 @@ detect_interface() {
     return 0
 }
 
+# Read the Cockpit port from /etc/cockpit/cockpit.conf, falling back to 9090.
+# This is the single source of truth for the port; config.json no longer carries it.
+get_cockpit_port() {
+    local port
+    port=$(grep -E '^Port\s*=' /etc/cockpit/cockpit.conf 2>/dev/null | tail -1 | sed 's/^Port\s*=\s*//' | tr -d '[:space:]')
+    echo "${port:-9090}"
+}
+
 ONBOARDING_FW_ZONE="fc-onboarding-ap"
 
 # Ensure the dedicated onboarding firewalld zone exists.
@@ -126,7 +134,7 @@ ensure_firewall_zone() {
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --set-target=REJECT
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-service=dhcp
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-service=dns
-    COCKPIT_PORT=$(load_config '.network.cockpitPort' '9090')
+    COCKPIT_PORT=$(get_cockpit_port)
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=${COCKPIT_PORT}/tcp
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=80/tcp
     firewall-cmd --reload

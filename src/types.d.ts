@@ -86,7 +86,6 @@ export interface NetworkConfig {
     wifiAp?: WifiApConfig;
     ethernet?: EthernetConfig;
     activationTimeoutSeconds?: number;
-    cockpitPort?: number;
 }
 
 export interface WifiApConfig {
