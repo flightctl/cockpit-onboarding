@@ -61,6 +61,7 @@ install -m 644 packaging/systemd/flightctl-onboarding-wifi-ap@.service %{buildro
 install -m 644 packaging/systemd/flightctl-onboarding-dnsmasq@.service %{buildroot}%{_unitdir}/
 install -m 644 packaging/systemd/flightctl-onboarding-captive-portal@.service %{buildroot}%{_unitdir}/
 install -m 644 packaging/systemd/flightctl-onboarding-mask-greenboot.service %{buildroot}%{_unitdir}/
+install -m 644 packaging/systemd/flightctl-onboarding-recovery.service %{buildroot}%{_unitdir}/
 
 # Install flightctl-agent startup gate drop-in
 mkdir -p %{buildroot}%{_unitdir}/flightctl-agent.service.d
@@ -121,6 +122,7 @@ appstream-util validate-relax --nonet %{buildroot}/%{_datadir}/metainfo/*
 %post
 # Enable the onboarding setup service on first boot
 %systemd_post flightctl-onboarding-setup.service
+%systemd_post flightctl-onboarding-recovery.service
 
 # Reload systemd to pick up the flightctl-agent gate drop-in
 systemctl daemon-reload >/dev/null 2>&1 || :
@@ -131,8 +133,12 @@ if [ ! -f /var/lib/flightctl-onboarding/.onboarding-complete ]; then
     /usr/libexec/flightctl-onboarding/mask-greenboot.sh 2>/dev/null || :
 fi
 
+# Always enable recovery — it is gated by ConditionPathExists
+systemctl enable flightctl-onboarding-recovery.service >/dev/null 2>&1 || :
+
 %preun
 %systemd_preun flightctl-onboarding-setup.service
+%systemd_preun flightctl-onboarding-recovery.service
 
 # Remove the flightctl-agent gate drop-in on package removal
 if [ $1 -eq 0 ]; then
@@ -144,6 +150,7 @@ fi
 
 %postun
 %systemd_postun flightctl-onboarding-setup.service
+%systemd_postun flightctl-onboarding-recovery.service
 
 # Full cleanup when the package is being removed (not upgraded)
 if [ $1 -eq 0 ]; then
@@ -211,6 +218,7 @@ fi
 %{_unitdir}/flightctl-onboarding-dnsmasq@.service
 %{_unitdir}/flightctl-onboarding-captive-portal@.service
 %{_unitdir}/flightctl-onboarding-mask-greenboot.service
+%{_unitdir}/flightctl-onboarding-recovery.service
 %dir %{_unitdir}/flightctl-agent.service.d
 %{_unitdir}/flightctl-agent.service.d/onboarding-gate.conf
 %{_libexecdir}/flightctl-onboarding/
