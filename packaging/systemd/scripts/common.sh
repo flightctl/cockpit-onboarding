@@ -116,7 +116,7 @@ ONBOARDING_FW_ZONE="fc-onboarding-ap"
 ensure_firewall_zone() {
     if ! command -v firewall-cmd >/dev/null 2>&1 || ! systemctl is-active --quiet firewalld; then
         echo "firewalld is not active, skipping firewall zone setup"
-        return 1
+        return 0
     fi
     if firewall-cmd --permanent --info-zone="$ONBOARDING_FW_ZONE" >/dev/null 2>&1; then
         echo "Firewalld zone '$ONBOARDING_FW_ZONE' already exists"
