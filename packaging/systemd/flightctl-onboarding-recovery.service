@@ -1,0 +1,20 @@
+[Unit]
+Description=Recover from interrupted onboarding completion
+Documentation=https://github.com/flightctl/cockpit-onboarding
+
+# The stuck state: enrollment completed (.onboarding-complete exists) but
+# cleanup never ran (.onboarding-confirmed missing). This happens when the
+# device loses power between finalize and the operator clicking Finish.
+ConditionPathExists=/var/lib/flightctl-onboarding/.onboarding-complete
+ConditionPathExists=!/var/lib/flightctl-onboarding/.onboarding-confirmed
+
+# Wait for network so flightctl-agent can start after cleanup writes the gate file.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/flightctl-onboarding/cleanup-onboarding.sh
+
+[Install]
+WantedBy=multi-user.target
