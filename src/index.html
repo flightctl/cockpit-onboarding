@@ -22,6 +22,8 @@ along with this package; If not, see <http://www.gnu.org/licenses/>.
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
+    <link rel="preload" href="../../static/fonts/RedHatText/RedHatTextVF.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="../../static/fonts/RedHatText-Regular.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="index.css">
 
     <script type="text/javascript" src="index.js"></script>
@@ -29,6 +31,15 @@ along with this package; If not, see <http://www.gnu.org/licenses/>.
 </head>
 
 <body>
+    <!--
+      Hidden password input pre-triggers the browser's font glyph fallback
+      for the password masking character. Without this, the first keystroke
+      in any type="password" field causes a full-page text flash as the
+      browser evaluates the font cascade for a character not in the web font.
+    -->
+    <input type="password" value="x" readonly
+           style="position:absolute;width:0;height:0;opacity:0;overflow:hidden;pointer-events:none"
+           tabindex="-1" aria-hidden="true">
     <div id="app"></div>
 </body>
 </html>
