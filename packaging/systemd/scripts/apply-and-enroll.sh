@@ -104,6 +104,8 @@ ENROLLMENT_REACHABILITY_PORT=$(jq -r '.enrollmentReachabilityPort // 443' "$PARA
 IPV4_METHOD=$(jq -r '.ipv4Method // "auto"' "$PARAMS_FILE")
 IPV6_METHOD=$(jq -r '.ipv6Method // "auto"' "$PARAMS_FILE")
 CONNECTIVITY_BUDGET=$(jq -r '.connectivityTimeoutSeconds // 300' "$PARAMS_FILE")
+PING_TIMEOUT=$(jq -r '.pingTimeoutSeconds // 10' "$PARAMS_FILE")
+PING_WAIT=$(jq -r '.pingWaitSeconds // 5' "$PARAMS_FILE")
 
 validate_iface_name() {
     local name="$1"
@@ -190,7 +192,7 @@ if [ -n "$ENROLLMENT_REACHABILITY_HOST" ] && [ "$ENROLLMENT_REACHABILITY_HOST" !
     CHECK_HOSTS="${CHECK_HOSTS},${ENROLLMENT_REACHABILITY_HOST}"
 fi
 
-CHECK_ARGS=(--hosts "$CHECK_HOSTS" --interface "$EFFECTIVE_IFACE" --port "$CHECK_PORT")
+CHECK_ARGS=(--hosts "$CHECK_HOSTS" --interface "$EFFECTIVE_IFACE" --port "$CHECK_PORT" --ping-timeout "$PING_TIMEOUT" --ping-wait "$PING_WAIT")
 if [ "$CONNECTIVITY_REQUIRED" = "true" ]; then
     CHECK_ARGS+=(--required)
 fi

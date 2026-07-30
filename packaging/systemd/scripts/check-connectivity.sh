@@ -24,13 +24,17 @@ HOSTS=""
 IFACE=""
 PORT="443"
 REQUIRED=false
+PING_TIMEOUT="10"
+PING_WAIT="5"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --hosts)    HOSTS="$2"; shift 2 ;;
-        --interface) IFACE="$2"; shift 2 ;;
-        --port)     PORT="$2"; shift 2 ;;
-        --required) REQUIRED=true; shift ;;
+        --hosts)        HOSTS="$2"; shift 2 ;;
+        --interface)    IFACE="$2"; shift 2 ;;
+        --port)         PORT="$2"; shift 2 ;;
+        --ping-timeout) PING_TIMEOUT="$2"; shift 2 ;;
+        --ping-wait)    PING_WAIT="$2"; shift 2 ;;
+        --required)     REQUIRED=true; shift ;;
         *)
             echo "ERROR: Unknown argument: $1" >&2
             exit 1
@@ -84,7 +88,7 @@ check_ping() {
     local host="$1"
 
     echo "STEP: Pinging ${host} via ${IFACE}"
-    if timeout 10 ping -c 1 -W 5 -I "$IFACE" "$host" >/dev/null 2>&1; then
+    if timeout "$PING_TIMEOUT" ping -c 1 -W "$PING_WAIT" -I "$IFACE" "$host" >/dev/null 2>&1; then
         echo "OK: Ping succeeded for ${host}"
         return 0
     fi
@@ -96,7 +100,7 @@ check_tcp() {
     local port="$2"
 
     echo "STEP: TCP connect to ${host}:${port}"
-    if timeout 10 bash -c "cat < /dev/null > /dev/tcp/${host}/${port}" 2>/dev/null; then
+    if timeout "$PING_TIMEOUT" bash -c "cat < /dev/null > /dev/tcp/${host}/${port}" 2>/dev/null; then
         echo "OK: TCP connect succeeded to ${host}:${port}"
         return 0
     fi

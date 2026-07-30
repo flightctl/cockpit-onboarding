@@ -18,6 +18,8 @@ export interface ConnectivityCheckOptions {
     enrollmentHost?: string | undefined;
     port?: number | undefined;
     required?: boolean | undefined;
+    pingTimeoutSeconds?: number | undefined;
+    pingWaitSeconds?: number | undefined;
 }
 
 export async function testNetworkConnectivity(
@@ -44,6 +46,10 @@ export async function testNetworkConnectivity(
         iface || "",
         "--port",
         String(options?.port ?? 443),
+        "--ping-timeout",
+        String(options?.pingTimeoutSeconds ?? 10),
+        "--ping-wait",
+        String(options?.pingWaitSeconds ?? 5),
     ];
     if (options?.required) {
         args.push("--required");

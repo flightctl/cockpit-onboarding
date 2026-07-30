@@ -214,17 +214,11 @@
           "default": "cockpit-project.org",
           "description": "Default host for network connectivity test (DNS + ping). Overridden by the enrollment endpoint hostname when enrollment is selected."
         },
-        "carrierTimeoutSeconds": {
+        "connectivityTimeoutSeconds": {
           "type": "integer",
           "default": 300,
           "minimum": 1,
-          "description": "Seconds to wait for link carrier before giving up (single-NIC flow)"
-        },
-        "connectivityRetries": {
-          "type": "integer",
-          "default": 30,
-          "minimum": 1,
-          "description": "Number of connectivity check retries after carrier is up (single-NIC flow)"
+          "description": "Total time budget in seconds for the connectivity loop (carrier detection, DHCP/SLAAC, and reachability check)"
         },
         "required": {
           "type": "boolean",
@@ -471,8 +465,7 @@
       "connectivityTest": {
         "host": "cockpit-project.org",
         "required": true,
-        "carrierTimeoutSeconds": 300,
-        "connectivityRetries": 30,
+        "connectivityTimeoutSeconds": 300,
         "ntpSyncTimeoutSeconds": 30,
         "pingTimeoutSeconds": 10,
         "pingWaitSeconds": 5

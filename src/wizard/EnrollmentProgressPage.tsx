@@ -504,6 +504,8 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             enrollmentHost: reachabilityHost !== testHost ? reachabilityHost : undefined,
             port: reachabilityPort,
             required: model.connectivityTestRequired,
+            pingTimeoutSeconds: config?.connectivityTest?.pingTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingTimeoutSeconds!,
+            pingWaitSeconds: config?.connectivityTest?.pingWaitSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingWaitSeconds!,
         });
     };
 
@@ -619,13 +621,15 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             hostname: model.hostname.value,
             originalHostname,
             connectivityTestHost: model.connectivityTestHost,
-            connectivityTimeoutSeconds: config?.connectivityTest?.carrierTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.carrierTimeoutSeconds!,
+            connectivityTimeoutSeconds: config?.connectivityTest?.connectivityTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.connectivityTimeoutSeconds!,
             connectivityTestRequired: model.connectivityTestRequired,
             ntpSyncTimeoutSeconds: config?.connectivityTest?.ntpSyncTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.ntpSyncTimeoutSeconds!,
             enrollmentReachabilityHost: reachabilityHost || "",
             enrollmentReachabilityPort: reachabilityPort || 443,
             ipv4Method: model.networkAddress.ipv4.method,
             ipv6Method: model.networkAddress.ipv6.method,
+            pingTimeoutSeconds: config?.connectivityTest?.pingTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingTimeoutSeconds!,
+            pingWaitSeconds: config?.connectivityTest?.pingWaitSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingWaitSeconds!,
         };
         const masterParamsFile = await createSecureTempFile(JSON.stringify(masterParams), ".onboarding-apply-");
         tempFilesToCleanup.push(masterParamsFile);
