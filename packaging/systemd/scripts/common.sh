@@ -123,66 +123,26 @@ get_cockpit_port() {
 }
 
 restore_setup_network() {
-    local restored=false
-
-    local wifi_ap_unit
-    wifi_ap_unit=$(systemctl list-units --plain --no-legend 'flightctl-onboarding-wifi-ap@*.service' 2>/dev/null | awk '{print $1}' | head -n 1)
-    if [ -n "$wifi_ap_unit" ]; then
-        echo "WiFi AP service found ($wifi_ap_unit), re-enabling"
-        systemctl enable "$wifi_ap_unit" 2>/dev/null || true
-        systemctl start "$wifi_ap_unit" 2>/dev/null || true
-        restored=true
-    else
-        local setup_iface
-        setup_iface=$(systemctl list-units --plain --no-legend 'flightctl-onboarding-wifi-ap@*.service' --all 2>/dev/null | awk '{print $1}' | head -n 1 | sed 's/.*@//;s/\.service//')
-        if [ -n "$setup_iface" ]; then
-            echo "Found inactive WiFi AP for $setup_iface, restarting"
-            systemctl start "flightctl-onboarding-wifi-ap@${setup_iface}.service" 2>/dev/null || true
-            restored=true
-        fi
+    # Reactivate the Ethernet setup connection if it exists
+    if nmcli connection show "$ONBOARDING_SETUP_CONNECTION" >/dev/null 2>&1; then
+        nmcli connection up "$ONBOARDING_SETUP_CONNECTION" 2>/dev/null || true
+        echo "Reactivated onboarding Ethernet connection"
     fi
 
-    local dnsmasq_unit
-    dnsmasq_unit=$(systemctl list-units --plain --no-legend --all 'flightctl-onboarding-dnsmasq@*.service' 2>/dev/null | awk '{print $1}' | head -n 1)
-    if [ -n "$dnsmasq_unit" ]; then
-        systemctl start "$dnsmasq_unit" 2>/dev/null || true
-        echo "Restarted $dnsmasq_unit"
-    fi
+    # Restart all WiFi AP instances (Wants= pulls in their dnsmasq + captive portal)
+    local unit
+    while IFS= read -r unit; do
+        [ -n "$unit" ] || continue
+        systemctl start "$unit" 2>/dev/null || true
+        echo "Restarted $unit"
+    done < <(systemctl list-units --plain --no-legend --all 'flightctl-onboarding-wifi-ap@*.service' 2>/dev/null | awk '{print $1}')
 
-    local captive_unit
-    captive_unit=$(systemctl list-units --plain --no-legend --all 'flightctl-onboarding-captive-portal@*.service' 2>/dev/null | awk '{print $1}' | head -n 1)
-    if [ -n "$captive_unit" ]; then
-        systemctl start "$captive_unit" 2>/dev/null || true
-        echo "Restarted $captive_unit"
-    fi
-
-    if [ "$restored" = "false" ]; then
-        if ! nmcli connection show "$ONBOARDING_SETUP_CONNECTION" >/dev/null 2>&1; then
-            local first_ethernet
-            first_ethernet=$(nmcli -t -f DEVICE,TYPE device | grep ':ethernet$' | head -n 1 | cut -d: -f1)
-            if [ -n "$first_ethernet" ]; then
-                nmcli connection add \
-                    type ethernet \
-                    con-name "$ONBOARDING_SETUP_CONNECTION" \
-                    ifname "$first_ethernet" \
-                    ipv4.method auto \
-                    ipv6.method auto \
-                    connection.autoconnect yes \
-                    connection.autoconnect-priority 100 2>/dev/null || true
-                nmcli connection up "$ONBOARDING_SETUP_CONNECTION" 2>/dev/null || true
-                restored=true
-                echo "Restored onboarding Ethernet connection on $first_ethernet"
-            fi
-        else
-            nmcli connection up "$ONBOARDING_SETUP_CONNECTION" 2>/dev/null || true
-            restored=true
-            echo "Reactivated existing onboarding Ethernet connection"
-        fi
-    fi
-
-    if [ "$restored" = "true" ]; then
-        systemctl restart NetworkManager 2>/dev/null || true
-    fi
+    # Restart all dnsmasq instances (covers Ethernet dnsmasq not pulled in by WiFi AP)
+    while IFS= read -r unit; do
+        [ -n "$unit" ] || continue
+        systemctl start "$unit" 2>/dev/null || true
+        echo "Restarted $unit"
+    done < <(systemctl list-units --plain --no-legend --all 'flightctl-onboarding-dnsmasq@*.service' 2>/dev/null | awk '{print $1}')
 }
 
 ONBOARDING_FW_ZONE="fc-onboarding-ap"
