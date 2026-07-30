@@ -540,6 +540,21 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 ntpSyncTimeoutSeconds: config?.connectivityTest?.ntpSyncTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.ntpSyncTimeoutSeconds!,
                 activationTimeoutSeconds: config?.network?.activationTimeoutSeconds ?? BUILT_IN_DEFAULTS.network!.activationTimeoutSeconds!,
             });
+            const manifest: RollbackManifest = {};
+            if (configResult.appliedItems.hostname && configResult.originalHostname) {
+                manifest.hostname = { original: configResult.originalHostname };
+            }
+            if (configResult.appliedItems.ntp) {
+                manifest.ntp = true;
+            }
+            if (configResult.appliedItems.proxy) {
+                manifest.proxy = true;
+            }
+            if (configResult.appliedItems.labels) {
+                manifest.labels = true;
+            }
+            rollbackManifestRef.current = manifest;
+
             if (configResult.success) {
                 onAction({
                     id: ENROLLMENT_ACTION_IDS.APPLY_HOSTNAME_NTP,
@@ -553,6 +568,9 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                     result: "error",
                 });
                 setSteps((prev) => prev.map((s) => (s.id === "apply-config" ? { ...s, status: "failed" } : s)));
+                if (Object.keys(rollbackManifestRef.current).length > 0) {
+                    await executeRollbackScript(rollbackManifestRef.current, onAction);
+                }
                 await disarmWatchdog();
                 updateModel("enrollmentProgress", { executionState: "failed" });
                 return;
@@ -569,6 +587,13 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 config?.network?.activationTimeoutSeconds ?? BUILT_IN_DEFAULTS.network!.activationTimeoutSeconds!,
                 true,
             );
+
+            const ifaceName = model.networkInterface.selectedInterface || "";
+            const vlanId = model.networkInterface.vlanId;
+            const isVlan = model.networkInterface.vlanEnabled && vlanId !== null && model.networkInterface.interfaceType !== "wifi";
+            const effectiveIfaceName = isVlan ? `${ifaceName}.${vlanId}` : ifaceName;
+            rollbackManifestRef.current.network = { connectionId: `flightctl-onboarding-${effectiveIfaceName}` };
+
             onAction({
                 id: ENROLLMENT_ACTION_IDS.CREATE_NETWORK_PROFILE,
                 actionTitle: deferredTitle,
@@ -584,6 +609,9 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         } catch (error) {
             onAction({ id: "single-nic-delegation-error", actionTitle: `Failed: ${String(error)}`, result: "error" });
             setSteps((prev) => prev.map((s) => (s.id === "apply-config" ? { ...s, status: "failed" } : s)));
+            if (Object.keys(rollbackManifestRef.current).length > 0) {
+                await executeRollbackScript(rollbackManifestRef.current, onAction);
+            }
             await disarmWatchdog();
             updateModel("enrollmentProgress", { executionState: "failed" });
             return;

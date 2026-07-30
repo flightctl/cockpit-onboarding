@@ -71,8 +71,9 @@ fi
 # Clean up runtime files (hostapd configs, env files)
 rm -rf /run/flightctl-onboarding 2>/dev/null || true
 
-# Remove apply log file
+# Remove log files
 rm -f /var/log/flightctl-onboarding-apply.log 2>/dev/null || true
+rm -f /var/log/flightctl-onboarding-mask-greenboot.log 2>/dev/null || true
 
 # Remove SSH denial for onboarding user (no longer needed after cleanup)
 if [ -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf ]; then
@@ -106,8 +107,9 @@ fi
 if [ "$RUN_ONCE" = "true" ]; then
     echo "runOnce is enabled - performing full cleanup"
 
-    # Note: sudoers and polkit rules are left in place here.
-    # They are removed by the RPM %postun scriptlet on package uninstall.
+    rm -f /etc/sudoers.d/flightctl-onboarding 2>/dev/null || true
+    rm -f /etc/polkit-1/rules.d/49-flightctl-onboarding.rules 2>/dev/null || true
+    echo "Removed sudoers and polkit rules"
 
     # Disable the systemd setup service to prevent re-running on next boot
     if systemctl is-enabled "$SERVICE_NAME" >/dev/null 2>&1; then

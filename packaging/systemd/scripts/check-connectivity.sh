@@ -116,6 +116,8 @@ for host in "${HOST_LIST[@]}"; do
         continue
     fi
 
+    validate_hostname_or_ip "$host"
+
     if is_ip_address "$host"; then
         echo "INFO: ${host} is an IP address, skipping DNS resolution"
     else

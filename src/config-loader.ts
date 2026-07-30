@@ -37,7 +37,7 @@ export const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
             watchdogTimeoutSeconds: 600,
         },
         wifiAp: {
-            enabled: true,
+            enabled: false,
             ssidPrefix: "flightctl-",
             interface: "",
             password: "onboarding",
@@ -46,7 +46,7 @@ export const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
             dhcpRangeSize: 40,
             channel: 6,
             dhcpLeaseDuration: "1h",
-            watchdogTimeoutSeconds: 240,
+            watchdogTimeoutSeconds: 420,
             driver: "nl80211",
             hwMode: "g",
             scanWaitMs: 3000,
@@ -134,6 +134,10 @@ export async function loadConfig(): Promise<SystemOnboardingConfig> {
         defaults: {
             ...defaultConfig.defaults,
             ...userConfig.defaults,
+            alias: {
+                ...defaultConfig.defaults?.alias,
+                ...userConfig.defaults?.alias,
+            },
             proxy: {
                 ...defaultConfig.defaults?.proxy,
                 ...userConfig.defaults?.proxy,
@@ -214,8 +218,32 @@ export function validateConfig(config: SystemOnboardingConfig): void {
         }
     }
 
+    // Validate top-level boolean fields
+    for (const key of ["runOnce", "keepCockpit", "hideModules", "autoReboot"] as const) {
+        if (config[key] !== undefined && typeof config[key] !== "boolean") {
+            throw new Error(`${key} must be a boolean`);
+        }
+    }
+
     // Validate network configuration
     if (config.network) {
+        if (config.network.ethernet?.enabled !== undefined && typeof config.network.ethernet.enabled !== "boolean") {
+            throw new Error("network.ethernet.enabled must be a boolean");
+        }
+
+        if (config.network.ethernet?.interface !== undefined && config.network.ethernet.interface !== "") {
+            if (typeof config.network.ethernet.interface !== "string" || config.network.ethernet.interface.length > 15) {
+                throw new Error("Ethernet interface must be a string of at most 15 characters");
+            }
+            if (!/^[a-zA-Z0-9._-]+$/.test(config.network.ethernet.interface)) {
+                throw new Error("Ethernet interface must contain only alphanumeric characters, dots, underscores, and hyphens");
+            }
+        }
+
+        if (config.network.wifiAp?.enabled !== undefined && typeof config.network.wifiAp.enabled !== "boolean") {
+            throw new Error("network.wifiAp.enabled must be a boolean");
+        }
+
         if (config.network.wifiAp) {
             const wifiAp = config.network.wifiAp;
 
@@ -324,6 +352,9 @@ export function validateConfig(config: SystemOnboardingConfig): void {
             if (typeof config.network.wifiAp.driver !== "string" || config.network.wifiAp.driver.length < 1) {
                 throw new Error("WiFi AP driver must be a non-empty string");
             }
+            if (!/^[a-zA-Z0-9_-]+$/.test(config.network.wifiAp.driver)) {
+                throw new Error("WiFi AP driver must contain only alphanumeric characters, underscores, and hyphens");
+            }
         }
 
         if (config.network.wifiAp?.hwMode !== undefined) {
@@ -370,6 +401,19 @@ export function validateConfig(config: SystemOnboardingConfig): void {
     }
 
     // Validate connectivity test configuration
+    if (config.connectivityTest?.host !== undefined) {
+        const val = config.connectivityTest.host;
+        if (typeof val !== "string" || !/^[a-zA-Z0-9.:-]+$/.test(val)) {
+            throw new Error("connectivityTest.host must be a valid hostname or IP address");
+        }
+    }
+
+    if (config.connectivityTest?.required !== undefined) {
+        if (typeof config.connectivityTest.required !== "boolean") {
+            throw new Error("connectivityTest.required must be a boolean");
+        }
+    }
+
     if (config.connectivityTest?.connectivityTimeoutSeconds !== undefined) {
         const val = config.connectivityTest.connectivityTimeoutSeconds;
         if (typeof val !== "number" || val <= 0) {

@@ -175,7 +175,7 @@ The override file does not need to contain all keys — only the values you want
 | `network.wifiAp.dhcpRangeSize` | int | `40` | Number of DHCP leases to offer |
 | `network.wifiAp.channel` | int | `6` | WiFi channel |
 | `network.wifiAp.dhcpLeaseDuration` | string | `"1h"` | DHCP lease duration for WiFi AP clients (e.g. `1h`, `30m`, `3600s`) |
-| `network.wifiAp.watchdogTimeoutSeconds` | int | `240` | Seconds before the network watchdog rolls back WiFi config if connectivity fails |
+| `network.wifiAp.watchdogTimeoutSeconds` | int | `420` | Seconds before the network watchdog rolls back WiFi config if connectivity fails |
 | `network.wifiAp.driver` | string | `"nl80211"` | Hostapd driver for the WiFi interface |
 | `network.wifiAp.hwMode` | string | `"g"` | 802.11 hardware mode: `g` (2.4 GHz), `a` (5 GHz), `b` (legacy), `ad` (60 GHz) |
 | `network.wifiAp.scanWaitMs` | int | `3000` | Milliseconds to wait after triggering a WiFi scan before reading results |
@@ -255,6 +255,27 @@ To change the setup Ethernet IP, pre-populate the Flight Control endpoint, and c
   }
 }
 ```
+
+## Security Model
+
+During onboarding, the device runs with a deliberately reduced security posture to enable first-boot setup from the local network. The setup service creates a temporary `onboarding` user that is passwordless by default (configurable via `onboardingUser.password`) and enables `AllowUnencrypted = true` in Cockpit so the captive portal and HTTP access work without TLS. These trade-offs are scoped to the onboarding window and cleaned up automatically on completion.
+
+**Access controls during onboarding:**
+
+- **SSH is blocked** — `DenyUsers onboarding` is added to sshd config, preventing remote shell access to the onboarding account. Only Cockpit web console access is allowed.
+- **Polkit rules** restrict the onboarding user to specific D-Bus actions (hostname, timedate, NetworkManager). No wildcards are used.
+- **Sudoers rules** allow passwordless sudo for specific onboarding scripts only. Each script performs its own argument validation.
+- **Credentials** (enrollment tokens, proxy passwords) are written to temp files with `0600` permissions, passed as file paths (not CLI arguments), and deleted immediately after use.
+
+**After onboarding completes:**
+
+- The `onboarding` user is deleted (unless `keepCockpit: true` is set, in which case the password is expired)
+- `AllowUnencrypted = true` is removed from Cockpit configuration
+- Sudoers and polkit rules are removed
+- The SSH denial rule is removed
+- The setup service is disabled so it cannot re-run
+
+**Operator responsibility:** Anyone who can reach the device's Cockpit port on the setup network (WiFi AP or Ethernet) during the onboarding window can log in and configure the device. Ensure the setup network segment is physically or logically isolated from untrusted networks.
 
 ## Testing
 

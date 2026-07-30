@@ -114,7 +114,7 @@ The operator connects and configures the **same** interface — e.g. connecting 
    - Stop onboarding network services (WiFi AP, dnsmasq)
    - `nmcli connection up` — browser connection is lost at this point
    - Wait for carrier (up to 5 minutes for Ethernet — time for the operator to move the cable)
-   - Test connectivity (30 retries at 2s intervals)
+   - Test connectivity (retries at 5s intervals within `connectivityTimeoutSeconds` budget)
    - Run enrollment script
    - Finalize → cleanup (remove user, stop AP, start flightctl-agent)
 9. **Meanwhile in the browser** (if still open or reconnected):
