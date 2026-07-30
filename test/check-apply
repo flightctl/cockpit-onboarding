@@ -345,7 +345,7 @@ class TestApplyTcpFallback(OnboardingMachineCase):
             f"add rule inet icmp_block input icmpv6 type echo-request drop'"
         )
 
-        # Start a TCP listener
+        # Start a TCP listener (fully detached so m.execute doesn't block)
         m.execute(
             f"ip netns exec {TCP_NS}"
             f" python3 -c 'import socket,time; "
@@ -354,7 +354,7 @@ class TestApplyTcpFallback(OnboardingMachineCase):
             f"s.setsockopt(socket.IPPROTO_IPV6,socket.IPV6_V6ONLY,0); "
             f"s.bind((\"::\",{TCP_PORT})); "
             f"s.listen(1); "
-            f"time.sleep(600)' &"
+            f"time.sleep(600)' </dev/null >/dev/null 2>&1 &"
         )
 
         m.execute(f"ip link set {TCP_VETH_HOST} up")
