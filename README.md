@@ -85,6 +85,52 @@ The static IP, subnet prefix, and DHCP range are all configurable — see [Confi
 
 If you have a keyboard and monitor connected to the device, open `http://localhost:9090` in a browser and log in as `onboarding`.
 
+## HTTPS and Certificates
+
+Cockpit serves the onboarding wizard over both HTTP and HTTPS. On first start, Cockpit auto-generates a self-signed TLS certificate stored at `/etc/cockpit/ws-certs.d/0-self-signed.cert`. HTTPS access works immediately at `https://<ip>:9090`, but browsers will show a certificate warning that must be accepted manually.
+
+### Provisioning a custom certificate
+
+To avoid self-signed certificate warnings, place a trusted certificate in `/etc/cockpit/ws-certs.d/`. Cockpit sorts `.cert` and `.crt` files alphabetically and uses the **last** one, so use a numeric prefix higher than `0` (e.g., `50-mycert.cert`).
+
+Two layouts are supported:
+
+- **Combined file** — put the certificate chain and private key in a single `.cert` file:
+
+  ```
+  /etc/cockpit/ws-certs.d/50-mycert.cert   # cert chain + unencrypted private key
+  ```
+
+- **Separate files** — use matching base names with `.cert` and `.key` extensions:
+
+  ```
+  /etc/cockpit/ws-certs.d/50-mycert.cert   # certificate chain (PEM)
+  /etc/cockpit/ws-certs.d/50-mycert.key    # unencrypted private key (PEM)
+  ```
+
+The key must not be encrypted. After placing the files, restart Cockpit:
+
+```sh
+sudo systemctl restart cockpit
+```
+
+To verify which certificate is active:
+
+```sh
+sudo /usr/libexec/cockpit-certificate-ensure --check
+```
+
+See the upstream [Cockpit TLS documentation](https://cockpit-project.org/guide/latest/https) for additional options including certmonger and FreeIPA integration.
+
+### HTTP access and known limitations
+
+During onboarding, `AllowUnencrypted = true` is set in `/etc/cockpit/cockpit.conf` so that the captive portal and HTTP access work without TLS. The captive portal flow over HTTP works correctly on mobile devices (iOS, Android) and is the recommended path for initial setup.
+
+> [!NOTE]
+> Some browsers (observed with Chrome and Edge on Windows) may experience a login loop when navigating directly to `http://<ip>:9090` — the login appears to succeed but immediately returns to the login page. The root cause is not fully understood but is likely related to how the browser handles Cockpit's `SameSite=Strict` session cookie over plain HTTP. If this occurs, use `https://<ip>:9090` instead and accept the self-signed certificate warning.
+
+After onboarding completes, the cleanup script removes `AllowUnencrypted` and only HTTPS is available.
+
 ## How It Works
 
 On first boot the setup service creates a temporary `onboarding` user, optionally starts a WiFi access point, and enables the Cockpit web console. The operator connects to Cockpit, steps through the wizard pages (network, network services, enrollment, device labels, review), and clicks "Apply".
