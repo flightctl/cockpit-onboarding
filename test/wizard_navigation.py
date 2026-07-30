@@ -25,6 +25,7 @@ class OnboardingMachineCase(testlib.MachineCase):
 
     def setUp(self):
         super().setUp()
+        self.allow_restart_journal_messages()
         if not self.is_nondestructive():
             wait_onboarding_setup(self.machine)
 
