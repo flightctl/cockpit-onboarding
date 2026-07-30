@@ -4,7 +4,8 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
   moduleNameMapper: {
     '\\.(css|scss)$': 'identity-obj-proxy',
-    '^cockpit$': '<rootDir>/test/__mocks__/cockpit.ts'
+    '^cockpit$': '<rootDir>/test/__mocks__/cockpit.ts',
+    '^(\\.{1,2}/.*)\\.js$': '$1'
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {

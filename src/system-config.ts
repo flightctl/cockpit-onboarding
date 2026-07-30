@@ -62,7 +62,13 @@ export class SystemConfigurationService {
     async applySystemConfiguration(
         networkManager: NetworkManagerModel | undefined,
         model: Model,
-        options?: { skipNetwork?: boolean; skipActivation?: boolean; onAction?: OnStepAction }
+        options: {
+            skipNetwork?: boolean;
+            skipActivation?: boolean;
+            onAction?: OnStepAction;
+            ntpSyncTimeoutSeconds: number;
+            activationTimeoutSeconds: number;
+        }
     ): Promise<SystemConfigurationApplyResult> {
         const actions: StepAction[] = [];
         let hasErrors = false;
@@ -111,8 +117,9 @@ export class SystemConfigurationService {
                 await applyNetworkConfiguration(
                     networkManager,
                     model,
-                    options?.skipActivation,
-                    emit
+                    options.activationTimeoutSeconds,
+                    options.skipActivation,
+                    emit,
                 );
                 appliedItems.network = true;
             } catch (error) {
@@ -133,8 +140,9 @@ export class SystemConfigurationService {
             await configureNtpServers(
                 model.networkServices.ntp.servers,
                 model.networkServices.ntp.autoConfig,
-                options?.skipNetwork,
-                emit
+                options.ntpSyncTimeoutSeconds,
+                options.skipNetwork,
+                emit,
             );
             appliedItems.ntp = true;
         } catch (error) {

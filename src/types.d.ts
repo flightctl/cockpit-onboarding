@@ -30,10 +30,14 @@ export interface ConnectivityTestConfig {
     carrierTimeoutSeconds?: number;
     connectivityRetries?: number;
     required?: boolean;
+    ntpSyncTimeoutSeconds?: number;
+    pingTimeoutSeconds?: number;
+    pingWaitSeconds?: number;
 }
 
 export interface FlightctlConfig {
     defaultEndpoint?: string;
+    certificateExpiration?: string;
 }
 
 export interface ConfigDefaults {
@@ -56,11 +60,34 @@ export interface ConfigDefaults {
         mode?: AliasMode;
         customValue?: string;
     };
+    ntp?: {
+        autoConfig?: boolean;
+        servers?: string[];
+    };
+    networkAddress?: {
+        ipv4?: {
+            method?: "auto" | "static" | "disabled";
+            address?: string;
+            subnetMask?: string;
+            gateway?: string;
+            primaryDns?: string;
+            secondaryDns?: string;
+        };
+        ipv6?: {
+            method?: "auto" | "dhcp" | "static" | "disabled";
+            address?: string;
+            gateway?: string;
+            primaryDns?: string;
+            secondaryDns?: string;
+        };
+    };
 }
 
 export interface NetworkConfig {
     wifiAp?: WifiApConfig;
     ethernet?: EthernetConfig;
+    activationTimeoutSeconds?: number;
+    cockpitPort?: number;
 }
 
 export interface WifiApConfig {
@@ -72,6 +99,11 @@ export interface WifiApConfig {
     subnetPrefix?: number;
     dhcpRangeSize?: number;
     channel?: number;
+    dhcpLeaseDuration?: string;
+    watchdogTimeoutSeconds?: number;
+    driver?: string;
+    hwMode?: string;
+    scanWaitMs?: number;
 }
 
 export interface EthernetConfig {
@@ -80,6 +112,8 @@ export interface EthernetConfig {
     staticIp?: string;
     subnetPrefix?: number;
     dhcpRangeSize?: number;
+    dhcpLeaseDuration?: string;
+    watchdogTimeoutSeconds?: number;
 }
 
 export interface OnboardingUserConfig {

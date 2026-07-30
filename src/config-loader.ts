@@ -15,7 +15,7 @@ const DEFAULT_CONFIG_PATH = "/usr/share/cockpit/system-onboarding/config.json";
 const USER_CONFIG_PATH = "/etc/cockpit/system-onboarding/config.json";
 
 // Default configuration if no files are found
-const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
+export const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
     version: "1.0",
     brandName: "Flight Control",
     runOnce: true,
@@ -24,23 +24,33 @@ const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
     autoReboot: false,
     flightctl: {
         defaultEndpoint: "",
+        certificateExpiration: "365d",
     },
     network: {
+        activationTimeoutSeconds: 30,
+        cockpitPort: 9090,
         ethernet: {
             enabled: true,
             staticIp: "192.168.100.1",
             subnetPrefix: 24,
             dhcpRangeSize: 40,
+            dhcpLeaseDuration: "1h",
+            watchdogTimeoutSeconds: 600,
         },
         wifiAp: {
             enabled: true,
             ssidPrefix: "flightctl-",
             interface: "",
-            password: "",
+            password: "onboarding",
             address: "10.42.0.1",
             subnetPrefix: 24,
             dhcpRangeSize: 40,
             channel: 6,
+            dhcpLeaseDuration: "1h",
+            watchdogTimeoutSeconds: 240,
+            driver: "nl80211",
+            hwMode: "g",
+            scanWaitMs: 3000,
         },
     },
     onboardingUser: {
@@ -54,6 +64,9 @@ const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
         carrierTimeoutSeconds: 300,
         connectivityRetries: 30,
         required: true,
+        ntpSyncTimeoutSeconds: 30,
+        pingTimeoutSeconds: 10,
+        pingWaitSeconds: 5,
     },
 };
 
@@ -130,6 +143,22 @@ export async function loadConfig(): Promise<SystemOnboardingConfig> {
             labels: {
                 ...defaultConfig.defaults?.labels,
                 ...userConfig.defaults?.labels,
+            },
+            ntp: {
+                ...defaultConfig.defaults?.ntp,
+                ...userConfig.defaults?.ntp,
+            },
+            networkAddress: {
+                ...defaultConfig.defaults?.networkAddress,
+                ...userConfig.defaults?.networkAddress,
+                ipv4: {
+                    ...defaultConfig.defaults?.networkAddress?.ipv4,
+                    ...userConfig.defaults?.networkAddress?.ipv4,
+                },
+                ipv6: {
+                    ...defaultConfig.defaults?.networkAddress?.ipv6,
+                    ...userConfig.defaults?.networkAddress?.ipv6,
+                },
             },
         },
         connectivityTest: {
@@ -278,11 +307,139 @@ export function validateConfig(config: SystemOnboardingConfig): void {
                 throw new Error("WiFi AP channel must be a number between 1 and 14");
             }
         }
+
+        if (config.network.wifiAp?.dhcpLeaseDuration !== undefined) {
+            if (typeof config.network.wifiAp.dhcpLeaseDuration !== "string" ||
+                !/^\d+[smhd]$/.test(config.network.wifiAp.dhcpLeaseDuration)) {
+                throw new Error("WiFi AP dhcpLeaseDuration must be a duration string (e.g. '1h', '30m', '3600s')");
+            }
+        }
+
+        if (config.network.wifiAp?.watchdogTimeoutSeconds !== undefined) {
+            const val = config.network.wifiAp.watchdogTimeoutSeconds;
+            if (typeof val !== "number" || val < 60 || val > 1800) {
+                throw new Error("WiFi AP watchdogTimeoutSeconds must be a number between 60 and 1800");
+            }
+        }
+
+        if (config.network.wifiAp?.driver !== undefined) {
+            if (typeof config.network.wifiAp.driver !== "string" || config.network.wifiAp.driver.length < 1) {
+                throw new Error("WiFi AP driver must be a non-empty string");
+            }
+        }
+
+        if (config.network.wifiAp?.hwMode !== undefined) {
+            const valid = ["a", "b", "g", "ad"];
+            if (!valid.includes(config.network.wifiAp.hwMode)) {
+                throw new Error(`WiFi AP hwMode must be one of: ${valid.join(", ")}`);
+            }
+        }
+
+        if (config.network.wifiAp?.scanWaitMs !== undefined) {
+            const val = config.network.wifiAp.scanWaitMs;
+            if (typeof val !== "number" || val <= 0) {
+                throw new Error("WiFi AP scanWaitMs must be a number greater than 0");
+            }
+        }
+
+        if (config.network.ethernet?.dhcpLeaseDuration !== undefined) {
+            if (typeof config.network.ethernet.dhcpLeaseDuration !== "string" ||
+                !/^\d+[smhd]$/.test(config.network.ethernet.dhcpLeaseDuration)) {
+                throw new Error("Ethernet dhcpLeaseDuration must be a duration string (e.g. '1h', '30m', '3600s')");
+            }
+        }
+
+        if (config.network.ethernet?.watchdogTimeoutSeconds !== undefined) {
+            const val = config.network.ethernet.watchdogTimeoutSeconds;
+            if (typeof val !== "number" || val < 60 || val > 1800) {
+                throw new Error("Ethernet watchdogTimeoutSeconds must be a number between 60 and 1800");
+            }
+        }
+
+        if (config.network.activationTimeoutSeconds !== undefined) {
+            const val = config.network.activationTimeoutSeconds;
+            if (typeof val !== "number" || val <= 0) {
+                throw new Error("network.activationTimeoutSeconds must be a number greater than 0");
+            }
+        }
+
+        if (config.network.cockpitPort !== undefined) {
+            const val = config.network.cockpitPort;
+            if (typeof val !== "number" || val < 1 || val > 65535) {
+                throw new Error("network.cockpitPort must be a number between 1 and 65535");
+            }
+        }
     }
 
     if (config.onboardingUser?.password !== undefined) {
         if (typeof config.onboardingUser.password !== "string") {
             throw new Error("onboardingUser.password must be a string");
+        }
+    }
+
+    // Validate connectivity test configuration
+    if (config.connectivityTest?.ntpSyncTimeoutSeconds !== undefined) {
+        const val = config.connectivityTest.ntpSyncTimeoutSeconds;
+        if (typeof val !== "number" || val <= 0) {
+            throw new Error("connectivityTest.ntpSyncTimeoutSeconds must be a number greater than 0");
+        }
+    }
+
+    if (config.connectivityTest?.pingTimeoutSeconds !== undefined) {
+        const val = config.connectivityTest.pingTimeoutSeconds;
+        if (typeof val !== "number" || val <= 0) {
+            throw new Error("connectivityTest.pingTimeoutSeconds must be a number greater than 0");
+        }
+    }
+
+    if (config.connectivityTest?.pingWaitSeconds !== undefined) {
+        const val = config.connectivityTest.pingWaitSeconds;
+        if (typeof val !== "number" || val <= 0) {
+            throw new Error("connectivityTest.pingWaitSeconds must be a number greater than 0");
+        }
+    }
+
+    // Validate flightctl configuration
+    if (config.flightctl?.certificateExpiration !== undefined) {
+        if (typeof config.flightctl.certificateExpiration !== "string" ||
+            !/^\d+[dhm]$/.test(config.flightctl.certificateExpiration)) {
+            throw new Error("flightctl.certificateExpiration must be a duration string (e.g. '365d', '24h', '60m')");
+        }
+    }
+
+    // Validate defaults
+    if (config.defaults?.ntp?.servers !== undefined) {
+        if (!Array.isArray(config.defaults.ntp.servers)) {
+            throw new Error("defaults.ntp.servers must be an array of strings");
+        }
+    }
+
+    if (config.defaults?.networkAddress?.ipv4) {
+        const ipv4 = config.defaults.networkAddress.ipv4;
+        if (ipv4.method !== undefined) {
+            const valid = ["auto", "static", "disabled"];
+            if (!valid.includes(ipv4.method)) {
+                throw new Error(`defaults.networkAddress.ipv4.method must be one of: ${valid.join(", ")}`);
+            }
+        }
+        if (ipv4.address !== undefined && !isValidIPv4(ipv4.address)) {
+            throw new Error("defaults.networkAddress.ipv4.address must be a valid IPv4 address");
+        }
+        if (ipv4.subnetMask !== undefined && !isValidIPv4(ipv4.subnetMask)) {
+            throw new Error("defaults.networkAddress.ipv4.subnetMask must be a valid IPv4 address");
+        }
+        if (ipv4.gateway !== undefined && !isValidIPv4(ipv4.gateway)) {
+            throw new Error("defaults.networkAddress.ipv4.gateway must be a valid IPv4 address");
+        }
+    }
+
+    if (config.defaults?.networkAddress?.ipv6) {
+        const ipv6 = config.defaults.networkAddress.ipv6;
+        if (ipv6.method !== undefined) {
+            const valid = ["auto", "dhcp", "static", "disabled"];
+            if (!valid.includes(ipv6.method)) {
+                throw new Error(`defaults.networkAddress.ipv6.method must be one of: ${valid.join(", ")}`);
+            }
         }
     }
 

@@ -259,7 +259,7 @@ function decodeSsid(ssidData: unknown): string {
     return "";
 }
 
-export async function scanWifiNetworks(interfaceName: string): Promise<WifiNetwork[]> {
+export async function scanWifiNetworks(interfaceName: string, scanWaitMs = 3000): Promise<WifiNetwork[]> {
     try {
         // polkit rule authorizes the onboarding user
         const nmClient = cockpit.dbus("org.freedesktop.NetworkManager");
@@ -275,8 +275,7 @@ export async function scanWifiNetworks(interfaceName: string): Promise<WifiNetwo
 
         await deviceProxy.call("RequestScan", [{}]);
 
-        // Wait for scan to complete (typical scan takes 2-3 seconds)
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await new Promise((resolve) => setTimeout(resolve, scanWaitMs));
 
         const apPaths = deviceProxy.data.AccessPoints || [];
 

@@ -23,8 +23,10 @@ export interface CancellationSignal {
 export async function testNetworkConnectivity(
     testHost: string,
     iface: string | undefined,
+    pingTimeoutSeconds: number,
+    pingWaitSeconds: number,
     signal?: CancellationSignal,
-    onAction?: OnStepAction
+    onAction?: OnStepAction,
 ): Promise<StepExecutionResult> {
     const { emit, getActions } = createActionEmitter(onAction);
 
@@ -81,7 +83,7 @@ export async function testNetworkConnectivity(
             const pingLabel = iface ? `${testHost} via ${iface}` : testHost;
             const pingTitle = `Pinging ${pingLabel}`;
             emit({ id: ENROLLMENT_ACTION_IDS.PING, actionTitle: pingTitle, result: "pending" });
-            const pingArgs = ["timeout", "10", "ping", "-c", "1", "-W", "5"];
+            const pingArgs = ["timeout", String(pingTimeoutSeconds), "ping", "-c", "1", "-W", String(pingWaitSeconds)];
             if (iface) {
                 pingArgs.push("-I", iface);
             }

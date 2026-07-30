@@ -40,6 +40,19 @@
       "type": "object",
       "description": "Network interface configuration for initial system access",
       "properties": {
+        "activationTimeoutSeconds": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 1,
+          "description": "Seconds to wait for a NetworkManager connection to activate before timing out"
+        },
+        "cockpitPort": {
+          "type": "integer",
+          "default": 9090,
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "TCP port Cockpit listens on; opened in the onboarding firewall zone"
+        },
         "wifiAp": {
           "type": "object",
           "description": "WiFi access point configuration for initial wireless access",
@@ -92,6 +105,37 @@
               "minimum": 1,
               "maximum": 14,
               "description": "WiFi channel for the access point"
+            },
+            "dhcpLeaseDuration": {
+              "type": "string",
+              "default": "1h",
+              "pattern": "^\\d+[smhd]$",
+              "description": "DHCP lease duration for WiFi AP clients (e.g. '1h', '30m', '3600s')"
+            },
+            "watchdogTimeoutSeconds": {
+              "type": "integer",
+              "default": 240,
+              "minimum": 60,
+              "maximum": 1800,
+              "description": "Seconds before the network watchdog rolls back WiFi configuration if connectivity fails"
+            },
+            "driver": {
+              "type": "string",
+              "default": "nl80211",
+              "minLength": 1,
+              "description": "Hostapd driver for the WiFi interface (e.g. 'nl80211', 'rtl871xdrv')"
+            },
+            "hwMode": {
+              "type": "string",
+              "default": "g",
+              "enum": ["a", "b", "g", "ad"],
+              "description": "802.11 hardware mode: 'g' for 2.4 GHz, 'a' for 5 GHz, 'b' for legacy 2.4 GHz, 'ad' for 60 GHz"
+            },
+            "scanWaitMs": {
+              "type": "integer",
+              "default": 3000,
+              "minimum": 1,
+              "description": "Milliseconds to wait after triggering a WiFi scan before reading results"
             }
           }
         },
@@ -126,6 +170,19 @@
               "default": 40,
               "minimum": 1,
               "description": "Number of DHCP addresses in the pool (range starts at base IP + 9)"
+            },
+            "dhcpLeaseDuration": {
+              "type": "string",
+              "default": "1h",
+              "pattern": "^\\d+[smhd]$",
+              "description": "DHCP lease duration for Ethernet onboarding clients (e.g. '1h', '30m', '3600s')"
+            },
+            "watchdogTimeoutSeconds": {
+              "type": "integer",
+              "default": 600,
+              "minimum": 60,
+              "maximum": 1800,
+              "description": "Seconds before the network watchdog rolls back Ethernet configuration if connectivity fails"
             }
           }
         }
@@ -139,6 +196,12 @@
           "type": "string",
           "description": "Default Flight Control server endpoint URL. Pre-populates the enrollment endpoint field in the wizard.",
           "pattern": "^(https?://.*)?$"
+        },
+        "certificateExpiration": {
+          "type": "string",
+          "default": "365d",
+          "pattern": "^\\d+[dhm]$",
+          "description": "Enrollment certificate expiration duration (e.g. '365d', '24h', '60m')"
         }
       }
     },
@@ -150,6 +213,41 @@
           "type": "string",
           "default": "cockpit-project.org",
           "description": "Default host for network connectivity test (DNS + ping). Overridden by the enrollment endpoint hostname when enrollment is selected."
+        },
+        "carrierTimeoutSeconds": {
+          "type": "integer",
+          "default": 300,
+          "minimum": 1,
+          "description": "Seconds to wait for link carrier before giving up (single-NIC flow)"
+        },
+        "connectivityRetries": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 1,
+          "description": "Number of connectivity check retries after carrier is up (single-NIC flow)"
+        },
+        "required": {
+          "type": "boolean",
+          "default": true,
+          "description": "Block enrollment until connectivity check passes"
+        },
+        "ntpSyncTimeoutSeconds": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 1,
+          "description": "Seconds to wait for NTP clock synchronization before proceeding"
+        },
+        "pingTimeoutSeconds": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 1,
+          "description": "Overall timeout in seconds for each ping connectivity check"
+        },
+        "pingWaitSeconds": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 1,
+          "description": "Seconds to wait for a single ping reply (-W flag)"
         }
       }
     },
@@ -209,6 +307,50 @@
           "properties": {
             "mode": { "type": "string", "enum": ["hostname", "custom", "none"] },
             "customValue": { "type": "string" }
+          }
+        },
+        "ntp": {
+          "type": "object",
+          "description": "Default NTP settings to pre-populate the wizard",
+          "properties": {
+            "autoConfig": {
+              "type": "boolean",
+              "description": "Pre-select automatic NTP configuration mode"
+            },
+            "servers": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Default NTP server list to pre-populate when system has no configured servers"
+            }
+          }
+        },
+        "networkAddress": {
+          "type": "object",
+          "description": "Default network address settings to pre-populate the wizard",
+          "properties": {
+            "ipv4": {
+              "type": "object",
+              "description": "Default IPv4 address settings",
+              "properties": {
+                "method": { "type": "string", "enum": ["auto", "static", "disabled"] },
+                "address": { "type": "string", "format": "ipv4" },
+                "subnetMask": { "type": "string", "format": "ipv4" },
+                "gateway": { "type": "string", "format": "ipv4" },
+                "primaryDns": { "type": "string" },
+                "secondaryDns": { "type": "string" }
+              }
+            },
+            "ipv6": {
+              "type": "object",
+              "description": "Default IPv6 address settings",
+              "properties": {
+                "method": { "type": "string", "enum": ["auto", "dhcp", "static", "disabled"] },
+                "address": { "type": "string", "description": "IPv6 address with /prefix notation" },
+                "gateway": { "type": "string" },
+                "primaryDns": { "type": "string" },
+                "secondaryDns": { "type": "string" }
+              }
+            }
           }
         }
       }
@@ -296,6 +438,8 @@
       "hideModules": true,
       "autoReboot": false,
       "network": {
+        "activationTimeoutSeconds": 30,
+        "cockpitPort": 9090,
         "wifiAp": {
           "enabled": true,
           "ssidPrefix": "flightctl-",
@@ -304,20 +448,34 @@
           "address": "10.42.0.1",
           "subnetPrefix": 24,
           "dhcpRangeSize": 40,
-          "channel": 6
+          "channel": 6,
+          "dhcpLeaseDuration": "1h",
+          "watchdogTimeoutSeconds": 240,
+          "driver": "nl80211",
+          "hwMode": "g",
+          "scanWaitMs": 3000
         },
         "ethernet": {
           "enabled": true,
           "staticIp": "192.168.100.1",
           "subnetPrefix": 24,
-          "dhcpRangeSize": 40
+          "dhcpRangeSize": 40,
+          "dhcpLeaseDuration": "1h",
+          "watchdogTimeoutSeconds": 600
         }
       },
       "flightctl": {
-        "defaultEndpoint": "https://api.flightctl.example.com"
+        "defaultEndpoint": "https://api.flightctl.example.com",
+        "certificateExpiration": "365d"
       },
       "connectivityTest": {
-        "host": "cockpit-project.org"
+        "host": "cockpit-project.org",
+        "required": true,
+        "carrierTimeoutSeconds": 300,
+        "connectivityRetries": 30,
+        "ntpSyncTimeoutSeconds": 30,
+        "pingTimeoutSeconds": 10,
+        "pingWaitSeconds": 5
       },
       "onboardingUser": {
         "password": ""

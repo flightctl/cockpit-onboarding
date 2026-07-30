@@ -32,16 +32,13 @@ export async function applyProxyConfiguration(proxy: ProxyConfig): Promise<StepA
         params.password = proxy.password;
     }
 
-    // Strip the default localhost entries from noProxy before passing to the script,
-    // since the script always includes them. Pass only user-specified extras.
-    const defaultEntries = new Set(["localhost", "127.0.0.1", "::1"]);
-    const userNoProxy = proxy.noProxy
+    const noProxy = proxy.noProxy
         .split(",")
         .map((s) => s.trim())
-        .filter((s) => s && !defaultEntries.has(s))
+        .filter(Boolean)
         .join(",");
-    if (userNoProxy) {
-        params.noProxy = userNoProxy;
+    if (noProxy) {
+        params.noProxy = noProxy;
     }
 
     try {

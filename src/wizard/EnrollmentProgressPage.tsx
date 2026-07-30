@@ -28,6 +28,7 @@ import {
 
 import { useModelContext } from "../model-context";
 import { useConfig } from "../app";
+import { BUILT_IN_DEFAULTS } from "../config-loader";
 import { systemConfigurationService } from "../system-config";
 import { getHostnameInfo } from "../services/hostname";
 import { applyNetworkConfiguration } from "../services/network";
@@ -379,7 +380,9 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                             return { success: true, actions: getActions() };
                         }
 
-                        const params = buildEnrollmentParams(model, brandName);
+                        const params = buildEnrollmentParams(model, {
+                    certificateExpiration: config?.flightctl?.certificateExpiration ?? BUILT_IN_DEFAULTS.flightctl!.certificateExpiration!,
+                }, brandName);
                         return await executeEnrollmentScript(
                             FLIGHTCTL_SCRIPT_PATH,
                             params,
@@ -408,6 +411,8 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         try {
             const result = await systemConfigurationService.applySystemConfiguration(networkManager, model, {
                 ...(onAction && { onAction }),
+                ntpSyncTimeoutSeconds: config?.connectivityTest?.ntpSyncTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.ntpSyncTimeoutSeconds!,
+                activationTimeoutSeconds: config?.network?.activationTimeoutSeconds ?? BUILT_IN_DEFAULTS.network!.activationTimeoutSeconds!,
             });
 
             networkAppliedRef.current = true;
@@ -465,7 +470,12 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             model.networkInterface.interfaceType !== "wifi"
                 ? `${parentIface}.${vlanId}`
                 : parentIface;
-        return testNetworkConnectivity(testHost, iface, signalRef.current, onAction);
+        return testNetworkConnectivity(
+            testHost, iface,
+            config?.connectivityTest?.pingTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingTimeoutSeconds!,
+            config?.connectivityTest?.pingWaitSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingWaitSeconds!,
+            signalRef.current, onAction,
+        );
     };
 
     // Single-NIC delegation: apply hostname/NTP in-process, create the NM
@@ -496,6 +506,8 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             const configResult = await systemConfigurationService.applySystemConfiguration(networkManager, model, {
                 skipNetwork: true,
                 onAction,
+                ntpSyncTimeoutSeconds: config?.connectivityTest?.ntpSyncTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.ntpSyncTimeoutSeconds!,
+                activationTimeoutSeconds: config?.network?.activationTimeoutSeconds ?? BUILT_IN_DEFAULTS.network!.activationTimeoutSeconds!,
             });
             if (configResult.success) {
                 onAction({
@@ -521,7 +533,11 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                 actionTitle: deferredTitle,
                 result: "pending",
             });
-            await applyNetworkConfiguration(networkManager, model, true);
+            await applyNetworkConfiguration(
+                networkManager, model,
+                config?.network?.activationTimeoutSeconds ?? BUILT_IN_DEFAULTS.network!.activationTimeoutSeconds!,
+                true,
+            );
             onAction({
                 id: ENROLLMENT_ACTION_IDS.CREATE_NETWORK_PROFILE,
                 actionTitle: deferredTitle,
@@ -548,7 +564,9 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         if (isEnrollmentSelected) {
             const enrollment = model.enrollment;
             if (!enrollment.useExisting) {
-                const params = buildEnrollmentParams(model, brandName);
+                const params = buildEnrollmentParams(model, {
+                    certificateExpiration: config?.flightctl?.certificateExpiration ?? BUILT_IN_DEFAULTS.flightctl!.certificateExpiration!,
+                }, brandName);
                 const pf = await createSecureTempFile(JSON.stringify(params), `.enrollment-${FLIGHTCTL_SERVICE_ID}-`);
                 tempFilesToCleanup.push(pf);
                 enrollmentScriptEntries.push({ scriptPath: FLIGHTCTL_SCRIPT_PATH, paramsFile: pf });
@@ -569,9 +587,12 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             hostname: model.hostname.value,
             originalHostname,
             connectivityTestHost: model.connectivityTestHost,
-            carrierTimeoutSeconds: config?.connectivityTest?.carrierTimeoutSeconds ?? 300,
-            connectivityRetries: config?.connectivityTest?.connectivityRetries ?? 30,
+            carrierTimeoutSeconds: config?.connectivityTest?.carrierTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.carrierTimeoutSeconds!,
+            connectivityRetries: config?.connectivityTest?.connectivityRetries ?? BUILT_IN_DEFAULTS.connectivityTest!.connectivityRetries!,
             connectivityTestRequired: model.connectivityTestRequired,
+            ntpSyncTimeoutSeconds: config?.connectivityTest?.ntpSyncTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.ntpSyncTimeoutSeconds!,
+            pingTimeoutSeconds: config?.connectivityTest?.pingTimeoutSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingTimeoutSeconds!,
+            pingWaitSeconds: config?.connectivityTest?.pingWaitSeconds ?? BUILT_IN_DEFAULTS.connectivityTest!.pingWaitSeconds!,
         };
         const masterParamsFile = await createSecureTempFile(JSON.stringify(masterParams), ".onboarding-apply-");
         tempFilesToCleanup.push(masterParamsFile);
@@ -637,7 +658,9 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
 
         await writeAttemptedMarker(model);
         const testHost = model.connectivityTestHost;
-        const watchdogTimeout = model.networkInterface.interfaceType === "wifi" ? 240 : 600;
+        const watchdogTimeout = model.networkInterface.interfaceType === "wifi"
+            ? (config?.network?.wifiAp?.watchdogTimeoutSeconds ?? BUILT_IN_DEFAULTS.network!.wifiAp!.watchdogTimeoutSeconds!)
+            : (config?.network?.ethernet?.watchdogTimeoutSeconds ?? BUILT_IN_DEFAULTS.network!.ethernet!.watchdogTimeoutSeconds!);
         await armWatchdog(testHost, watchdogTimeout);
 
         const resultsBuffer: EnrollmentProgressResultItem[] = [];

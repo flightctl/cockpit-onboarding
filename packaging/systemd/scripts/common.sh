@@ -126,7 +126,8 @@ ensure_firewall_zone() {
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --set-target=REJECT
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-service=dhcp
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-service=dns
-    firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=9090/tcp
+    COCKPIT_PORT=$(load_config '.network.cockpitPort' '9090')
+    firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=${COCKPIT_PORT}/tcp
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=80/tcp
     firewall-cmd --reload
     echo "Created firewalld zone '$ONBOARDING_FW_ZONE'"
