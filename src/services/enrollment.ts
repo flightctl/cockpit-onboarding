@@ -32,7 +32,11 @@ function getExitCodeMessage(exitCode: number, endpoint?: string): string | null 
     return template;
 }
 
-export function buildEnrollmentParams(model: Model, brandName?: string): Record<string, unknown> {
+export function buildEnrollmentParams(
+    model: Model,
+    flightctlConfig: { certificateExpiration: string },
+    brandName?: string,
+): Record<string, unknown> {
     const enrollment = model.enrollment;
     const networkProxy = model.networkServices.proxy;
     const service = getFlightctlServiceDescriptor(brandName !== undefined ? { brandName } : null);
@@ -61,6 +65,7 @@ export function buildEnrollmentParams(model: Model, brandName?: string): Record<
                 : enrollment.authCaMode === "custom"
                   ? enrollment.authCaCertPem || ""
                   : "",
+        ENROLLMENT_CERTIFICATE_EXPIRATION: flightctlConfig.certificateExpiration,
     };
 }
 

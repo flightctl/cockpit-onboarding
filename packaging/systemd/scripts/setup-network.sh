@@ -28,6 +28,8 @@ ETHERNET_INTERFACE=$(load_config '.network.ethernet.interface' '')
 STATIC_IP=$(load_config '.network.ethernet.staticIp' '192.168.100.1')
 SUBNET_PREFIX=$(load_config '.network.ethernet.subnetPrefix' '24')
 DHCP_RANGE_SIZE=$(load_config '.network.ethernet.dhcpRangeSize' '40')
+DHCP_LEASE=$(load_config '.network.ethernet.dhcpLeaseDuration' '1h')
+COCKPIT_PORT=$(load_config '.network.cockpitPort' '9090')
 
 compute_dhcp_range "$STATIC_IP" "$SUBNET_PREFIX" "$DHCP_RANGE_SIZE"
 
@@ -86,7 +88,7 @@ if command -v dnsmasq >/dev/null 2>&1; then
 interface=${ETHERNET_INTERFACE}
 bind-interfaces
 except-interface=lo
-dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_NETMASK},1h
+dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_NETMASK},${DHCP_LEASE}
 dhcp-option=3,${STATIC_IP}
 dhcp-option=6,${STATIC_IP}
 no-resolv
@@ -104,4 +106,4 @@ else
     echo "Technicians will need to manually configure a static IP to reach this device"
 fi
 
-echo "System accessible at: http://$STATIC_IP:9090"
+echo "System accessible at: http://$STATIC_IP:$COCKPIT_PORT"

@@ -45,7 +45,9 @@ collect_diagnostics() {
         DIAG_DNS_RESOLVED="true"
     fi
 
-    if timeout 10 ping -c 1 -W 5 "$test_host" >/dev/null 2>&1; then
+    PING_TIMEOUT=$(load_config '.connectivityTest.pingTimeoutSeconds' '10')
+    PING_WAIT=$(load_config '.connectivityTest.pingWaitSeconds' '5')
+    if timeout ${PING_TIMEOUT} ping -c 1 -W ${PING_WAIT} "$test_host" >/dev/null 2>&1; then
         DIAG_PING_SUCCEEDED="true"
     fi
 

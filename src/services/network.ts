@@ -364,10 +364,14 @@ function resolveVlanInfo(
     return { isVlan, effectiveIfaceName };
 }
 
-function waitForActivation(nmClient: cockpit.DBusClient, activeConnPath: string): Promise<void> {
+function waitForActivation(
+    nmClient: cockpit.DBusClient,
+    activeConnPath: string,
+    activationTimeoutSeconds: number,
+): Promise<void> {
     const NM_ACTIVE_CONNECTION_STATE_ACTIVATED = 2;
     const NM_ACTIVE_CONNECTION_STATE_DEACTIVATED = 4;
-    const TIMEOUT_MS = 30000;
+    const TIMEOUT_MS = activationTimeoutSeconds * 1000;
     const POLL_MS = 500;
 
     return new Promise((resolve, reject) => {
@@ -574,8 +578,9 @@ function buildConnectionSettings(
 export async function applyNetworkConfiguration(
     networkManager: NetworkManagerModel | undefined,
     model: Model,
+    activationTimeoutSeconds: number,
     skipActivation = false,
-    onAction?: OnStepAction
+    onAction?: OnStepAction,
 ): Promise<NetworkApplyResult> {
     const actions: StepAction[] = [];
 
@@ -690,7 +695,7 @@ export async function applyNetworkConfiguration(
                 );
 
                 const activeConnPath = dbusPathResult(activeConnResult);
-                await waitForActivation(nmClient, activeConnPath);
+                await waitForActivation(nmClient, activeConnPath, activationTimeoutSeconds);
 
                 pushNetworkAction(actions, `Activated connection ${connectionId} on ${effectiveIfaceName}`, "success", onAction);
             }

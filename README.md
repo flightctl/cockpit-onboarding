@@ -165,6 +165,8 @@ The override file does not need to contain all keys — only the values you want
 | `keepCockpit` | bool | `false` | Keep Cockpit running post-onboarding (expires the onboarding user's password instead of deleting the user) |
 | `hideModules` | bool | `true` | Hide other Cockpit modules during onboarding |
 | `autoReboot` | bool | `false` | Reboot the device after onboarding completes |
+| `network.activationTimeoutSeconds` | int | `30` | Seconds to wait for a NetworkManager connection to activate |
+| `network.cockpitPort` | int | `9090` | TCP port Cockpit listens on; opened in the onboarding firewall zone |
 | `network.wifiAp.enabled` | bool | `true` | Enable WiFi AP provisioning |
 | `network.wifiAp.ssidPrefix` | string | `"flightctl-"` | SSID prefix; suffix is auto-generated from DMI serial or MAC |
 | `network.wifiAp.interface` | string | `""` | WiFi interface for the AP; empty = auto-detect |
@@ -173,16 +175,27 @@ The override file does not need to contain all keys — only the values you want
 | `network.wifiAp.subnetPrefix` | int | `24` | AP subnet prefix length |
 | `network.wifiAp.dhcpRangeSize` | int | `40` | Number of DHCP leases to offer |
 | `network.wifiAp.channel` | int | `6` | WiFi channel |
+| `network.wifiAp.dhcpLeaseDuration` | string | `"1h"` | DHCP lease duration for WiFi AP clients (e.g. `1h`, `30m`, `3600s`) |
+| `network.wifiAp.watchdogTimeoutSeconds` | int | `240` | Seconds before the network watchdog rolls back WiFi config if connectivity fails |
+| `network.wifiAp.driver` | string | `"nl80211"` | Hostapd driver for the WiFi interface |
+| `network.wifiAp.hwMode` | string | `"g"` | 802.11 hardware mode: `g` (2.4 GHz), `a` (5 GHz), `b` (legacy), `ad` (60 GHz) |
+| `network.wifiAp.scanWaitMs` | int | `3000` | Milliseconds to wait after triggering a WiFi scan before reading results |
 | `network.ethernet.enabled` | bool | `true` | Enable Ethernet setup interface |
 | `network.ethernet.interface` | string | `""` | Ethernet interface for onboarding; empty = auto-detect |
 | `network.ethernet.staticIp` | string | `"192.168.100.1"` | Static IP for the onboarding Ethernet interface |
 | `network.ethernet.subnetPrefix` | int | `24` | Ethernet subnet prefix length |
 | `network.ethernet.dhcpRangeSize` | int | `40` | Number of DHCP leases (requires dnsmasq) |
+| `network.ethernet.dhcpLeaseDuration` | string | `"1h"` | DHCP lease duration for Ethernet onboarding clients |
+| `network.ethernet.watchdogTimeoutSeconds` | int | `600` | Seconds before the network watchdog rolls back Ethernet config if connectivity fails |
 | `flightctl.defaultEndpoint` | string | `""` | Pre-populated Flight Control server URL in the enrollment form |
+| `flightctl.certificateExpiration` | string | `"365d"` | Enrollment certificate expiration duration (e.g. `365d`, `24h`) |
 | `connectivityTest.host` | string | `"cockpit-project.org"` | Host used for DNS/ping connectivity checks after network apply |
 | `connectivityTest.required` | bool | `true` | Block enrollment until connectivity check passes |
 | `connectivityTest.carrierTimeoutSeconds` | int | `300` | Seconds to wait for link carrier before giving up |
 | `connectivityTest.connectivityRetries` | int | `30` | Number of connectivity check retries after carrier is up |
+| `connectivityTest.ntpSyncTimeoutSeconds` | int | `30` | Seconds to wait for NTP clock synchronization before proceeding |
+| `connectivityTest.pingTimeoutSeconds` | int | `10` | Overall timeout in seconds for each ping connectivity check |
+| `connectivityTest.pingWaitSeconds` | int | `5` | Seconds to wait for a single ping reply |
 | `defaults.hostname` | string | `""` | Pre-populated hostname in the wizard |
 | `defaults.proxy.enabled` | bool | `false` | Enable proxy by default in the wizard |
 | `defaults.proxy.protocol` | string | `"http"` | Default proxy protocol (`http`, `https`, or `socks5`) |
@@ -192,6 +205,19 @@ The override file does not need to contain all keys — only the values you want
 | `defaults.proxy.username` | string | `""` | Default proxy username |
 | `defaults.proxy.password` | string | `""` | Default proxy password |
 | `defaults.proxy.noProxy` | string | `""` | Comma-separated list of hosts to bypass the proxy |
+| `defaults.ntp.autoConfig` | bool | — | Pre-select automatic NTP configuration mode |
+| `defaults.ntp.servers` | array | `[]` | Default NTP server list to pre-populate when system has no configured servers |
+| `defaults.networkAddress.ipv4.method` | string | — | Pre-select IPv4 method: `auto`, `static`, or `disabled` |
+| `defaults.networkAddress.ipv4.address` | string | — | Default static IPv4 address |
+| `defaults.networkAddress.ipv4.subnetMask` | string | — | Default subnet mask |
+| `defaults.networkAddress.ipv4.gateway` | string | — | Default gateway |
+| `defaults.networkAddress.ipv4.primaryDns` | string | — | Default primary DNS server |
+| `defaults.networkAddress.ipv4.secondaryDns` | string | — | Default secondary DNS server |
+| `defaults.networkAddress.ipv6.method` | string | — | Pre-select IPv6 method: `auto`, `dhcp`, `static`, or `disabled` |
+| `defaults.networkAddress.ipv6.address` | string | — | Default static IPv6 address (with /prefix) |
+| `defaults.networkAddress.ipv6.gateway` | string | — | Default IPv6 gateway |
+| `defaults.networkAddress.ipv6.primaryDns` | string | — | Default primary IPv6 DNS server |
+| `defaults.networkAddress.ipv6.secondaryDns` | string | — | Default secondary IPv6 DNS server |
 | `defaults.labels.deviceLabels` | array | `[]` | Pre-populated device labels (`[{key, value}]`) |
 | `defaults.labels.systemInfoMappings` | array | `[]` | Pre-populated system-info label mappings (`[{key, value}]`) |
 | `defaults.alias.mode` | string | — | Default alias mode for the device |
@@ -203,17 +229,31 @@ The override file does not need to contain all keys — only the values you want
 
 ### Example override
 
-To change the setup Ethernet IP and pre-populate the Flight Control endpoint, create `/etc/cockpit/system-onboarding/config.json`:
+To change the setup Ethernet IP, pre-populate the Flight Control endpoint, and configure NTP defaults, create `/etc/cockpit/system-onboarding/config.json`:
 
 ```json
 {
   "network": {
     "ethernet": {
-      "staticIp": "10.0.0.1"
+      "staticIp": "10.0.0.1",
+      "watchdogTimeoutSeconds": 900
+    },
+    "wifiAp": {
+      "hwMode": "a",
+      "dhcpLeaseDuration": "30m"
     }
   },
   "flightctl": {
-    "defaultEndpoint": "https://api.flightctl.example.com:7443"
+    "defaultEndpoint": "https://api.flightctl.example.com:7443",
+    "certificateExpiration": "180d"
+  },
+  "connectivityTest": {
+    "ntpSyncTimeoutSeconds": 60
+  },
+  "defaults": {
+    "ntp": {
+      "servers": ["ntp1.example.com", "ntp2.example.com"]
+    }
   }
 }
 ```

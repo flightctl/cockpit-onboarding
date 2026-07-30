@@ -29,6 +29,7 @@ import WithTooltip from "../components/WithTooltip.tsx";
 import NetworkInterfaceModel from "./NetworkInterfaceModel.tsx";
 
 import { useModelContext } from "../model-context.js";
+import { useConfig } from "../app.js";
 import { mapWifiSecurity } from "../services/network.js";
 import { validateVlanConfig } from "../validation.js";
 import { getCurrentWifiConnection, scanWifiNetworks, WifiConnection, WifiNetwork } from "../services/wifi.js";
@@ -250,6 +251,7 @@ const SignalStrengthIcon = ({ strength }: { strength: number }) => {
 
 export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps) => {
     const { model, updateModel } = useModelContext();
+    const { config } = useConfig();
     const [isScanning, setIsScanning] = React.useState(true);
     const [networks, setNetworks] = React.useState<WifiNetwork[]>([]);
     const [scanError, setScanError] = React.useState<string | null>(null);
@@ -286,7 +288,7 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
 
             // Then scan for networks
             try {
-                const scannedNetworks = await scanWifiNetworks(interfaceName);
+                const scannedNetworks = await scanWifiNetworks(interfaceName, config?.network?.wifiAp?.scanWaitMs);
                 if (cancelled) {
                     return;
                 }
@@ -350,7 +352,7 @@ export const NetworkWifiSelector = ({ interfaceName }: NetworkWifiSelectorProps)
         setIsScanning(true);
         setScanError(null);
         try {
-            const scannedNetworks = await scanWifiNetworks(interfaceName);
+            const scannedNetworks = await scanWifiNetworks(interfaceName, config?.network?.wifiAp?.scanWaitMs);
             setNetworks(scannedNetworks);
         } catch (error) {
             console.error("WiFi scan failed:", error);

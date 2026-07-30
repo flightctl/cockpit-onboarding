@@ -206,10 +206,12 @@ is_ip_address() {
     [[ "$1" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || [[ "$1" =~ ^[0-9a-fA-F:]+$ ]]
 }
 
+PING_TIMEOUT=$(jq -r '.pingTimeoutSeconds // 10' "$PARAMS_FILE")
+PING_WAIT=$(jq -r '.pingWaitSeconds // 5' "$PARAMS_FILE")
 log "Waiting for network connectivity (up to ${CONNECTIVITY_TIMEOUT} retries)..."
 for i in $(seq 1 $CONNECTIVITY_TIMEOUT); do
     if is_ip_address "$CONNECTIVITY_TEST_HOST"; then
-        if ping -c1 -W2 "$CONNECTIVITY_TEST_HOST" >/dev/null 2>&1; then
+        if ping -c1 -W${PING_WAIT} "$CONNECTIVITY_TEST_HOST" >/dev/null 2>&1; then
             log "Network connectivity confirmed (ping)"
             break
         fi
@@ -239,7 +241,7 @@ done
 /usr/libexec/flightctl-onboarding/configure-ntp.sh nudge 2>&1 | while IFS= read -r line; do log "$line"; done || true
 NTP_ACTIVE=$(timedatectl show --property=NTP --value 2>/dev/null || echo "no")
 if [ "$NTP_ACTIVE" = "yes" ]; then
-    NTP_SYNC_TIMEOUT=30
+    NTP_SYNC_TIMEOUT=$(jq -r '.ntpSyncTimeoutSeconds // 30' "$PARAMS_FILE")
     log "Waiting for NTP time synchronization (up to ${NTP_SYNC_TIMEOUT}s)..."
     ntp_elapsed=0
     while [ "$ntp_elapsed" -lt "$NTP_SYNC_TIMEOUT" ]; do

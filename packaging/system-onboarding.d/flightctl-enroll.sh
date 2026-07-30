@@ -22,8 +22,6 @@
 #   INFO:  Informational message (UI shows info icon)
 #   DEVICE_URL: Device management URL (captured for "View in UI" link)
 #   (unprefixed lines are attached as detail to the preceding action)
-#
-# See: specs/001-system-onboarding/contracts/enrollment-api.md
 set -euo pipefail
 
 # systemd-run transient units and sudo do not always set HOME. flightctl login
@@ -52,7 +50,8 @@ if [ -n "${1:-}" ] && [ -f "$1" ]; then
     ENROLLMENT_TLS_MODE=$(jq -r '.ENROLLMENT_TLS_MODE // "system"' "$1")
     ENROLLMENT_CA_CERT_PEM=$(jq -r '.ENROLLMENT_CA_CERT_PEM // empty' "$1")
     ENROLLMENT_AUTH_CA_CERT_PEM=$(jq -r '.ENROLLMENT_AUTH_CA_CERT_PEM // empty' "$1")
-    export ENROLLMENT_SERVICE_ID ENROLLMENT_SERVICE_NAME ENROLLMENT_ENDPOINT
+    ENROLLMENT_CERTIFICATE_EXPIRATION=$(jq -r '.ENROLLMENT_CERTIFICATE_EXPIRATION // "365d"' "$1")
+    export ENROLLMENT_SERVICE_ID ENROLLMENT_SERVICE_NAME ENROLLMENT_ENDPOINT ENROLLMENT_CERTIFICATE_EXPIRATION
     rm -f "$1"
 fi
 
@@ -120,7 +119,7 @@ fi
 
 # Set up proxy environment if proxy is configured
 PROXY_URL=""
-PROXY_NO_PROXY="${ENROLLMENT_PROXY_NO_PROXY:-localhost,127.0.0.1,::1}"
+PROXY_NO_PROXY="${ENROLLMENT_PROXY_NO_PROXY:-}"
 if [ "$ENROLLMENT_PROXY_ENABLED" = "true" ] && [ -n "$ENROLLMENT_PROXY_HOSTNAME" ] && [ -n "$ENROLLMENT_PROXY_PORT" ]; then
     PROXY_SCHEME="${ENROLLMENT_PROXY_PROTOCOL:-http}"
     if [ -n "$ENROLLMENT_PROXY_USERNAME" ] && [ -n "$ENROLLMENT_PROXY_PASSWORD" ]; then
@@ -184,7 +183,7 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
     # stdout contains the YAML config; stderr has progress output we suppress
     if ! flightctl certificate request \
         --signer=enrollment \
-        --expiration=365d \
+        --expiration="$ENROLLMENT_CERTIFICATE_EXPIRATION" \
         --output=embedded \
         --config-dir "$TMPDIR" \
         -d "$TMPDIR" > "$TMPDIR/config.yaml" 2>"$TMPDIR/cert-request.log"; then

@@ -10,7 +10,7 @@
 #   "port": 8080,
 #   "username": "user",       (optional)
 #   "password": "pass",       (optional)
-#   "noProxy": "10.0.0.0/8"   (optional, extra entries beyond the defaults)
+#   "noProxy": "10.0.0.0/8"   (optional, comma-separated no-proxy hosts)
 # }
 #
 # Writes:
@@ -55,17 +55,8 @@ else
     PROXY_URL="$PROXY_URL_STRIPPED"
 fi
 
-# Build NO_PROXY: always include localhost entries
-NO_PROXY="localhost,127.0.0.1,::1"
-if [ -n "$NO_PROXY_EXTRA" ]; then
-    # Strip the default entries from user input to avoid duplicates, then append
-    CLEANED=$(echo "$NO_PROXY_EXTRA" | tr ',' '\n' | \
-        grep -v -x -e 'localhost' -e '127.0.0.1' -e '::1' | \
-        paste -sd ',' -)
-    if [ -n "$CLEANED" ]; then
-        NO_PROXY="${NO_PROXY},${CLEANED}"
-    fi
-fi
+# Build NO_PROXY from wizard input
+NO_PROXY="${NO_PROXY_EXTRA:-}"
 
 # Write systemd global default drop-in
 SYSTEMD_DROPIN_DIR="/etc/systemd/system.conf.d"

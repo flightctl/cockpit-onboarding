@@ -32,11 +32,15 @@ fi
 
 # Get configuration values
 SSID_PREFIX=$(load_config '.network.wifiAp.ssidPrefix' 'flightctl-')
-PASSWORD=$(load_config '.network.wifiAp.password' '')
+PASSWORD=$(load_config '.network.wifiAp.password' 'onboarding')
 AP_ADDRESS=$(load_config '.network.wifiAp.address' '10.42.0.1')
 AP_SUBNET_PREFIX=$(load_config '.network.wifiAp.subnetPrefix' '24')
 AP_DHCP_RANGE_SIZE=$(load_config '.network.wifiAp.dhcpRangeSize' '40')
 AP_CHANNEL=$(load_config '.network.wifiAp.channel' '6')
+DHCP_LEASE=$(load_config '.network.wifiAp.dhcpLeaseDuration' '1h')
+WIFI_DRIVER=$(load_config '.network.wifiAp.driver' 'nl80211')
+WIFI_HW_MODE=$(load_config '.network.wifiAp.hwMode' 'g')
+COCKPIT_PORT=$(load_config '.network.cockpitPort' '9090')
 
 compute_dhcp_range "$AP_ADDRESS" "$AP_SUBNET_PREFIX" "$AP_DHCP_RANGE_SIZE"
 
@@ -107,9 +111,9 @@ mkdir -p "$RUNTIME_DIR"
 HOSTAPD_CONF="$RUNTIME_DIR/hostapd-${WIFI_INTERFACE}.conf"
 cat > "$HOSTAPD_CONF" <<EOF
 interface=${WIFI_INTERFACE}
-driver=nl80211
+driver=${WIFI_DRIVER}
 ssid=${SSID}
-hw_mode=g
+hw_mode=${WIFI_HW_MODE}
 channel=${AP_CHANNEL}
 wmm_enabled=0
 macaddr_acl=0
@@ -141,7 +145,7 @@ cat > "$DNSMASQ_CONF" <<EOF
 interface=${WIFI_INTERFACE}
 bind-interfaces
 except-interface=lo
-dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_NETMASK},1h
+dhcp-range=${DHCP_RANGE_START},${DHCP_RANGE_END},${DHCP_NETMASK},${DHCP_LEASE}
 dhcp-option=3,${AP_ADDRESS}
 dhcp-option=6,${AP_ADDRESS}
 no-resolv
@@ -173,4 +177,4 @@ systemctl enable "flightctl-onboarding-wifi-ap@${WIFI_INTERFACE}.service" 2>/dev
 systemctl start "flightctl-onboarding-wifi-ap@${WIFI_INTERFACE}.service"
 
 echo "WiFi AP started on $WIFI_INTERFACE"
-echo "AP accessible at: http://${AP_ADDRESS}:9090"
+echo "AP accessible at: http://${AP_ADDRESS}:${COCKPIT_PORT}"

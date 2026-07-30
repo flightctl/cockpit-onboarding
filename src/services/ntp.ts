@@ -54,7 +54,6 @@ export async function getNtpServers(): Promise<string[]> {
     return [];
 }
 
-const NTP_SYNC_TIMEOUT_SECONDS = 30;
 const NTP_SYNC_POLL_INTERVAL_MS = 1000;
 
 async function isNtpActive(): Promise<boolean> {
@@ -81,14 +80,16 @@ async function isNtpSynchronized(): Promise<boolean> {
     }
 }
 
-export async function waitForNtpSync(): Promise<boolean> {
+export async function waitForNtpSync(
+    ntpSyncTimeoutSeconds: number,
+): Promise<boolean> {
     if (!(await isNtpActive())) {
         return false;
     }
 
     await cockpit.spawn(["sudo", SCRIPT_NTP, "nudge"], { err: "ignore" }).catch(() => {});
 
-    for (let i = 0; i < NTP_SYNC_TIMEOUT_SECONDS; i++) {
+    for (let i = 0; i < ntpSyncTimeoutSeconds; i++) {
         if (await isNtpSynchronized()) {
             return true;
         }
@@ -101,8 +102,9 @@ export async function waitForNtpSync(): Promise<boolean> {
 export async function configureNtpServers(
     servers: string[],
     autoConfig: boolean,
+    ntpSyncTimeoutSeconds: number,
     skipSync?: boolean,
-    onAction?: OnStepAction
+    onAction?: OnStepAction,
 ): Promise<StepAction[]> {
     const actions: StepAction[] = [];
     const emit = (action: StepAction) => {
@@ -156,7 +158,7 @@ export async function configureNtpServers(
         emit(
             makeStepAction(CONFIG_ACTION_IDS.NTP_SYNC, "Waiting for NTP time synchronization...", "pending")
         );
-        const synced = await waitForNtpSync();
+        const synced = await waitForNtpSync(ntpSyncTimeoutSeconds);
         if (synced) {
             emit(
                 makeStepAction(CONFIG_ACTION_IDS.NTP_SYNC, "NTP time synchronized", "success")

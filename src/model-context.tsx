@@ -550,7 +550,32 @@ export const ModelProvider: React.FunctionComponent<{
                     selectedInterface: systemInfo.defaultInterface,
                     interfaceType: systemInfo.defaultInterface ? defaultInterfaceType : null,
                 },
-                networkAddress: configToState(defaultConfig),
+                networkAddress: (() => {
+                    const base = configToState(defaultConfig);
+                    return {
+                        ipv4: {
+                            ...base.ipv4,
+                            ...(defaults?.networkAddress?.ipv4 && {
+                                method: defaults.networkAddress.ipv4.method ?? base.ipv4.method,
+                                address: defaults.networkAddress.ipv4.address ?? base.ipv4.address,
+                                subnetMask: defaults.networkAddress.ipv4.subnetMask ?? base.ipv4.subnetMask,
+                                gateway: defaults.networkAddress.ipv4.gateway ?? base.ipv4.gateway,
+                                primaryDns: defaults.networkAddress.ipv4.primaryDns ?? base.ipv4.primaryDns,
+                                secondaryDns: defaults.networkAddress.ipv4.secondaryDns ?? base.ipv4.secondaryDns,
+                            }),
+                        },
+                        ipv6: {
+                            ...base.ipv6,
+                            ...(defaults?.networkAddress?.ipv6 && {
+                                method: defaults.networkAddress.ipv6.method ?? base.ipv6.method,
+                                address: defaults.networkAddress.ipv6.address ?? base.ipv6.address,
+                                gateway: defaults.networkAddress.ipv6.gateway ?? base.ipv6.gateway,
+                                primaryDns: defaults.networkAddress.ipv6.primaryDns ?? base.ipv6.primaryDns,
+                                secondaryDns: defaults.networkAddress.ipv6.secondaryDns ?? base.ipv6.secondaryDns,
+                            }),
+                        },
+                    };
+                })(),
                 originalNetworkConfigs: originalConfigs,
                 userNetworkConfigs: {},
                 networkServices: {
@@ -558,6 +583,10 @@ export const ModelProvider: React.FunctionComponent<{
                         ...prev.networkServices.ntp,
                         servers: systemInfo.ntpServers,
                         autoConfig: systemInfo.ntpServers.length === 0,
+                        ...(systemInfo.ntpServers.length === 0 && defaults?.ntp && {
+                            servers: defaults.ntp.servers?.length ? defaults.ntp.servers : prev.networkServices.ntp.servers,
+                            autoConfig: defaults.ntp.autoConfig ?? (defaults.ntp.servers?.length ? false : prev.networkServices.ntp.autoConfig),
+                        }),
                     },
                     proxy: {
                         ...prev.networkServices.proxy,

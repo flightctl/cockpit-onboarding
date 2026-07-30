@@ -5,6 +5,8 @@
   "hideModules": true,
   "autoReboot": false,
   "network": {
+    "activationTimeoutSeconds": 30,
+    "cockpitPort": 9090,
     "wifiAp": {
       "enabled": true,
       "ssidPrefix": "flightctl-",
@@ -13,21 +15,34 @@
       "address": "10.42.0.1",
       "subnetPrefix": 24,
       "dhcpRangeSize": 40,
-      "channel": 6
+      "channel": 6,
+      "dhcpLeaseDuration": "1h",
+      "watchdogTimeoutSeconds": 240,
+      "driver": "nl80211",
+      "hwMode": "g",
+      "scanWaitMs": 3000
     },
     "ethernet": {
       "enabled": true,
       "staticIp": "192.168.100.1",
       "subnetPrefix": 24,
-      "dhcpRangeSize": 40
+      "dhcpRangeSize": 40,
+      "dhcpLeaseDuration": "1h",
+      "watchdogTimeoutSeconds": 600
     }
   },
   "flightctl": {
-    "defaultEndpoint": ""
+    "defaultEndpoint": "",
+    "certificateExpiration": "365d"
   },
   "connectivityTest": {
     "host": "cockpit-project.org",
-    "required": true
+    "required": true,
+    "carrierTimeoutSeconds": 300,
+    "connectivityRetries": 30,
+    "ntpSyncTimeoutSeconds": 30,
+    "pingTimeoutSeconds": 10,
+    "pingWaitSeconds": 5
   },
   "onboardingUser": {
     "password": ""

@@ -65,7 +65,7 @@ function serializeModel(model: Model): AttemptedMarkerData {
                 protocol: model.networkServices.proxy.protocol,
                 hostname: model.networkServices.proxy.hostname,
                 port: model.networkServices.proxy.port,
-                noProxy: model.networkServices.proxy.noProxy || "localhost,127.0.0.1,::1",
+                noProxy: model.networkServices.proxy.noProxy || "",
             },
         },
         enrollment: serializeEnrollmentForMarker(model.enrollment),
