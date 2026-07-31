@@ -29,6 +29,10 @@ check_systemd_service() {
     return 0
 }
 
+# Clean up stale watchdog state from a previous boot that was interrupted
+rm -f /var/lib/flightctl-onboarding/.watchdog-active 2>/dev/null || true
+rm -f /var/lib/flightctl-onboarding/.watchdog-status 2>/dev/null || true
+
 echo "Checking dependencies..."
 
 # Required dependencies

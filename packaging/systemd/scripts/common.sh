@@ -48,6 +48,14 @@ disarm_watchdog() {
     systemctl stop flightctl-onboarding-watchdog.service 2>/dev/null || true
 }
 
+validate_hostname_or_ip() {
+    local value="$1"
+    if [[ ! "$value" =~ ^[a-zA-Z0-9.:-]+$ ]]; then
+        echo "ERROR: Invalid hostname or IP: $value" >&2
+        exit 1
+    fi
+}
+
 prefix_to_netmask() {
     local prefix=$1
     local mask=$((0xFFFFFFFF << (32 - prefix) & 0xFFFFFFFF))
@@ -108,11 +116,33 @@ detect_interface() {
     return 0
 }
 
-# Read the Cockpit port from the cockpit.socket systemd unit, falling back to 9090.
 get_cockpit_port() {
     local port
     port=$(systemctl show cockpit.socket -p Listen 2>/dev/null | grep -oE '[0-9]+[[:space:]]+\(Stream\)' | head -1 | grep -oE '[0-9]+')
     echo "${port:-9090}"
+}
+
+restore_setup_network() {
+    # Reactivate the Ethernet setup connection if it exists
+    if nmcli connection show "$ONBOARDING_SETUP_CONNECTION" >/dev/null 2>&1; then
+        nmcli connection up "$ONBOARDING_SETUP_CONNECTION" 2>/dev/null || true
+        echo "Reactivated onboarding Ethernet connection"
+    fi
+
+    # Restart all WiFi AP instances (Wants= pulls in their dnsmasq + captive portal)
+    local unit
+    while IFS= read -r unit; do
+        [ -n "$unit" ] || continue
+        systemctl start "$unit" 2>/dev/null || true
+        echo "Restarted $unit"
+    done < <(systemctl list-units --plain --no-legend --all 'flightctl-onboarding-wifi-ap@*.service' 2>/dev/null | awk '{print $1}')
+
+    # Restart all dnsmasq instances (covers Ethernet dnsmasq not pulled in by WiFi AP)
+    while IFS= read -r unit; do
+        [ -n "$unit" ] || continue
+        systemctl start "$unit" 2>/dev/null || true
+        echo "Restarted $unit"
+    done < <(systemctl list-units --plain --no-legend --all 'flightctl-onboarding-dnsmasq@*.service' 2>/dev/null | awk '{print $1}')
 }
 
 ONBOARDING_FW_ZONE="fc-onboarding-ap"

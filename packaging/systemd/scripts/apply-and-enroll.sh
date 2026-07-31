@@ -140,6 +140,10 @@ rollback() {
     done || true
 
     rm -f "$PARAMS_FILE" 2>/dev/null || true
+
+    log "Restoring setup network services..."
+    restore_setup_network 2>&1 | while IFS= read -r line; do log "$line"; done
+
     log "Rollback complete"
 }
 trap 'rc=$?; if [ $rc -ne 0 ]; then rollback; fi; exit $rc' EXIT

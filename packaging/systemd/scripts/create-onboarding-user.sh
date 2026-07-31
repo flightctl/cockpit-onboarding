@@ -37,28 +37,36 @@ mkdir -p /var/lib/flightctl-onboarding
 chmod 0700 /var/lib/flightctl-onboarding
 chown onboarding:onboarding /var/lib/flightctl-onboarding
 
-# Configure Cockpit to allow passwordless login for onboarding user
+# Configure Cockpit for onboarding access.
+# Track which settings we add so cleanup only reverts our changes.
 mkdir -p /etc/cockpit
-if [ ! -f /etc/cockpit/cockpit.conf ]; then
-    cat > /etc/cockpit/cockpit.conf <<EOF
-[WebService]
-AllowUnencrypted = true
-LoginTo = false
-EOF
-    echo "Created Cockpit configuration"
-else
-    # Add settings if not already present
-    if ! grep -q "AllowUnencrypted" /etc/cockpit/cockpit.conf; then
-        if grep -q '^\[WebService\]' /etc/cockpit/cockpit.conf; then
-            # Insert under existing [WebService] section
-            sed -i '/^\[WebService\]/a AllowUnencrypted = true\nLoginTo = false' /etc/cockpit/cockpit.conf
-        else
-            # No [WebService] section exists, append one
-            printf '\n[WebService]\nAllowUnencrypted = true\nLoginTo = false\n' >> /etc/cockpit/cockpit.conf
-        fi
-        echo "Updated Cockpit configuration"
+COCKPIT_CONF="/etc/cockpit/cockpit.conf"
+COCKPIT_MODIFIED="${ONBOARDING_MARKER_DIR}/.cockpit-conf-modified"
+: > "$COCKPIT_MODIFIED"
+
+ensure_webservice_section() {
+    if [ ! -f "$COCKPIT_CONF" ]; then
+        printf '[WebService]\n' > "$COCKPIT_CONF"
+    elif ! grep -q '^\[WebService\]' "$COCKPIT_CONF"; then
+        printf '\n[WebService]\n' >> "$COCKPIT_CONF"
     fi
-fi
+}
+
+add_cockpit_setting() {
+    local key="$1"
+    local value="$2"
+    if grep -q "^${key}" "$COCKPIT_CONF" 2>/dev/null; then
+        echo "Cockpit ${key} already set, skipping"
+        return
+    fi
+    ensure_webservice_section
+    sed -i "/^\[WebService\]/a ${key} = ${value}" "$COCKPIT_CONF"
+    echo "${key}" >> "$COCKPIT_MODIFIED"
+    echo "Added ${key} = ${value} to Cockpit configuration"
+}
+
+add_cockpit_setting "AllowUnencrypted" "true"
+add_cockpit_setting "LoginTo" "false"
 
 # Install module overrides if hideModules=true
 HIDE_MODULES=$(load_config '.hideModules' 'true')

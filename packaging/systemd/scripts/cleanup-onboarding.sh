@@ -71,8 +71,9 @@ fi
 # Clean up runtime files (hostapd configs, env files)
 rm -rf /run/flightctl-onboarding 2>/dev/null || true
 
-# Remove apply log file
+# Remove log files
 rm -f /var/log/flightctl-onboarding-apply.log 2>/dev/null || true
+rm -f /var/log/flightctl-onboarding-mask-greenboot.log 2>/dev/null || true
 
 # Remove SSH denial for onboarding user (no longer needed after cleanup)
 if [ -f /etc/ssh/sshd_config.d/50-deny-onboarding.conf ]; then
@@ -106,9 +107,6 @@ fi
 if [ "$RUN_ONCE" = "true" ]; then
     echo "runOnce is enabled - performing full cleanup"
 
-    # Note: sudoers and polkit rules are left in place here.
-    # They are removed by the RPM %postun scriptlet on package uninstall.
-
     # Disable the systemd setup service to prevent re-running on next boot
     if systemctl is-enabled "$SERVICE_NAME" >/dev/null 2>&1; then
         systemctl disable "$SERVICE_NAME" 2>/dev/null || true
@@ -123,18 +121,27 @@ if [ "$RUN_ONCE" = "true" ]; then
             echo "Forced password change for $ONBOARDING_USER on next login"
         fi
     else
-        # Remove Cockpit configuration changes made during setup
-        # Only remove AllowUnencrypted if we added it
-        if [ -f /etc/cockpit/cockpit.conf ]; then
-            # Remove the lines we added
-            sed -i '/^AllowUnencrypted = true$/d' /etc/cockpit/cockpit.conf 2>/dev/null || true
-            sed -i '/^LoginTo = false$/d' /etc/cockpit/cockpit.conf 2>/dev/null || true
-            # Remove file if only section headers and whitespace remain
-            if ! grep -qE '^[^[\s]' /etc/cockpit/cockpit.conf 2>/dev/null; then
-                rm -f /etc/cockpit/cockpit.conf
+        # Only revert cockpit.conf settings that we added during setup
+        if [ -f "${ONBOARDING_MARKER_DIR}/.cockpit-conf-modified" ] && [ -s "${ONBOARDING_MARKER_DIR}/.cockpit-conf-modified" ]; then
+            if [ -f /etc/cockpit/cockpit.conf ]; then
+                while IFS= read -r key; do
+                    [ -n "$key" ] || continue
+                    sed -i "/^${key} = .*$/d" /etc/cockpit/cockpit.conf 2>/dev/null || true
+                    echo "Removed ${key} from Cockpit configuration"
+                done < "${ONBOARDING_MARKER_DIR}/.cockpit-conf-modified"
+                if ! grep -qE '^[^[\s]' /etc/cockpit/cockpit.conf 2>/dev/null; then
+                    rm -f /etc/cockpit/cockpit.conf
+                fi
             fi
-            echo "Cleaned up Cockpit configuration"
+            rm -f "${ONBOARDING_MARKER_DIR}/.cockpit-conf-modified"
+        else
+            echo "Cockpit configuration was not modified by onboarding, skipping"
+            rm -f "${ONBOARDING_MARKER_DIR}/.cockpit-conf-modified" 2>/dev/null || true
         fi
+
+        rm -f /etc/sudoers.d/flightctl-onboarding 2>/dev/null || true
+        rm -f /etc/polkit-1/rules.d/49-flightctl-onboarding.rules 2>/dev/null || true
+        echo "Removed sudoers and polkit rules"
 
         # Delete the onboarding user last — terminating the user severs the
         # Cockpit session that spawned this script, so all critical work

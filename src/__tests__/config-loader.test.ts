@@ -438,7 +438,7 @@ describe("loadConfig", () => {
         expect(config.brandName).toBe("Flight Control");
         expect(config.network?.activationTimeoutSeconds).toBe(30);
         expect(config.network?.wifiAp?.dhcpLeaseDuration).toBe("1h");
-        expect(config.network?.wifiAp?.watchdogTimeoutSeconds).toBe(240);
+        expect(config.network?.wifiAp?.watchdogTimeoutSeconds).toBe(420);
         expect(config.network?.wifiAp?.driver).toBe("nl80211");
         expect(config.network?.wifiAp?.hwMode).toBe("g");
         expect(config.network?.wifiAp?.scanWaitMs).toBe(3000);

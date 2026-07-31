@@ -94,55 +94,7 @@ write_status() {
 
 rollback_network() {
     log "Rolling back network configuration"
-
-    local rollback_performed=false
-
-    # Check if the original setup used WiFi AP mode
-    local wifi_ap_unit
-    wifi_ap_unit=$(systemctl list-units --plain --no-legend 'flightctl-onboarding-wifi-ap@*.service' 2>/dev/null | awk '{print $1}' | head -n 1)
-    if [ -n "$wifi_ap_unit" ]; then
-        log "WiFi AP service found ($wifi_ap_unit), re-enabling"
-        systemctl enable "$wifi_ap_unit" 2>/dev/null || true
-        systemctl start "$wifi_ap_unit" 2>/dev/null || true
-        rollback_performed=true
-    else
-        # Check for setup service — it may have already been stopped
-        local setup_iface
-        setup_iface=$(systemctl list-units --plain --no-legend 'flightctl-onboarding-wifi-ap@*.service' --all 2>/dev/null | awk '{print $1}' | head -n 1 | sed 's/.*@//;s/\.service//')
-        if [ -n "$setup_iface" ]; then
-            log "Found inactive WiFi AP for $setup_iface, restarting setup"
-            systemctl start "flightctl-onboarding-wifi-ap@${setup_iface}.service" 2>/dev/null || true
-            rollback_performed=true
-        fi
-    fi
-
-    if [ "$rollback_performed" = "false" ]; then
-        if ! nmcli connection show "$ONBOARDING_SETUP_CONNECTION" >/dev/null 2>&1; then
-            local first_ethernet
-            first_ethernet=$(nmcli -t -f DEVICE,TYPE device | grep ':ethernet$' | head -n 1 | cut -d: -f1)
-            if [ -n "$first_ethernet" ]; then
-                nmcli connection add \
-                    type ethernet \
-                    con-name "$ONBOARDING_SETUP_CONNECTION" \
-                    ifname "$first_ethernet" \
-                    ipv4.method auto \
-                    ipv6.method auto \
-                    connection.autoconnect yes \
-                    connection.autoconnect-priority 100 2>/dev/null || true
-                nmcli connection up "$ONBOARDING_SETUP_CONNECTION" 2>/dev/null || true
-                rollback_performed=true
-                log "Restored onboarding Ethernet connection on $first_ethernet"
-            fi
-        else
-            nmcli connection up "$ONBOARDING_SETUP_CONNECTION" 2>/dev/null || true
-            rollback_performed=true
-            log "Reactivated existing onboarding Ethernet connection"
-        fi
-    fi
-
-    if [ "$rollback_performed" = "true" ]; then
-        systemctl restart NetworkManager 2>/dev/null || true
-    fi
+    restore_setup_network 2>&1 | while IFS= read -r line; do log "$line"; done
 }
 
 reenter_setup_mode() {

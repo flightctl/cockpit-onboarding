@@ -20,6 +20,9 @@
 #       [--port <port>] [--required]
 set -euo pipefail
 
+# shellcheck source=common.sh
+. /usr/libexec/flightctl-onboarding/common.sh
+
 HOSTS=""
 IFACE=""
 PORT="443"
@@ -115,6 +118,8 @@ for host in "${HOST_LIST[@]}"; do
     if [ -z "$host" ]; then
         continue
     fi
+
+    validate_hostname_or_ip "$host"
 
     if is_ip_address "$host"; then
         echo "INFO: ${host} is an IP address, skipping DNS resolution"

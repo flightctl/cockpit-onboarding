@@ -40,7 +40,7 @@ TMPFILE=$(mktemp "${LABELS_FILE}.XXXXXX")
 {
     if [ "$DEFAULT_LABELS" != "{}" ]; then
         echo "default-labels:"
-        echo "$DEFAULT_LABELS" | jq -r 'to_entries[] | "  \(.key): \"\(.value)\""'
+        echo "$DEFAULT_LABELS" | jq -r 'to_entries[] | "  \(.key): \"\(.value | gsub("\\\\"; "\\\\") | gsub("\""; "\\\""))\""'
     fi
     if [ "$SYSTEMINFO_LABELS" != "{}" ]; then
         echo "label-from-systeminfo:"

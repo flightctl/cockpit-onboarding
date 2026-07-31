@@ -104,13 +104,15 @@ export function createStreamParser(
 }
 
 /**
- * Create a temp file with 0600 permissions atomically via mktemp, then write
- * content into the already-restricted file. This avoids TOCTOU races where
- * a file is created world-readable and then chmod'd.
+ * Create a temp file with 0600 permissions and write content into it.
+ * Uses a single shell pipeline so the file is never world-readable:
+ * mktemp creates the file with 0600, then content is written directly
+ * via cockpit.spawn to avoid cockpit.file().replace() creating an
+ * intermediate temp file with the process umask.
  */
 export async function createSecureTempFile(content: string, prefix = ".params-"): Promise<string> {
     const tmpPath = (await cockpit.spawn(["mktemp", `/tmp/${prefix}XXXXXX.json`], { err: "message" })).trim();
-    await cockpit.file(tmpPath).replace(content);
+    await cockpit.spawn(["tee", tmpPath], { err: "message" }).input(content);
     return tmpPath;
 }
 

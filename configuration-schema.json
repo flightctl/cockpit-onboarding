@@ -436,7 +436,7 @@
           "dhcpRangeSize": 40,
           "channel": 6,
           "dhcpLeaseDuration": "1h",
-          "watchdogTimeoutSeconds": 240,
+          "watchdogTimeoutSeconds": 420,
           "driver": "nl80211",
           "hwMode": "g",
           "scanWaitMs": 3000
