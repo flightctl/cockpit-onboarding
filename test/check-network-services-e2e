@@ -455,6 +455,44 @@ class TestProxyE2E(TestNetworkServicesE2EBase):
         )
 
 
+    def testProxyWithoutHttps(self):
+        """Configure proxy with applyForHttps disabled and verify HTTPS_PROXY is absent"""
+        m = self.machine
+        b = self.browser
+
+        self.login_and_go(
+            "/system-onboarding", user="onboarding", password="",
+            superuser=False, tls=True,
+        )
+
+        self.select_production_nic_with_static_ip()
+        self.configure_proxy(NETSERVICES_IP, SQUID_PORT)
+        b.click("label[for='proxy-apply-for-https']")
+        click_button_text(b, "Next")
+
+        self.skip_enrollment_and_apply("proxy-no-https-test")
+
+        with b.wait_timeout(120):
+            b.wait_in_text(
+                "#apply-success-alert",
+                "Configuration completed successfully",
+            )
+
+        expected_url = f"http://{NETSERVICES_IP}:{SQUID_PORT}"
+
+        env = m.execute("cat /etc/environment")
+        self.assertIn(f'HTTP_PROXY="{expected_url}"', env)
+        self.assertNotIn("HTTPS_PROXY", env)
+        self.assertIn('NO_PROXY="localhost,127.0.0.1,::1"', env)
+
+        dropin = m.execute(
+            "cat /etc/systemd/system.conf.d/"
+            "50-flightctl-onboarding-proxy.conf"
+        )
+        self.assertIn(f'"HTTP_PROXY={expected_url}"', dropin)
+        self.assertNotIn("HTTPS_PROXY", dropin)
+
+
 class TestEnrollmentThroughProxyE2E(OnboardingMachineCase):
     """Enroll against Flight Control through a real Squid proxy (3 VMs)"""
 
