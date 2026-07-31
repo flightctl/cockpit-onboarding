@@ -193,10 +193,14 @@ if [ $1 -eq 0 ]; then
     rm -f /etc/sudoers.d/flightctl-onboarding || :
     rm -f /etc/polkit-1/rules.d/49-flightctl-onboarding.rules || :
 
-    # Clean up Cockpit configuration changes made during setup
-    if [ -f /etc/cockpit/cockpit.conf ]; then
-        sed -i '/^AllowUnencrypted = true$/d' /etc/cockpit/cockpit.conf 2>/dev/null || :
-        sed -i '/^LoginTo = false$/d' /etc/cockpit/cockpit.conf 2>/dev/null || :
+    # Only revert cockpit.conf settings that we added during setup
+    if [ -f /var/lib/flightctl-onboarding/.cockpit-conf-modified ] && \
+       [ -s /var/lib/flightctl-onboarding/.cockpit-conf-modified ] && \
+       [ -f /etc/cockpit/cockpit.conf ]; then
+        while IFS= read -r key; do
+            [ -n "$key" ] || continue
+            sed -i "/^${key} = .*$/d" /etc/cockpit/cockpit.conf 2>/dev/null || :
+        done < /var/lib/flightctl-onboarding/.cockpit-conf-modified
         if ! grep -qE '^[^[\s]' /etc/cockpit/cockpit.conf 2>/dev/null; then
             rm -f /etc/cockpit/cockpit.conf || :
         fi
