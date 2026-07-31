@@ -6,7 +6,6 @@
   "autoReboot": false,
   "network": {
     "activationTimeoutSeconds": 30,
-    "cockpitPort": 9090,
     "wifiAp": {
       "enabled": true,
       "ssidPrefix": "flightctl-",

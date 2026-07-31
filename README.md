@@ -166,7 +166,6 @@ The override file does not need to contain all keys — only the values you want
 | `hideModules` | bool | `true` | Hide other Cockpit modules during onboarding |
 | `autoReboot` | bool | `false` | Reboot the device after onboarding completes |
 | `network.activationTimeoutSeconds` | int | `30` | Seconds to wait for a NetworkManager connection to activate |
-| `network.cockpitPort` | int | `9090` | TCP port Cockpit listens on; opened in the onboarding firewall zone |
 | `network.wifiAp.enabled` | bool | `true` | Enable WiFi AP provisioning |
 | `network.wifiAp.ssidPrefix` | string | `"flightctl-"` | SSID prefix; suffix is auto-generated from DMI serial or MAC |
 | `network.wifiAp.interface` | string | `""` | WiFi interface for the AP; empty = auto-detect |

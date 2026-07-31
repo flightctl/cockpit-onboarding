@@ -108,6 +108,13 @@ detect_interface() {
     return 0
 }
 
+# Read the Cockpit port from the cockpit.socket systemd unit, falling back to 9090.
+get_cockpit_port() {
+    local port
+    port=$(systemctl show cockpit.socket -p Listen 2>/dev/null | grep -oE '[0-9]+[[:space:]]+\(Stream\)' | head -1 | grep -oE '[0-9]+')
+    echo "${port:-9090}"
+}
+
 ONBOARDING_FW_ZONE="fc-onboarding-ap"
 
 # Ensure the dedicated onboarding firewalld zone exists.
@@ -126,7 +133,7 @@ ensure_firewall_zone() {
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --set-target=REJECT
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-service=dhcp
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-service=dns
-    COCKPIT_PORT=$(load_config '.network.cockpitPort' '9090')
+    COCKPIT_PORT=$(get_cockpit_port)
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=${COCKPIT_PORT}/tcp
     firewall-cmd --permanent --zone="$ONBOARDING_FW_ZONE" --add-port=80/tcp
     firewall-cmd --reload

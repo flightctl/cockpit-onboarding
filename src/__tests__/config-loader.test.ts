@@ -204,31 +204,6 @@ describe("validateConfig", () => {
             });
         });
 
-        describe("cockpitPort", () => {
-            test("accepts port 9090", () => {
-                expect(() => validateConfig(makeValidConfig({ network: { cockpitPort: 9090 } }))).not.toThrow();
-            });
-
-            test("accepts port 1", () => {
-                expect(() => validateConfig(makeValidConfig({ network: { cockpitPort: 1 } }))).not.toThrow();
-            });
-
-            test("accepts port 65535", () => {
-                expect(() => validateConfig(makeValidConfig({ network: { cockpitPort: 65535 } }))).not.toThrow();
-            });
-
-            test("rejects port 0", () => {
-                expect(() => validateConfig(makeValidConfig({ network: { cockpitPort: 0 } }))).toThrow(
-                    "network.cockpitPort must be a number between 1 and 65535"
-                );
-            });
-
-            test("rejects port 65536", () => {
-                expect(() => validateConfig(makeValidConfig({ network: { cockpitPort: 65536 } }))).toThrow(
-                    "network.cockpitPort must be a number between 1 and 65535"
-                );
-            });
-        });
     });
 
     describe("connectivityTest new fields", () => {
@@ -462,7 +437,6 @@ describe("loadConfig", () => {
         expect(config.version).toBe("1.0");
         expect(config.brandName).toBe("Flight Control");
         expect(config.network?.activationTimeoutSeconds).toBe(30);
-        expect(config.network?.cockpitPort).toBe(9090);
         expect(config.network?.wifiAp?.dhcpLeaseDuration).toBe("1h");
         expect(config.network?.wifiAp?.watchdogTimeoutSeconds).toBe(240);
         expect(config.network?.wifiAp?.driver).toBe("nl80211");
