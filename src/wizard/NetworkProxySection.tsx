@@ -132,7 +132,6 @@ const NetworkProxySection = () => {
                                 </Select>
                             </FlexItem>
                             <FlexItem>
-                                {/* TODO: Review backend wiring for applyForHttps (apply-proxy.sh, enrollment). */}
                                 <Switch
                                     id="proxy-apply-for-https"
                                     label={_("Apply for HTTPS")}

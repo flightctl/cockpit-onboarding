@@ -44,7 +44,7 @@ TMPFILE=$(mktemp "${LABELS_FILE}.XXXXXX")
     fi
     if [ "$SYSTEMINFO_LABELS" != "{}" ]; then
         echo "label-from-systeminfo:"
-        echo "$SYSTEMINFO_LABELS" | jq -r 'to_entries[] | "  \(.key): \(.value)"'
+        echo "$SYSTEMINFO_LABELS" | jq -r 'to_entries[] | "  \(.key): \"\(.value | gsub("\\\\"; "\\\\") | gsub("\""; "\\\""))\""'
     fi
 } > "$TMPFILE"
 

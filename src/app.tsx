@@ -64,7 +64,7 @@ import {
     validateNetworkStep,
     validateEnrollmentStep,
     validateLabelsStep,
-    validateNetworkServicesConfig,
+    validateNetworkServicesStep,
     validateReviewStep,
 } from "./wizard/WizardSteps.ts";
 
@@ -347,7 +347,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
 
     // Compute validation state for each step
     const isNetworkStepValid = validateNetworkStep(model);
-    const isNetworkServicesConfigValid = validateNetworkServicesConfig(model);
+    const isNetworkServicesConfigValid = validateNetworkServicesStep(model);
     const isEnrollmentStepValid = validateEnrollmentStep(model);
     const isLabelsStepValid = validateLabelsStep(model);
     const isReviewStepValid = validateReviewStep(model);

@@ -236,7 +236,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
     const { config } = useConfig();
     const brandName = getBrandName(config);
     const { model, updateModel, networkManager, cancelEnrollmentRef } = useModelContext();
-    const [hasStarted, setHasStarted] = useState(false);
+    const hasStartedRef = React.useRef(false);
     const [isEnrollmentSelected, setIsEnrollmentSelected] = useState(false);
     const [steps, setSteps] = useState<Step[]>([]);
     const [results, setResults] = useState<EnrollmentProgressResultItem[]>([]);
@@ -717,7 +717,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
 
     // Main execution function
     const executeEnrollment = async () => {
-        setHasStarted(true);
+        hasStartedRef.current = true;
         shouldCancelRef.current = false;
         signalRef.current = { cancelled: false };
         updateModel("enrollmentProgress", { executionState: "running" });
@@ -880,12 +880,12 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
     }, []);
 
     useEffect(() => {
-        if (!isApplyAuthorized || steps.length === 0 || hasStarted) {
+        if (!isApplyAuthorized || steps.length === 0 || hasStartedRef.current) {
             return;
         }
         executeEnrollment();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isApplyAuthorized, steps, hasStarted]);
+    }, [isApplyAuthorized, steps]);
 
     useEffect(() => {
         if (model.enrollmentProgress.executionState === "failed") {

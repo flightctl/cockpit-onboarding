@@ -27,7 +27,6 @@ import FormHelperText from "../components/HelperTexts";
 import { AliasMode, useModelContext } from "../model-context";
 import { useConfig } from "../app";
 import { getBrandName } from "../flightctl-enrollment";
-import { useIsConnectedViaInterface } from "../hooks/useIsConnectedViaInterface";
 import { resolveAliasValue } from "../services/alias";
 import { WIZARD_STEP_IDS, type WizardStepId } from "./WizardSteps";
 import { GenericLabel, ServiceEnrollmentConfig } from "../types";
@@ -290,12 +289,6 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
         updateModel("connectivityTestRequired", checked);
     };
 
-    const isSingleNic = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
-
-    useEffect(() => {
-        updateModel("isSingleNic", isSingleNic);
-    }, [isSingleNic]); // eslint-disable-line react-hooks/exhaustive-deps
-
     const aliasSummary =
         model.alias.mode === AliasMode.NONE
             ? _("Not set")
@@ -315,7 +308,7 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
                 </Alert>
             </StackItem>
 
-            {isSingleNic && (
+            {model.isSingleNic && (
                 <StackItem>
                     <Alert id="review-singlenic-warning" variant="warning" isInline title={_("Connection will be interrupted")}>
                         {_(

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
-import React from "react";
+import React, { useEffect } from "react";
 import cockpit from "cockpit";
 
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
@@ -30,12 +30,16 @@ const SetupInterfaceAlert = ({ isWifi }: { isWifi: boolean }) => {
 };
 
 const SelectedNetworkInterfaceAlert = () => {
-    const { model, networkManager } = useModelContext();
+    const { model, updateModel, networkManager } = useModelContext();
 
     const interfaces = networkManager?.list_interfaces?.() || [];
     const selectedIface = interfaces.find((iface) => iface.Name === model.networkInterface.selectedInterface);
 
     const isSetupIface = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
+
+    useEffect(() => {
+        updateModel("isSingleNic", isSetupIface);
+    }, [isSetupIface]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!selectedIface) {
         return null;
