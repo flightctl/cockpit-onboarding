@@ -20,6 +20,9 @@
 #       [--port <port>] [--required]
 set -euo pipefail
 
+# shellcheck source=common.sh
+. /usr/libexec/flightctl-onboarding/common.sh
+
 HOSTS=""
 IFACE=""
 PORT="443"
