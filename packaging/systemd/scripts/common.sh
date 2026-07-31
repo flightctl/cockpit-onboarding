@@ -108,11 +108,10 @@ detect_interface() {
     return 0
 }
 
-# Read the Cockpit port from /etc/cockpit/cockpit.conf, falling back to 9090.
-# This is the single source of truth for the port; config.json no longer carries it.
+# Read the Cockpit port from the cockpit.socket systemd unit, falling back to 9090.
 get_cockpit_port() {
     local port
-    port=$(grep -E '^Port\s*=' /etc/cockpit/cockpit.conf 2>/dev/null | tail -1 | sed 's/^Port\s*=\s*//' | tr -d '[:space:]')
+    port=$(systemctl show cockpit.socket -p Listen 2>/dev/null | grep -oE '[0-9]+[[:space:]]+\(Stream\)' | head -1 | grep -oE '[0-9]+')
     echo "${port:-9090}"
 }
 
