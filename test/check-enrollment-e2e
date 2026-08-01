@@ -379,7 +379,7 @@ class TestEnrollmentE2E(TestEnrollmentE2EBase):
         self.assertIn('env: "production"', labels_yaml)
         self.assertIn('region: "us-east"', labels_yaml)
         self.assertIn("label-from-systeminfo:", labels_yaml)
-        self.assertIn("arch: architecture", labels_yaml)
+        self.assertIn('arch: "architecture"', labels_yaml)
 
         click_button_text(b, "Finish")
 
