@@ -173,6 +173,14 @@ def click_button_text(b, text):
     )
 
 
+def wait_next_enabled(b):
+    """Wait for the Next button to become enabled (e.g. after async single-NIC detection)."""
+    b.wait_js_cond(
+        "Array.from(document.querySelectorAll('button'))"
+        ".some(el => el.textContent.trim() === 'Next' && !el.disabled)"
+    )
+
+
 def wait_button_text(b, text):
     b.wait_js_cond(
         f"Array.from(document.querySelectorAll('button'))"
@@ -202,6 +210,7 @@ def complete_network_step(b):
     b.wait_visible("#networkStep")
     b.wait_visible(IFACE_TABLE)
     b.wait_visible(f"{IFACE_TABLE} tbody input[type='radio']:checked")
+    wait_next_enabled(b)
     click_button_text(b, "Next")
 
 

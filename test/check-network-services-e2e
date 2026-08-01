@@ -29,6 +29,7 @@ from wizard_navigation import (
     click_button_text,
     iface_row_selector,
     wait_for_nic,
+    wait_next_enabled,
 )
 
 TEST_IMAGE = os.environ.get("TEST_OS", "fedora-43")
@@ -153,6 +154,7 @@ class TestNetworkServicesE2EBase(OnboardingMachineCase):
         b.set_input_text("#subnet-mask", SUBNET_MASK)
         b.set_input_text("#gateway-ip", NETSERVICES_IP)
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
 
@@ -300,6 +302,7 @@ class TestNtpE2E(TestNetworkServicesE2EBase):
         b.set_input_text("#ipv6-address", "fd00::10/64")
         b.set_input_text("#gateway-ipv6", "fd00::1")
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
 
@@ -627,6 +630,7 @@ class TestEnrollmentThroughProxyE2E(OnboardingMachineCase):
         b.wait_visible("#primary-dns-ipv4")
         b.set_input_text("#primary-dns-ipv4", SERVICES_IP)
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
 
         # ── Network Services step ─────────────────────────────────────
