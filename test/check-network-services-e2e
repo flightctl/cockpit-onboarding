@@ -470,7 +470,8 @@ class TestProxyE2E(TestNetworkServicesE2EBase):
 
         self.select_production_nic_with_static_ip()
         self.configure_proxy(NETSERVICES_IP, SQUID_PORT)
-        b.click("label[for='proxy-apply-for-https']")
+        b.click("#proxy-apply-for-https + span")
+        b.wait_not_present("#proxy-apply-for-https:checked")
         click_button_text(b, "Next")
 
         self.skip_enrollment_and_apply("proxy-no-https-test")

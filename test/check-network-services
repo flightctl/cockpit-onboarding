@@ -195,7 +195,7 @@ class TestProxy(OnboardingMachineCase):
         self.assertEqual(b.attr("#proxy-password-input", "type"), "password")
 
     def testProxyApplyForHttpsToggle(self):
-        """Test that the Apply for HTTPS switch toggles and disables for non-HTTP protocols"""
+        """Test that the Apply for HTTPS toggle is independent of protocol selection"""
         b = self.browser
 
         b.click("label[for='proxy-enabled']")
@@ -204,16 +204,16 @@ class TestProxy(OnboardingMachineCase):
         b.wait_visible("#proxy-apply-for-https")
         self.assertTrue(b.is_present("#proxy-apply-for-https:checked"))
 
-        b.click("label[for='proxy-apply-for-https']")
-        self.assertFalse(b.is_present("#proxy-apply-for-https:checked"))
+        b.click("#proxy-apply-for-https + span")
+        b.wait_not_present("#proxy-apply-for-https:checked")
 
         b.click("#proxy-protocol-select")
         b.click("#proxy-protocol-select-menu li:nth-child(2) button")
-        self.assertTrue(b.attr("#proxy-apply-for-https", "disabled") is not None)
+        self.assertFalse(b.is_present("#proxy-apply-for-https:checked"))
 
         b.click("#proxy-protocol-select")
         b.click("#proxy-protocol-select-menu li:nth-child(3) button")
-        self.assertTrue(b.attr("#proxy-apply-for-https", "disabled") is not None)
+        self.assertFalse(b.is_present("#proxy-apply-for-https:checked"))
 
         b.click("#proxy-protocol-select")
         b.click("#proxy-protocol-select-menu li:nth-child(1) button")
