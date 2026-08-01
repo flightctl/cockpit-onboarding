@@ -35,11 +35,12 @@ const SelectedNetworkInterfaceAlert = () => {
     const interfaces = networkManager?.list_interfaces?.() || [];
     const selectedIface = interfaces.find((iface) => iface.Name === model.networkInterface.selectedInterface);
 
-    const isSetupIface = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
+    const { isConnected: isSetupIface, isResolved } = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
 
     useEffect(() => {
         updateModel("isSingleNic", isSetupIface);
-    }, [isSetupIface]); // eslint-disable-line react-hooks/exhaustive-deps
+        updateModel("isSingleNicResolved", isResolved);
+    }, [isSetupIface, isResolved]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!selectedIface) {
         return null;

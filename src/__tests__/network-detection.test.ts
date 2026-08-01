@@ -19,9 +19,10 @@ describe("useIsConnectedViaInterface", () => {
         mockedIsConnectedViaInterface.mockReset();
     });
 
-    test("returns false when no interface is selected", () => {
+    test("returns false and resolved when no interface is selected", () => {
         const { result } = renderHook(() => useIsConnectedViaInterface(null));
-        expect(result.current).toBe(false);
+        expect(result.current.isConnected).toBe(false);
+        expect(result.current.isResolved).toBe(true);
         expect(mockedIsConnectedViaInterface).not.toHaveBeenCalled();
     });
 
@@ -31,7 +32,8 @@ describe("useIsConnectedViaInterface", () => {
         const { result } = renderHook(() => useIsConnectedViaInterface("eth0"));
 
         await waitFor(() => {
-            expect(result.current).toBe(true);
+            expect(result.current.isConnected).toBe(true);
+            expect(result.current.isResolved).toBe(true);
         });
         expect(mockedIsConnectedViaInterface).toHaveBeenCalledWith("eth0");
     });
@@ -50,13 +52,14 @@ describe("useIsConnectedViaInterface", () => {
         rerender({ iface: "eth1" });
 
         await waitFor(() => {
-            expect(result.current).toBe(false);
+            expect(result.current.isConnected).toBe(false);
+            expect(result.current.isResolved).toBe(true);
         });
 
         resolveFirst(true);
 
         await waitFor(() => {
-            expect(result.current).toBe(false);
+            expect(result.current.isConnected).toBe(false);
         });
     });
 });

@@ -528,7 +528,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     <WizardStep
                         name={_("Network")}
                         id={WIZARD_STEP_IDS.network}
-                        footer={{ isNextDisabled: !isNetworkStepValid, isCancelHidden: true }}
+                        footer={{ isNextDisabled: !isNetworkStepValid || !model.isSingleNicResolved, isCancelHidden: true }}
                     >
                         <FormWrapper>
                             <NetworkPage interfaces={interfaces} />
