@@ -208,15 +208,15 @@ class TestProxy(OnboardingMachineCase):
         self.assertFalse(b.is_present("#proxy-apply-for-https:checked"))
 
         b.click("#proxy-protocol-select")
-        b.click("button:contains('HTTPS')")
+        b.click("#proxy-protocol-select-menu button[value='https']")
         self.assertTrue(b.attr("#proxy-apply-for-https", "disabled") is not None)
 
         b.click("#proxy-protocol-select")
-        b.click("button:contains('SOCKS5')")
+        b.click("#proxy-protocol-select-menu button[value='socks5']")
         self.assertTrue(b.attr("#proxy-apply-for-https", "disabled") is not None)
 
         b.click("#proxy-protocol-select")
-        b.click("button:contains('HTTP')")
+        b.click("#proxy-protocol-select-menu button[value='http']")
         self.assertFalse(b.is_present("#proxy-apply-for-https:checked"))
 
     def testProxyApplyForHttpsDefaultBehavior(self):
