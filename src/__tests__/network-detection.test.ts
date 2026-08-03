@@ -43,8 +43,8 @@ describe("useCockpitConnectedInterface", () => {
 
     test("starts unresolved and transitions to resolved", async () => {
         let resolve: (value: string | null) => void = () => {};
-        const promise = new Promise<string | null>((r) => {
-            resolve = r;
+        const promise = new Promise<string | null>((_resolve) => {
+            resolve = _resolve;
         });
         mockedGetCockpitConnectedInterface.mockReturnValue(promise);
 
