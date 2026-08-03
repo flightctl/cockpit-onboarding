@@ -124,7 +124,8 @@ function parseLocalAddressFromSsLine(line: string): string | null {
     const localAddrPort = fields[3];
     let addr: string;
     if (localAddrPort.startsWith("[")) {
-        addr = localAddrPort.replace(/^\[/, "").replace(/\]:\d+$/, "");
+        const match = localAddrPort.match(/^\[([^\]]+)\]/);
+        addr = match ? match[1] : "";
     } else {
         addr = localAddrPort.replace(/:\d+$/, "");
     }
@@ -147,16 +148,16 @@ function parseInterfaceFromIpLine(line: string): string | null {
     return match ? match[1] : null;
 }
 
-let cachedCockpitConnectedInterface: string | null | undefined;
+let cachedCockpitConnectedInterfaces: string[] | undefined;
 
-export async function getCockpitConnectedInterface(): Promise<string | null> {
-    if (cachedCockpitConnectedInterface !== undefined) {
-        return cachedCockpitConnectedInterface;
+export async function getCockpitConnectedInterfaces(): Promise<string[]> {
+    if (cachedCockpitConnectedInterfaces !== undefined) {
+        return cachedCockpitConnectedInterfaces;
     }
 
     if (isLocalhost(window.location.hostname)) {
-        cachedCockpitConnectedInterface = null;
-        return null;
+        cachedCockpitConnectedInterfaces = [];
+        return [];
     }
 
     const port = await getCockpitWsPort();
@@ -174,13 +175,12 @@ export async function getCockpitConnectedInterface(): Promise<string | null> {
         );
     } catch (error) {
         console.warn("Failed to query cockpit-ws connections:", error);
-        cachedCockpitConnectedInterface = null;
-        return null;
+        return [];
     }
 
     if (cockpitLocalAddrs.size === 0) {
-        cachedCockpitConnectedInterface = null;
-        return null;
+        cachedCockpitConnectedInterfaces = [];
+        return [];
     }
 
     const addrToInterface = new Map<string, string>();
@@ -198,20 +198,19 @@ export async function getCockpitConnectedInterface(): Promise<string | null> {
         }
     } catch (error) {
         console.warn("Failed to query interface addresses:", error);
-        cachedCockpitConnectedInterface = null;
-        return null;
+        return [];
     }
 
+    const connected = new Set<string>();
     for (const addr of cockpitLocalAddrs) {
         const iface = addrToInterface.get(addr);
         if (iface) {
-            cachedCockpitConnectedInterface = iface;
-            return iface;
+            connected.add(iface);
         }
     }
 
-    cachedCockpitConnectedInterface = null;
-    return null;
+    cachedCockpitConnectedInterfaces = [...connected];
+    return cachedCockpitConnectedInterfaces;
 }
 
 export async function getDefaultInterface(interfaces: Interface[]): Promise<string | null> {

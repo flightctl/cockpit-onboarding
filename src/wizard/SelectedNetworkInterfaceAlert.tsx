@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
-import React, { useEffect } from "react";
+import React, { useLayoutEffect } from "react";
 import cockpit from "cockpit";
 
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
@@ -35,10 +35,11 @@ const SelectedNetworkInterfaceAlert = () => {
     const interfaces = networkManager?.list_interfaces?.() || [];
     const selectedIface = interfaces.find((iface) => iface.Name === model.networkInterface.selectedInterface);
 
-    const { cockpitInterface, isResolved } = useCockpitConnectedInterface();
-    const isSetupIface = isResolved && cockpitInterface !== null && model.networkInterface.selectedInterface === cockpitInterface;
+    const { cockpitInterfaces, isResolved } = useCockpitConnectedInterface();
+    const selectedInterface = model.networkInterface.selectedInterface;
+    const isSetupIface = isResolved && selectedInterface !== null && cockpitInterfaces.includes(selectedInterface);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (isResolved) {
             updateModel("isSingleNic", isSetupIface);
             updateModel("isSingleNicResolved", true);

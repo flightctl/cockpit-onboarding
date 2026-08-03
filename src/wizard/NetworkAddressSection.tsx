@@ -24,8 +24,8 @@ const _ = cockpit.gettext;
 const NetworkAddressSection = () => {
     const { model } = useModelContext();
 
-    const { cockpitInterface } = useCockpitConnectedInterface();
-    const isSetupInterface = model.networkInterface.selectedInterface !== null && model.networkInterface.selectedInterface === cockpitInterface;
+    const { cockpitInterfaces } = useCockpitConnectedInterface();
+    const isSetupInterface = model.networkInterface.selectedInterface !== null && cockpitInterfaces.includes(model.networkInterface.selectedInterface);
 
     // Hide arping/ping availability check buttons when they can't produce reliable results:
     // - setup interface: changing its IP would break the browser session

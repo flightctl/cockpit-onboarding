@@ -1,21 +1,21 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 import { useEffect, useState } from "react";
 
-import { getCockpitConnectedInterface } from "../services/network";
+import { getCockpitConnectedInterfaces } from "../services/network";
 
 export function useCockpitConnectedInterface(): {
-    cockpitInterface: string | null;
+    cockpitInterfaces: string[];
     isResolved: boolean;
 } {
-    const [cockpitInterface, setCockpitInterface] = useState<string | null>(null);
+    const [cockpitInterfaces, setCockpitInterfaces] = useState<string[]>([]);
     const [isResolved, setIsResolved] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
 
-        getCockpitConnectedInterface().then((result) => {
+        getCockpitConnectedInterfaces().then((result) => {
             if (!cancelled) {
-                setCockpitInterface(result);
+                setCockpitInterfaces(result);
                 setIsResolved(true);
             }
         });
@@ -25,5 +25,5 @@ export function useCockpitConnectedInterface(): {
         };
     }, []);
 
-    return { cockpitInterface, isResolved };
+    return { cockpitInterfaces, isResolved };
 }
