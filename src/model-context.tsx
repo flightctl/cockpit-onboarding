@@ -69,6 +69,7 @@ export interface Model {
     connectivityTestRequired: boolean;
     connectivityTestRequiredEdited: boolean;
     isSingleNic: boolean;
+    isSingleNicResolved: boolean;
     enrollmentProgress: {
         currentStep: number; // 0-3
         stepStates: ("pending" | "running" | "success" | "error")[];
@@ -171,6 +172,7 @@ const initialModel: Model = {
     connectivityTestRequired: true,
     connectivityTestRequiredEdited: false,
     isSingleNic: false,
+    isSingleNicResolved: false,
     enrollmentProgress: {
         currentStep: 0,
         stepStates: ["pending", "pending", "pending", "pending"],

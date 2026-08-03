@@ -32,6 +32,8 @@ export async function applyProxyConfiguration(proxy: ProxyConfig): Promise<StepA
         params.password = proxy.password;
     }
 
+    params.applyForHttps = String(proxy.applyForHttps);
+
     const noProxy = proxy.noProxy
         .split(",")
         .map((s) => s.trim())

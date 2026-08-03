@@ -49,8 +49,8 @@ export function buildEnrollmentParams(
         ENROLLMENT_USE_EXISTING: Boolean(enrollment.useExisting),
         ENROLLMENT_HOSTNAME: model.hostname.value,
         ENROLLMENT_INTERFACE: model.networkInterface.selectedInterface || "",
-        // TODO: Review backend wiring for proxy.applyForHttps (flightctl-enroll.sh).
         ENROLLMENT_PROXY_ENABLED: networkProxy.enabled,
+        ENROLLMENT_PROXY_APPLY_FOR_HTTPS: networkProxy.applyForHttps,
         ENROLLMENT_PROXY_PROTOCOL: networkProxy.protocol || "http",
         ENROLLMENT_PROXY_HOSTNAME: networkProxy.hostname || "",
         ENROLLMENT_PROXY_PORT: networkProxy.port ?? "",

@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
-import React from "react";
+import React, { useLayoutEffect } from "react";
 import cockpit from "cockpit";
 
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 
-import { useIsConnectedViaInterface } from "../hooks/useIsConnectedViaInterface";
+import { useCockpitConnectedInterface } from "../hooks/useCockpitConnectedInterface";
 import { useModelContext } from "../model-context";
 import { Interface } from "../../pkg/networkmanager/interfaces";
 
@@ -30,12 +30,21 @@ const SetupInterfaceAlert = ({ isWifi }: { isWifi: boolean }) => {
 };
 
 const SelectedNetworkInterfaceAlert = () => {
-    const { model, networkManager } = useModelContext();
+    const { model, updateModel, networkManager } = useModelContext();
 
     const interfaces = networkManager?.list_interfaces?.() || [];
     const selectedIface = interfaces.find((iface) => iface.Name === model.networkInterface.selectedInterface);
 
-    const isSetupIface = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
+    const { cockpitInterfaces, isResolved } = useCockpitConnectedInterface();
+    const selectedInterface = model.networkInterface.selectedInterface;
+    const isSetupIface = isResolved && selectedInterface !== null && cockpitInterfaces.includes(selectedInterface);
+
+    useLayoutEffect(() => {
+        if (isResolved) {
+            updateModel("isSingleNic", isSetupIface);
+            updateModel("isSingleNicResolved", true);
+        }
+    }, [isSetupIface, isResolved]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!selectedIface) {
         return null;

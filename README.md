@@ -334,6 +334,15 @@ During onboarding, the device runs with a deliberately reduced security posture 
 
 **Operator responsibility:** Anyone who can reach the device's Cockpit port on the setup network (WiFi AP or Ethernet) during the onboarding window can log in and configure the device. Ensure the setup network segment is physically or logically isolated from untrusted networks.
 
+### Security considerations for deployers
+
+The default configuration prioritizes ease of first-boot setup. When building OS images for production deployments, deployers should harden the following settings in `config.json`:
+
+- **WiFi AP password** — The default WiFi AP password is `onboarding` (set via `network.wifiAp.password`). Deployers building OS images should set a strong, unique password to prevent unauthorized devices from joining the setup network.
+- **Onboarding user password** — The default onboarding user is created with no password (`passwd -d`), allowing passwordless Cockpit login. Deployers should set a password via `onboardingUser.password` in `config.json` for production deployments.
+- **Unencrypted Cockpit access** — During onboarding, `AllowUnencrypted = true` is set in `/etc/cockpit/cockpit.conf` to support first-boot access over the WiFi AP captive portal. This setting is automatically reverted when onboarding completes.
+- **SSH access** — SSH login is blocked for the onboarding user via a `DenyUsers onboarding` directive in sshd configuration. Only Cockpit web console access is permitted during the onboarding window.
+
 ## Testing
 
 For detailed test environment setup guides, see:

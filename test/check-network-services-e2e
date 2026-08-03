@@ -29,6 +29,7 @@ from wizard_navigation import (
     click_button_text,
     iface_row_selector,
     wait_for_nic,
+    wait_next_enabled,
 )
 
 TEST_IMAGE = os.environ.get("TEST_OS", "fedora-43")
@@ -153,6 +154,7 @@ class TestNetworkServicesE2EBase(OnboardingMachineCase):
         b.set_input_text("#subnet-mask", SUBNET_MASK)
         b.set_input_text("#gateway-ip", NETSERVICES_IP)
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
 
@@ -300,6 +302,7 @@ class TestNtpE2E(TestNetworkServicesE2EBase):
         b.set_input_text("#ipv6-address", "fd00::10/64")
         b.set_input_text("#gateway-ipv6", "fd00::1")
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
 
@@ -455,6 +458,45 @@ class TestProxyE2E(TestNetworkServicesE2EBase):
         )
 
 
+    def testProxyWithoutHttps(self):
+        """Configure proxy with applyForHttps disabled and verify HTTPS_PROXY is absent"""
+        m = self.machine
+        b = self.browser
+
+        self.login_and_go(
+            "/system-onboarding", user="onboarding", password="",
+            superuser=False, tls=True,
+        )
+
+        self.select_production_nic_with_static_ip()
+        self.configure_proxy(NETSERVICES_IP, SQUID_PORT)
+        b.click("#proxy-apply-for-https + span")
+        b.wait_not_present("#proxy-apply-for-https:checked")
+        click_button_text(b, "Next")
+
+        self.skip_enrollment_and_apply("proxy-no-https-test")
+
+        with b.wait_timeout(120):
+            b.wait_in_text(
+                "#apply-success-alert",
+                "Configuration completed successfully",
+            )
+
+        expected_url = f"http://{NETSERVICES_IP}:{SQUID_PORT}"
+
+        env = m.execute("cat /etc/environment")
+        self.assertIn(f'HTTP_PROXY="{expected_url}"', env)
+        self.assertNotIn("HTTPS_PROXY", env)
+        self.assertIn('NO_PROXY="localhost,127.0.0.1,::1"', env)
+
+        dropin = m.execute(
+            "cat /etc/systemd/system.conf.d/"
+            "50-flightctl-onboarding-proxy.conf"
+        )
+        self.assertIn(f'"HTTP_PROXY={expected_url}"', dropin)
+        self.assertNotIn("HTTPS_PROXY", dropin)
+
+
 class TestEnrollmentThroughProxyE2E(OnboardingMachineCase):
     """Enroll against Flight Control through a real Squid proxy (3 VMs)"""
 
@@ -589,6 +631,7 @@ class TestEnrollmentThroughProxyE2E(OnboardingMachineCase):
         b.wait_visible("#primary-dns-ipv4")
         b.set_input_text("#primary-dns-ipv4", SERVICES_IP)
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
 
         # ── Network Services step ─────────────────────────────────────

@@ -33,6 +33,7 @@ from wizard_navigation import (
     click_button_text,
     iface_row_selector,
     wait_for_nic,
+    wait_next_enabled,
 )
 
 TEST_IMAGE = os.environ.get("TEST_OS", "fedora-43")
@@ -177,6 +178,7 @@ class TestEnrollmentE2EBase(OnboardingMachineCase):
         b.wait_visible("#primary-dns-ipv4")
         b.set_input_text("#primary-dns-ipv4", self.SERVICES_IP)
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
 
         b.wait_visible("#networkServicesStep")
@@ -377,7 +379,7 @@ class TestEnrollmentE2E(TestEnrollmentE2EBase):
         self.assertIn('env: "production"', labels_yaml)
         self.assertIn('region: "us-east"', labels_yaml)
         self.assertIn("label-from-systeminfo:", labels_yaml)
-        self.assertIn("arch: architecture", labels_yaml)
+        self.assertIn('arch: "architecture"', labels_yaml)
 
         click_button_text(b, "Finish")
 

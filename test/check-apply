@@ -24,6 +24,7 @@ from wizard_navigation import (
     complete_enrollment_step,
     iface_row_selector,
     wait_for_nic,
+    wait_next_enabled,
 )
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 
@@ -70,6 +71,7 @@ class TestApplyConfiguration(OnboardingMachineCase):
         b.wait_visible(IFACE_TABLE)
         row_sel = iface_row_selector(b, IFACE_TABLE, self.production_iface)
         b.click(f"{row_sel} input[type='radio']")
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
@@ -137,6 +139,7 @@ class TestApplySingleNic(OnboardingMachineCase):
         if not b.is_present(f"{iface_radio}:checked"):
             b.click(iface_radio)
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
@@ -233,6 +236,7 @@ class TestApplySingleNicRollback(OnboardingMachineCase):
         if not b.is_present(f"{iface_radio}:checked"):
             b.click(iface_radio)
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
@@ -433,6 +437,7 @@ class TestApplyTcpFallback(OnboardingMachineCase):
         b.set_input_text("#subnet-mask", TCP_NETMASK)
         b.set_input_text("#gateway-ip", TCP_NS_IP4)
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
@@ -501,6 +506,7 @@ class TestApplyTcpFallback(OnboardingMachineCase):
         b.set_input_text("#ipv6-address", f"{TCP_HOST_IP6}/64")
         b.set_input_text("#gateway-ipv6", TCP_NS_IP6)
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
@@ -667,6 +673,7 @@ class TestApplyVlan(OnboardingMachineCase):
         b.wait_visible("#primary-dns-ipv4")
         b.set_input_text("#primary-dns-ipv4", VLAN_NS_IP)
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")

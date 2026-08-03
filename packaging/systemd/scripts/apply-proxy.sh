@@ -27,12 +27,13 @@ if [ ! -f "$PARAMS_FILE" ]; then
     exit 1
 fi
 
-PROTOCOL=$(jq -r '.protocol // "http"' "$PARAMS_FILE")
-PROXY_HOST=$(jq -r '.hostname // empty' "$PARAMS_FILE")
-PROXY_PORT=$(jq -r '.port // empty' "$PARAMS_FILE")
-USERNAME=$(jq -r '.username // empty' "$PARAMS_FILE")
-PASSWORD=$(jq -r '.password // empty' "$PARAMS_FILE")
-NO_PROXY_EXTRA=$(jq -r '.noProxy // empty' "$PARAMS_FILE")
+PROTOCOL=$(jq -r '.protocol // "http"' "$PARAMS_FILE" | tr -d '\n\r')
+PROXY_HOST=$(jq -r '.hostname // empty' "$PARAMS_FILE" | tr -d '\n\r')
+PROXY_PORT=$(jq -r '.port // empty' "$PARAMS_FILE" | tr -d '\n\r')
+USERNAME=$(jq -r '.username // empty' "$PARAMS_FILE" | tr -d '\n\r')
+PASSWORD=$(jq -r '.password // empty' "$PARAMS_FILE" | tr -d '\n\r')
+NO_PROXY_EXTRA=$(jq -r '.noProxy // empty' "$PARAMS_FILE" | tr -d '\n\r')
+APPLY_FOR_HTTPS=$(jq -r '.applyForHttps // "true"' "$PARAMS_FILE" | tr -d '\n\r')
 
 if [ -z "$PROXY_HOST" ] || [ -z "$PROXY_PORT" ]; then
     echo "Error: hostname and port are required" >&2
@@ -65,9 +66,14 @@ SYSTEMD_DROPIN="${SYSTEMD_DROPIN_DIR}/50-flightctl-onboarding-proxy.conf"
 mkdir -p "$SYSTEMD_DROPIN_DIR"
 
 TMPFILE=$(mktemp "${SYSTEMD_DROPIN}.XXXXXX")
+DEFAULT_ENV="\"HTTP_PROXY=${PROXY_URL}\""
+if [ "$APPLY_FOR_HTTPS" = "true" ]; then
+    DEFAULT_ENV="${DEFAULT_ENV} \"HTTPS_PROXY=${PROXY_URL}\""
+fi
+DEFAULT_ENV="${DEFAULT_ENV} \"NO_PROXY=${NO_PROXY}\""
 cat > "$TMPFILE" <<EOF
 [Manager]
-DefaultEnvironment="HTTP_PROXY=${PROXY_URL}" "HTTPS_PROXY=${PROXY_URL}" "NO_PROXY=${NO_PROXY}"
+DefaultEnvironment=${DEFAULT_ENV}
 EOF
 chmod 0600 "$TMPFILE"
 mv "$TMPFILE" "$SYSTEMD_DROPIN"
@@ -78,18 +84,19 @@ echo "Wrote systemd proxy drop-in: $SYSTEMD_DROPIN"
 ENV_FILE="/etc/environment"
 MARKER="# flightctl-onboarding proxy"
 if [ -f "$ENV_FILE" ]; then
-    # Remove previous onboarding proxy block
-    sed -i "/${MARKER}/,+3d" "$ENV_FILE"
+    sed -i "/^${MARKER}$/,/^$/{ /^${MARKER}$/d; /^HTTP_PROXY=/d; /^HTTPS_PROXY=/d; /^NO_PROXY=/d; /^$/d; }" "$ENV_FILE"
 else
     touch "$ENV_FILE"
 fi
 
-cat >> "$ENV_FILE" <<EOF
-${MARKER}
-HTTP_PROXY="${PROXY_URL_STRIPPED}"
-HTTPS_PROXY="${PROXY_URL_STRIPPED}"
-NO_PROXY="${NO_PROXY}"
-EOF
+{
+    echo "${MARKER}"
+    echo "HTTP_PROXY=\"${PROXY_URL_STRIPPED}\""
+    if [ "$APPLY_FOR_HTTPS" = "true" ]; then
+        echo "HTTPS_PROXY=\"${PROXY_URL_STRIPPED}\""
+    fi
+    echo "NO_PROXY=\"${NO_PROXY}\""
+} >> "$ENV_FILE"
 
 chmod 0644 "$ENV_FILE"
 echo "Updated /etc/environment with proxy settings (credentials excluded)"

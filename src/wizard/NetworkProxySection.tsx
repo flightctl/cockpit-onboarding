@@ -61,10 +61,7 @@ const NetworkProxySection = () => {
     };
 
     const handleProxyProtocolChange = (value: ProxyProtocol) => {
-        updateNestedModel("networkServices", "proxy", {
-            protocol: value,
-            applyForHttps: value === "http",
-        });
+        updateNestedModel("networkServices", "proxy", { protocol: value });
     };
 
     const setApplyForHttps = (applyForHttps: boolean) => {
@@ -72,7 +69,6 @@ const NetworkProxySection = () => {
     };
 
     const selectedProtocol = model.networkServices.proxy.protocol;
-    const isHttpProtocol = selectedProtocol === "http";
     const selectedProtocolLabel =
         PROXY_PROTOCOLS.find((protocol) => protocol.value === selectedProtocol)?.label ?? _("HTTP");
 
@@ -132,12 +128,10 @@ const NetworkProxySection = () => {
                                 </Select>
                             </FlexItem>
                             <FlexItem>
-                                {/* TODO: Review backend wiring for applyForHttps (apply-proxy.sh, enrollment). */}
                                 <Switch
                                     id="proxy-apply-for-https"
                                     label={_("Apply for HTTPS")}
                                     isChecked={model.networkServices.proxy.applyForHttps}
-                                    isDisabled={!isHttpProtocol}
                                     onChange={(_event, checked) => setApplyForHttps(checked)}
                                 />
                             </FlexItem>

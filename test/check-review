@@ -19,6 +19,7 @@ from wizard_navigation import (
     click_button_text,
     complete_enrollment_step,
     iface_row_selector,
+    wait_next_enabled,
 )
 
 REVIEW_NETWORK = "#review-network"
@@ -187,6 +188,7 @@ class TestReviewSingleNic(OnboardingMachineCase):
         if not b.is_present(f"{iface_radio}:checked"):
             b.click(iface_radio)
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")

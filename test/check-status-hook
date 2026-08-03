@@ -23,6 +23,7 @@ from wizard_navigation import (
     complete_enrollment_step,
     iface_row_selector,
     wait_for_nic,
+    wait_next_enabled,
 )
 
 HOOK_LOG = "/var/log/flightctl-onboarding-hook-test.log"
@@ -136,6 +137,7 @@ class TestStatusHook(OnboardingMachineCase):
         row_sel = iface_row_selector(b, IFACE_TABLE, self.production_iface)
         b.click(f"{row_sel} input[type='radio']")
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
@@ -241,6 +243,7 @@ class TestStatusHookSingleNic(OnboardingMachineCase):
         if not b.is_present(f"{iface_radio}:checked"):
             b.click(iface_radio)
 
+        wait_next_enabled(b)
         click_button_text(b, "Next")
         b.wait_visible("#networkServicesStep")
         click_button_text(b, "Next")
