@@ -1,65 +1,63 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 import { renderHook, waitFor } from "@testing-library/react";
 
-import { useIsConnectedViaInterface } from "../hooks/useIsConnectedViaInterface";
-import { isConnectedViaInterface } from "../services/network";
+import { useCockpitConnectedInterface } from "../hooks/useCockpitConnectedInterface";
+import { getCockpitConnectedInterface } from "../services/network";
 
 jest.mock("../services/network", () => {
     const actual = jest.requireActual("../services/network");
     return {
         ...actual,
-        isConnectedViaInterface: jest.fn(),
+        getCockpitConnectedInterface: jest.fn(),
     };
 });
 
-const mockedIsConnectedViaInterface = isConnectedViaInterface as jest.MockedFunction<typeof isConnectedViaInterface>;
+const mockedGetCockpitConnectedInterface = getCockpitConnectedInterface as jest.MockedFunction<typeof getCockpitConnectedInterface>;
 
-describe("useIsConnectedViaInterface", () => {
+describe("useCockpitConnectedInterface", () => {
     beforeEach(() => {
-        mockedIsConnectedViaInterface.mockReset();
+        mockedGetCockpitConnectedInterface.mockReset();
     });
 
-    test("returns false and resolved when no interface is selected", () => {
-        const { result } = renderHook(() => useIsConnectedViaInterface(null));
-        expect(result.current.isConnected).toBe(false);
-        expect(result.current.isResolved).toBe(true);
-        expect(mockedIsConnectedViaInterface).not.toHaveBeenCalled();
-    });
+    test("returns null and resolved when no cockpit interface is found", async () => {
+        mockedGetCockpitConnectedInterface.mockResolvedValue(null);
 
-    test("resolves connection state for the selected interface", async () => {
-        mockedIsConnectedViaInterface.mockResolvedValue(true);
-
-        const { result } = renderHook(() => useIsConnectedViaInterface("eth0"));
+        const { result } = renderHook(() => useCockpitConnectedInterface());
 
         await waitFor(() => {
-            expect(result.current.isConnected).toBe(true);
             expect(result.current.isResolved).toBe(true);
         });
-        expect(mockedIsConnectedViaInterface).toHaveBeenCalledWith("eth0");
+        expect(result.current.cockpitInterface).toBeNull();
     });
 
-    test("ignores stale results after the selected interface changes", async () => {
-        let resolveFirst: (value: boolean) => void = () => {};
-        const firstPromise = new Promise<boolean>((resolve) => {
-            resolveFirst = resolve;
-        });
-        mockedIsConnectedViaInterface.mockReturnValueOnce(firstPromise).mockResolvedValueOnce(false);
+    test("returns interface name when cockpit is connected through an interface", async () => {
+        mockedGetCockpitConnectedInterface.mockResolvedValue("eth0");
 
-        const { result, rerender } = renderHook(({ iface }) => useIsConnectedViaInterface(iface), {
-            initialProps: { iface: "eth0" },
-        });
-
-        rerender({ iface: "eth1" });
+        const { result } = renderHook(() => useCockpitConnectedInterface());
 
         await waitFor(() => {
-            expect(result.current.isConnected).toBe(false);
             expect(result.current.isResolved).toBe(true);
+            expect(result.current.cockpitInterface).toBe("eth0");
         });
+    });
 
-        resolveFirst(true);
+    test("starts unresolved and transitions to resolved", async () => {
+        let resolve: (value: string | null) => void = () => {};
+        const promise = new Promise<string | null>((r) => {
+            resolve = r;
+        });
+        mockedGetCockpitConnectedInterface.mockReturnValue(promise);
+
+        const { result } = renderHook(() => useCockpitConnectedInterface());
+
+        expect(result.current.isResolved).toBe(false);
+        expect(result.current.cockpitInterface).toBeNull();
+
+        resolve("eth1");
 
         await waitFor(() => {
-            expect(result.current.isConnected).toBe(false);
+            expect(result.current.isResolved).toBe(true);
+            expect(result.current.cockpitInterface).toBe("eth1");
         });
     });
 });

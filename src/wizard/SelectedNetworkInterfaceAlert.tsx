@@ -4,7 +4,7 @@ import cockpit from "cockpit";
 
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 
-import { useIsConnectedViaInterface } from "../hooks/useIsConnectedViaInterface";
+import { useCockpitConnectedInterface } from "../hooks/useCockpitConnectedInterface";
 import { useModelContext } from "../model-context";
 import { Interface } from "../../pkg/networkmanager/interfaces";
 
@@ -35,11 +35,14 @@ const SelectedNetworkInterfaceAlert = () => {
     const interfaces = networkManager?.list_interfaces?.() || [];
     const selectedIface = interfaces.find((iface) => iface.Name === model.networkInterface.selectedInterface);
 
-    const { isConnected: isSetupIface, isResolved } = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
+    const { cockpitInterface, isResolved } = useCockpitConnectedInterface();
+    const isSetupIface = isResolved && cockpitInterface !== null && model.networkInterface.selectedInterface === cockpitInterface;
 
     useEffect(() => {
-        updateModel("isSingleNic", isSetupIface);
-        updateModel("isSingleNicResolved", isResolved);
+        if (isResolved) {
+            updateModel("isSingleNic", isSetupIface);
+            updateModel("isSingleNicResolved", true);
+        }
     }, [isSetupIface, isResolved]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!selectedIface) {

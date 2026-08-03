@@ -142,9 +142,21 @@ function parseAddressFromIpAddrLine(line: string): string | null {
     return normalizeIpv6(match[1]);
 }
 
-export async function isConnectedViaInterface(ifaceName: string): Promise<boolean> {
+function parseInterfaceFromIpLine(line: string): string | null {
+    const match = line.match(/^\d+:\s+(\S+)\s/);
+    return match ? match[1] : null;
+}
+
+let cachedCockpitConnectedInterface: string | null | undefined;
+
+export async function getCockpitConnectedInterface(): Promise<string | null> {
+    if (cachedCockpitConnectedInterface !== undefined) {
+        return cachedCockpitConnectedInterface;
+    }
+
     if (isLocalhost(window.location.hostname)) {
-        return false;
+        cachedCockpitConnectedInterface = null;
+        return null;
     }
 
     const port = await getCockpitWsPort();
@@ -162,36 +174,44 @@ export async function isConnectedViaInterface(ifaceName: string): Promise<boolea
         );
     } catch (error) {
         console.warn("Failed to query cockpit-ws connections:", error);
-        return false;
+        cachedCockpitConnectedInterface = null;
+        return null;
     }
 
     if (cockpitLocalAddrs.size === 0) {
-        return false;
+        cachedCockpitConnectedInterface = null;
+        return null;
     }
 
-    let ifaceAddrs: Set<string>;
+    const addrToInterface = new Map<string, string>();
     try {
         const ipOutput = await cockpit.spawn(
-            ["ip", "-o", "addr", "show", ifaceName],
+            ["ip", "-o", "addr", "show"],
             { err: "message" }
         );
-        ifaceAddrs = new Set(
-            ipOutput.split("\n")
-                .map(parseAddressFromIpAddrLine)
-                .filter((a): a is string => a !== null)
-        );
+        for (const line of ipOutput.split("\n")) {
+            const iface = parseInterfaceFromIpLine(line);
+            const addr = parseAddressFromIpAddrLine(line);
+            if (iface && addr) {
+                addrToInterface.set(addr, iface);
+            }
+        }
     } catch (error) {
         console.warn("Failed to query interface addresses:", error);
-        return false;
+        cachedCockpitConnectedInterface = null;
+        return null;
     }
 
     for (const addr of cockpitLocalAddrs) {
-        if (ifaceAddrs.has(addr)) {
-            return true;
+        const iface = addrToInterface.get(addr);
+        if (iface) {
+            cachedCockpitConnectedInterface = iface;
+            return iface;
         }
     }
 
-    return false;
+    cachedCockpitConnectedInterface = null;
+    return null;
 }
 
 export async function getDefaultInterface(interfaces: Interface[]): Promise<string | null> {
