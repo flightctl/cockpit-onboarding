@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 
-# Prefer proper release tags pointing at this exact commit first, prioritizing
-# the highest version tag. If there is no tag at this commit, then fallback to
-# 'git describe' which will construct a "human-readable" artificial tag.
-tag=$(git -c "versionsort.suffix=-rc" tag --points-at HEAD --sort version:refname -l 'v*' | tail -n 1 2>/dev/null)
+# Prefer release/RC tags over development milestone tags (-main) when both
+# exist on the same commit. Fall back to any v* tag, then to git describe.
+tag=$(git -c "versionsort.suffix=-rc" tag --points-at HEAD --sort version:refname -l 'v*' | grep -v -- '-main$' | tail -n 1 2>/dev/null)
+if [[ -z "$tag" ]]; then
+  tag=$(git -c "versionsort.suffix=-rc" tag --points-at HEAD --sort version:refname -l 'v*' | tail -n 1 2>/dev/null)
+fi
 
 # When multiple tags exist on the same commit (e.g. v1.3.0-main and v1.2.0-rc1),
 # git describe may pick the wrong one. Re-resolve using version sorting at the
@@ -13,7 +15,10 @@ if [[ -z "$tag" ]]; then
   if [[ -n "$full_describe" ]]; then
     nearest_tag=$(git describe --tags --first-parent --match 'v*' --abbrev=0 2>/dev/null)
     base_commit=$(git rev-parse "$nearest_tag"^{commit} 2>/dev/null)
-    best_tag=$(git -c "versionsort.suffix=-rc" tag --points-at "$base_commit" --sort version:refname -l 'v*' | tail -n 1 2>/dev/null)
+    best_tag=$(git -c "versionsort.suffix=-rc" tag --points-at "$base_commit" --sort version:refname -l 'v*' | grep -v -- '-main$' | tail -n 1 2>/dev/null)
+    if [[ -z "$best_tag" ]]; then
+      best_tag=$(git -c "versionsort.suffix=-rc" tag --points-at "$base_commit" --sort version:refname -l 'v*' | tail -n 1 2>/dev/null)
+    fi
     if [[ -n "$best_tag" ]]; then
       tag="${best_tag}${full_describe#"$nearest_tag"}"
     else
