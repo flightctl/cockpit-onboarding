@@ -7,18 +7,15 @@ if [[ -z "$tag" ]]; then
   tag=$(git -c "versionsort.suffix=-rc" tag --points-at HEAD --sort version:refname -l 'v*' | tail -n 1 2>/dev/null)
 fi
 
-# When multiple tags exist on the same commit (e.g. v1.3.0-main and v1.2.0-rc1),
-# git describe may pick the wrong one. Re-resolve using version sorting at the
-# base commit and re-attach the distance and hash suffix.
+# For dev builds (no tag at HEAD), git describe finds the nearest tag. When
+# multiple tags exist on that base commit, prefer the highest version (-main)
+# so the dev version reflects the current development cycle.
 if [[ -z "$tag" ]]; then
   full_describe=$(git describe --tags --first-parent --match 'v*' 2>/dev/null)
   if [[ -n "$full_describe" ]]; then
     nearest_tag=$(git describe --tags --first-parent --match 'v*' --abbrev=0 2>/dev/null)
     base_commit=$(git rev-parse "$nearest_tag"^{commit} 2>/dev/null)
-    best_tag=$(git -c "versionsort.suffix=-rc" tag --points-at "$base_commit" --sort version:refname -l 'v*' | grep -v -- '-main$' | tail -n 1 2>/dev/null)
-    if [[ -z "$best_tag" ]]; then
-      best_tag=$(git -c "versionsort.suffix=-rc" tag --points-at "$base_commit" --sort version:refname -l 'v*' | tail -n 1 2>/dev/null)
-    fi
+    best_tag=$(git -c "versionsort.suffix=-rc" tag --points-at "$base_commit" --sort version:refname -l 'v*' | tail -n 1 2>/dev/null)
     if [[ -n "$best_tag" ]]; then
       tag="${best_tag}${full_describe#"$nearest_tag"}"
     else
