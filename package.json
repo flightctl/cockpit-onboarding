@@ -69,12 +69,12 @@
     "immutable": "^5.1.8"
   },
   "dependencies": {
-    "@patternfly/patternfly": "6.4.0",
-    "@patternfly/react-core": "6.4.0",
-    "@patternfly/react-icons": "6.4.0",
-    "@patternfly/react-styles": "6.4.0",
-    "@patternfly/react-table": "6.4.0",
-    "@patternfly/react-tokens": "6.4.0",
+    "@patternfly/patternfly": "6.6.1",
+    "@patternfly/react-core": "6.6.1",
+    "@patternfly/react-icons": "6.6.1",
+    "@patternfly/react-styles": "6.6.1",
+    "@patternfly/react-table": "6.6.1",
+    "@patternfly/react-tokens": "6.6.1",
     "dequal": "2.0.3",
     "react": "18.3.1",
     "react-dom": "18.3.1",
