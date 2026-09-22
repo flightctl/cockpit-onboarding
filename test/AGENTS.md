@@ -24,11 +24,13 @@ Tests run against QEMU VMs built with `bots/image-customize`. Each image is a qc
 | Make target          | Image file                          | What it provides                                                                                   |
 |----------------------|-------------------------------------|----------------------------------------------------------------------------------------------------|
 | `make vm`            | `test/images/$(TEST_OS)`            | Base VM with Cockpit and the onboarding RPM installed from source tarball. Used by `make check`.    |
-| `make vm-agent`      | `test/images/$(TEST_OS)`            | Agent/onboarding VM with the pre-built RPM, flightctl agent/CLI from COPR, dnsmasq, and on Fedora mac80211_hwsim (3 simulated radios) and WiFi stack (hostapd, wpa_supplicant). Used by `make check-integration`. |
+| `make vm-agent`      | `test/images/$(TEST_OS)`            | Agent/onboarding VM with the pre-built RPM, Flight Control agent/CLI from the selected stable or latest channel, dnsmasq, and on Fedora mac80211_hwsim (3 simulated radios) and WiFi stack (hostapd, wpa_supplicant). Used by `make check-integration`. |
 | `make vm-services`   | `test/images/fedora-44-services`    | Fedora 44 VM with flightctl-services (API, DB, KV, PAM issuer) pre-pulled via podman. Provides a self-contained Flight Control backend for enrollment e2e tests. Always Fedora-based. |
 | `make vm-network-services` | `test/images/fedora-44-network-services` | Fedora 44 VM with Squid HTTP proxy and chrony NTP server. Used by network-services e2e tests. Always Fedora-based. |
 
 The `TEST_OS` variable controls which OS is used for the agent VM (default: `fedora-44`). Supported values: `fedora-44`, `centos-9-stream`, `centos-10`. Services VMs are always Fedora-based regardless of `TEST_OS`.
+
+Flight Control packages default to the stable RPM repository. Set `FLIGHTCTL_CHANNEL=latest` with the `make vm-agent`, `make vm-services`, or `make deploy-test-vm` targets to use the COPR development repository.
 
 Build images before running tests — they are cached and only rebuilt when install scripts change.
 

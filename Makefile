@@ -6,6 +6,11 @@ ifeq ($(TEST_OS),)
 TEST_OS = fedora-44
 endif
 export TEST_OS
+FLIGHTCTL_CHANNEL ?= stable
+ifneq ($(filter latest stable,$(FLIGHTCTL_CHANNEL)),$(FLIGHTCTL_CHANNEL))
+$(error FLIGHTCTL_CHANNEL must be either latest or stable)
+endif
+export FLIGHTCTL_CHANNEL
 TARFILE=$(RPM_NAME)-$(VERSION).tar.xz
 NODE_CACHE=$(RPM_NAME)-node.tar.xz
 SPEC=$(RPM_NAME).spec
@@ -175,7 +180,8 @@ vm: $(VM_IMAGE)
 print-vm:
 	@echo $(VM_IMAGE)
 
-# Full test VM — installs pre-built RPM, flightctl agent/CLI from COPR,
+# Full test VM — installs pre-built RPM, flightctl agent/CLI from the selected
+# Flight Control package channel,
 # and on Fedora sets up mac80211_hwsim WiFi simulation.
 AGENT_IMAGE = $(CURDIR)/test/images/$(TEST_OS)
 $(AGENT_IMAGE): bots test/vm-agent.install
@@ -183,7 +189,9 @@ $(AGENT_IMAGE): bots test/vm-agent.install
 		|| $(MAKE) rpm
 	bots/image-customize --fresh \
 		--upload $$(ls -t bin/rpm/flightctl-onboarding-*.noarch.rpm | head -1):/var/tmp/ \
-		--script $(CURDIR)/test/vm-agent.install $(TEST_OS)
+		--upload $(CURDIR)/test/vm-agent.install:/var/tmp/vm-agent.install \
+		--run-command "FLIGHTCTL_CHANNEL=$(FLIGHTCTL_CHANNEL) /bin/sh /var/tmp/vm-agent.install" \
+		$(TEST_OS)
 
 vm-agent: $(AGENT_IMAGE)
 	@echo $(AGENT_IMAGE)
@@ -194,7 +202,9 @@ SERVICES_IMAGE = $(CURDIR)/test/images/fedora-44-services
 $(SERVICES_IMAGE): bots test/vm-flightctl-services.install
 	bots/image-customize --fresh \
 		--base-image fedora-44 \
-		--script $(CURDIR)/test/vm-flightctl-services.install fedora-44-services
+		--upload $(CURDIR)/test/vm-flightctl-services.install:/var/tmp/vm-flightctl-services.install \
+		--run-command "FLIGHTCTL_CHANNEL=$(FLIGHTCTL_CHANNEL) /bin/sh /var/tmp/vm-flightctl-services.install" \
+		fedora-44-services
 
 vm-services: $(SERVICES_IMAGE)
 	@echo $(SERVICES_IMAGE)
