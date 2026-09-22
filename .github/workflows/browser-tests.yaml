@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [fedora-43, fedora-44, centos-9-stream, centos-10]
+        os: [fedora-44, centos-9-stream, centos-10]
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -94,13 +94,13 @@ jobs:
             cockpit-images-${{ matrix.os }}-
 
       - name: Restore cached Fedora base image (for service VMs)
-        if: matrix.os != 'fedora-43'
+        if: matrix.os != 'fedora-44'
         uses: actions/cache/restore@v6
         with:
           path: ~/.cache/cockpit-images
-          key: cockpit-images-fedora-43-${{ hashFiles('Makefile') }}
+          key: cockpit-images-fedora-44-${{ hashFiles('Makefile') }}
           restore-keys: |
-            cockpit-images-fedora-43-
+            cockpit-images-fedora-44-
 
       - name: Download RPM
         uses: actions/download-artifact@v8

@@ -3,7 +3,7 @@ PACKAGE_NAME := $(shell awk '/"name":/ {gsub(/[",]/, "", $$2); print $$2}' packa
 RPM_NAME := flightctl-onboarding
 VERSION := $(shell T=$$(hack/current-version 2>/dev/null | sed 's/^v//'); [ -z "$$T" ] && T=0.0.1; echo $$T | tr '-' '.')
 ifeq ($(TEST_OS),)
-TEST_OS = fedora-43
+TEST_OS = fedora-44
 endif
 export TEST_OS
 TARFILE=$(RPM_NAME)-$(VERSION).tar.xz
@@ -190,22 +190,22 @@ vm-agent: $(AGENT_IMAGE)
 
 # Flight Control services VM for end-to-end enrollment tests
 # Always Fedora-based — this is infrastructure, not the OS under test.
-SERVICES_IMAGE = $(CURDIR)/test/images/fedora-43-services
+SERVICES_IMAGE = $(CURDIR)/test/images/fedora-44-services
 $(SERVICES_IMAGE): bots test/vm-flightctl-services.install
 	bots/image-customize --fresh \
-		--base-image fedora-43 \
-		--script $(CURDIR)/test/vm-flightctl-services.install fedora-43-services
+		--base-image fedora-44 \
+		--script $(CURDIR)/test/vm-flightctl-services.install fedora-44-services
 
 vm-services: $(SERVICES_IMAGE)
 	@echo $(SERVICES_IMAGE)
 
 # Network services VM (Squid proxy + chrony NTP) for e2e network-services tests
 # Always Fedora-based — this is infrastructure, not the OS under test.
-NETWORK_SERVICES_IMAGE = $(CURDIR)/test/images/fedora-43-network-services
+NETWORK_SERVICES_IMAGE = $(CURDIR)/test/images/fedora-44-network-services
 $(NETWORK_SERVICES_IMAGE): bots test/vm-network-services.install
 	bots/image-customize --fresh \
-		--base-image fedora-43 \
-		--script $(CURDIR)/test/vm-network-services.install fedora-43-network-services
+		--base-image fedora-44 \
+		--script $(CURDIR)/test/vm-network-services.install fedora-44-network-services
 
 vm-network-services: $(NETWORK_SERVICES_IMAGE)
 	@echo $(NETWORK_SERVICES_IMAGE)

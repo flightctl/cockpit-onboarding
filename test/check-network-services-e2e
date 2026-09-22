@@ -32,7 +32,7 @@ from wizard_navigation import (
     wait_next_enabled,
 )
 
-TEST_IMAGE = os.environ.get("TEST_OS", "fedora-43")
+TEST_IMAGE = os.environ.get("TEST_OS", "fedora-44")
 AGENT_CONFIG = "/etc/flightctl/config.yaml"
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
 TEST_DIR = os.path.dirname(__file__)
@@ -91,7 +91,7 @@ class TestNetworkServicesE2EBase(OnboardingMachineCase):
             'restrict': False,
         },
         'network_services': {
-            'image': os.path.join(TEST_DIR, 'images', 'fedora-43-network-services'),
+            'image': os.path.join(TEST_DIR, 'images', 'fedora-44-network-services'),
             'restrict': False,
         },
     }
@@ -506,11 +506,11 @@ class TestEnrollmentThroughProxyE2E(OnboardingMachineCase):
             'restrict': False,
         },
         'network_services': {
-            'image': os.path.join(TEST_DIR, 'images', 'fedora-43-network-services'),
+            'image': os.path.join(TEST_DIR, 'images', 'fedora-44-network-services'),
             'restrict': False,
         },
         'services': {
-            'image': os.path.join(TEST_DIR, 'images', 'fedora-43-services'),
+            'image': os.path.join(TEST_DIR, 'images', 'fedora-44-services'),
             'restrict': False,
             'memory_mb': 4096,
         },

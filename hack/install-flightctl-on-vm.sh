@@ -28,7 +28,7 @@ if [[ $# -ne 1 ]]; then
 fi
 
 VM_IP="$1"
-FEDORA_VERSION="${FEDORA_VERSION:-43}"
+FEDORA_VERSION="${FEDORA_VERSION:-44}"
 FLIGHTCTL_REPO_URL="${FLIGHTCTL_REPO_URL:-https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-${FEDORA_VERSION}/flightctl-redhat-et-flightctl-dev-fedora-${FEDORA_VERSION}.repo}"
 
 run_ssh() {
