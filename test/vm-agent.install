@@ -96,6 +96,16 @@ systemctl enable chronyd.service
 # Tests guarded by @onlyImage("fedora-*") will be skipped on other OSes.
 if [ "$ID" = "fedora" ]; then
 
+# Fedora 44's SELinux policy confines sshd-session and blocks the SSH local
+# forwarding used by the single-NIC enrollment tests from reaching Cockpit's
+# websm_port_t listener. Install a narrow local rule for that test-only path.
+dnf install -y policycoreutils
+mkdir -p /etc/selinux/local
+cat > /etc/selinux/local/flightctl-ssh-forwarding.cil <<'EOF'
+(allow sshd_session_t websm_port_t (tcp_socket (name_connect)))
+EOF
+semodule -i /etc/selinux/local/flightctl-ssh-forwarding.cil
+
 # kernel-modules-internal (which ships mac80211_hwsim.ko) and the rest of the
 # WiFi stack are already present on the Fedora cloud base image, matching the
 # running kernel. Do NOT `dnf install` here: pulling any of these in would
