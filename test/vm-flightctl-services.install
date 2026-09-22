@@ -113,7 +113,15 @@ timeout 120 bash -c '
 timeout 60 bash -c '
     while true; do
         if podman ps --quiet --filter "name=flightctl-kv" | grep -q . && \
-           podman exec flightctl-kv redis-cli ping >/dev/null 2>&1; then
+           podman exec flightctl-kv sh -c "
+               if command -v valkey-cli >/dev/null 2>&1; then
+                   valkey-cli -a \"\$KV_PASSWORD\" ping
+               elif command -v redis-cli >/dev/null 2>&1; then
+                   redis-cli -a \"\$KV_PASSWORD\" ping
+               else
+                   exit 1
+               fi
+           " >/dev/null 2>&1; then
             echo "Key-value service is ready" >&2
             break
         fi
