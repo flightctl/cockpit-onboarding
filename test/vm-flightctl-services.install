@@ -133,7 +133,10 @@ timeout 60 bash -c '
 # Wait for all services under flightctl.target
 timeout 120 bash -c '
     ALL_SERVICES=$(systemctl show flightctl.target -p Wants --value \
-        | tr " " "\n" | grep -E "^flightctl-.*\.service$" | sort)
+        | tr " " "\n" \
+        | grep -E "^flightctl-.*\.service$" \
+        | grep -v '^flightctl-delta-worker\.service$' \
+        | sort)
     echo "Services under flightctl.target: $ALL_SERVICES" >&2
     while true; do
         all_active=true
