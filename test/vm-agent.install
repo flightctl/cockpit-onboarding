@@ -1,9 +1,12 @@
 #!/bin/sh
 # Test VM image customization — builds the RPM, installs flightctl agent/CLI
-# from COPR, and (on Fedora only) sets up mac80211_hwsim WiFi simulation.
+# from the selected Flight Control package channel, and (on Fedora only) sets
+# up mac80211_hwsim WiFi simulation.
 set -eux
 
-# ── Detect OS for conditional behavior ───────────────────────────────
+FLIGHTCTL_CHANNEL="${FLIGHTCTL_CHANNEL:-stable}"
+
+# ── Detect OS for package repository and DNF syntax ───────────────────
 . /etc/os-release
 OS_MAJOR="${VERSION_ID%%.*}"
 
@@ -19,6 +22,30 @@ case "$ID" in
         else
             USE_DNF5=false
         fi
+        ;;
+    *)
+        echo "Unsupported operating system: $ID" >&2
+        exit 1
+        ;;
+esac
+
+case "$FLIGHTCTL_CHANNEL" in
+    stable)
+        case "$ID" in
+            fedora)
+                FLIGHTCTL_REPO_URL="https://rpm.flightctl.io/flightctl-fedora.repo"
+                ;;
+            centos|rhel)
+                FLIGHTCTL_REPO_URL="https://rpm.flightctl.io/flightctl-epel${OS_MAJOR}.repo"
+                ;;
+        esac
+        ;;
+    latest)
+        FLIGHTCTL_REPO_URL="https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/${COPR_CHROOT}/flightctl-redhat-et-flightctl-dev-${COPR_CHROOT}.repo"
+        ;;
+    *)
+        echo "FLIGHTCTL_CHANNEL must be either latest or stable: $FLIGHTCTL_CHANNEL" >&2
+        exit 1
         ;;
 esac
 
@@ -36,15 +63,15 @@ jq '.network.ethernet.enabled = false' \
     > /etc/cockpit/system-onboarding/config.json
 
 
-# ── Install flightctl agent + CLI from COPR (needed for e2e enrollment) ──
-COPR_REPO_URL="https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/${COPR_CHROOT}/flightctl-redhat-et-flightctl-dev-${COPR_CHROOT}.repo"
+# ── Install flightctl agent + CLI (needed for e2e enrollment) ────────────
+echo "Using Flight Control $FLIGHTCTL_CHANNEL repository: $FLIGHTCTL_REPO_URL"
 if [ "$ID" = "fedora" ]; then
-    dnf config-manager addrepo --from-repofile="${COPR_REPO_URL}"
+    dnf config-manager addrepo --from-repofile="${FLIGHTCTL_REPO_URL}"
 elif [ "$USE_DNF5" = true ]; then
-    dnf config-manager --add-repo "${COPR_REPO_URL}"
+    dnf config-manager --add-repo "${FLIGHTCTL_REPO_URL}"
 else
     dnf install -y dnf-plugins-core
-    dnf config-manager --add-repo "${COPR_REPO_URL}"
+    dnf config-manager --add-repo "${FLIGHTCTL_REPO_URL}"
 fi
 dnf install -y flightctl-agent flightctl-cli
 
@@ -68,6 +95,16 @@ systemctl enable chronyd.service
 # on Fedora. CentOS/RHEL kernels do not ship kernel-modules-internal.
 # Tests guarded by @onlyImage("fedora-*") will be skipped on other OSes.
 if [ "$ID" = "fedora" ]; then
+
+# Fedora 44's SELinux policy confines sshd-session and blocks the SSH local
+# forwarding used by the single-NIC enrollment tests from reaching Cockpit's
+# websm_port_t listener. Install a narrow local rule for that test-only path.
+dnf install -y policycoreutils
+mkdir -p /etc/selinux/local
+cat > /etc/selinux/local/flightctl-ssh-forwarding.cil <<'EOF'
+(allow sshd_session_t websm_port_t (tcp_socket (name_connect)))
+EOF
+semodule -i /etc/selinux/local/flightctl-ssh-forwarding.cil
 
 # kernel-modules-internal (which ships mac80211_hwsim.ko) and the rest of the
 # WiFi stack are already present on the Fedora cloud base image, matching the

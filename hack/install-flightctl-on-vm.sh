@@ -5,7 +5,8 @@
 #
 # Environment:
 #   SKIP_FLIGHTCTL=1          Skip installation entirely
-#   FLIGHTCTL_REPO_URL        .repo file (default: COPR @redhat-et/flightctl-dev for Fedora)
+#   FLIGHTCTL_CHANNEL         Package channel: stable or latest (default: stable)
+#   FLIGHTCTL_REPO_URL        Override the repository .repo file URL
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,7 +15,8 @@ usage() {
     echo "Usage: $0 <vm-ip>" >&2
     echo "  Install flightctl-cli, flightctl-agent, and flightctl-selinux from published RPMs." >&2
     echo "" >&2
-    echo "  Set SKIP_FLIGHTCTL=1 to skip. Override FLIGHTCTL_REPO_URL to use a different repo." >&2
+    echo "  Set SKIP_FLIGHTCTL=1 to skip. Set FLIGHTCTL_CHANNEL=latest for COPR builds." >&2
+    echo "  Override FLIGHTCTL_REPO_URL to use a different RPM repository." >&2
     exit 1
 }
 
@@ -28,8 +30,21 @@ if [[ $# -ne 1 ]]; then
 fi
 
 VM_IP="$1"
-FEDORA_VERSION="${FEDORA_VERSION:-43}"
-FLIGHTCTL_REPO_URL="${FLIGHTCTL_REPO_URL:-https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-${FEDORA_VERSION}/flightctl-redhat-et-flightctl-dev-fedora-${FEDORA_VERSION}.repo}"
+FEDORA_VERSION="${FEDORA_VERSION:-44}"
+FLIGHTCTL_CHANNEL="${FLIGHTCTL_CHANNEL:-stable}"
+case "$FLIGHTCTL_CHANNEL" in
+    stable)
+        DEFAULT_FLIGHTCTL_REPO_URL="https://rpm.flightctl.io/flightctl-fedora.repo"
+        ;;
+    latest)
+        DEFAULT_FLIGHTCTL_REPO_URL="https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-${FEDORA_VERSION}/flightctl-redhat-et-flightctl-dev-fedora-${FEDORA_VERSION}.repo"
+        ;;
+    *)
+        echo "FLIGHTCTL_CHANNEL must be either latest or stable: $FLIGHTCTL_CHANNEL" >&2
+        exit 1
+        ;;
+esac
+FLIGHTCTL_REPO_URL="${FLIGHTCTL_REPO_URL:-$DEFAULT_FLIGHTCTL_REPO_URL}"
 
 run_ssh() {
     ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -37,7 +52,7 @@ run_ssh() {
         "fedora@${VM_IP}" "$@"
 }
 
-echo "=== Installing flightctl packages on ${VM_IP} ==="
+echo "=== Installing Flight Control ${FLIGHTCTL_CHANNEL} packages on ${VM_IP} ==="
 
 run_ssh \
     FLIGHTCTL_REPO_URL="${FLIGHTCTL_REPO_URL}" \

@@ -4,7 +4,9 @@
 # and ready to start via `systemctl start flightctl.target`.
 set -eux
 
-# ── Detect OS for COPR repo and dnf syntax ───────────────────────────
+FLIGHTCTL_CHANNEL="${FLIGHTCTL_CHANNEL:-stable}"
+
+# ── Detect OS for package repository and DNF syntax ───────────────────
 . /etc/os-release
 OS_MAJOR="${VERSION_ID%%.*}"
 
@@ -21,6 +23,30 @@ case "$ID" in
             USE_DNF5=false
         fi
         ;;
+    *)
+        echo "Unsupported operating system: $ID" >&2
+        exit 1
+        ;;
+esac
+
+case "$FLIGHTCTL_CHANNEL" in
+    stable)
+        case "$ID" in
+            fedora)
+                FLIGHTCTL_REPO_URL="https://rpm.flightctl.io/flightctl-fedora.repo"
+                ;;
+            centos|rhel)
+                FLIGHTCTL_REPO_URL="https://rpm.flightctl.io/flightctl-epel${OS_MAJOR}.repo"
+                ;;
+        esac
+        ;;
+    latest)
+        FLIGHTCTL_REPO_URL="https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/${COPR_CHROOT}/flightctl-redhat-et-flightctl-dev-${COPR_CHROOT}.repo"
+        ;;
+    *)
+        echo "FLIGHTCTL_CHANNEL must be either latest or stable: $FLIGHTCTL_CHANNEL" >&2
+        exit 1
+        ;;
 esac
 
 # Fixed production-network identity for this image. check-enrollment-e2e
@@ -28,13 +54,13 @@ esac
 SERVICES_IP="10.111.118.1"
 BASE_DOMAIN="e2e-flightctl.test"
 
-# ── Install flightctl-services and CLI from COPR ────────────────────────
-COPR_REPO_URL="https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/${COPR_CHROOT}/flightctl-redhat-et-flightctl-dev-${COPR_CHROOT}.repo"
+# ── Install flightctl-services and CLI ──────────────────────────────────
+echo "Using Flight Control $FLIGHTCTL_CHANNEL repository: $FLIGHTCTL_REPO_URL"
 if [ "$USE_DNF5" = true ]; then
-    dnf config-manager addrepo --from-repofile="${COPR_REPO_URL}"
+    dnf config-manager addrepo --from-repofile="${FLIGHTCTL_REPO_URL}"
 else
     dnf install -y dnf-plugins-core
-    dnf config-manager --add-repo "${COPR_REPO_URL}"
+    dnf config-manager --add-repo "${FLIGHTCTL_REPO_URL}"
 fi
 dnf install -y flightctl-services flightctl-cli dnsmasq
 
@@ -113,7 +139,15 @@ timeout 120 bash -c '
 timeout 60 bash -c '
     while true; do
         if podman ps --quiet --filter "name=flightctl-kv" | grep -q . && \
-           podman exec flightctl-kv redis-cli ping >/dev/null 2>&1; then
+           podman exec flightctl-kv sh -c "
+               if command -v valkey-cli >/dev/null 2>&1; then
+                   valkey-cli -a \"\$KV_PASSWORD\" ping
+               elif command -v redis-cli >/dev/null 2>&1; then
+                   redis-cli -a \"\$KV_PASSWORD\" ping
+               else
+                   exit 1
+               fi
+           " >/dev/null 2>&1; then
             echo "Key-value service is ready" >&2
             break
         fi
@@ -125,7 +159,10 @@ timeout 60 bash -c '
 # Wait for all services under flightctl.target
 timeout 120 bash -c '
     ALL_SERVICES=$(systemctl show flightctl.target -p Wants --value \
-        | tr " " "\n" | grep -E "^flightctl-.*\.service$" | sort)
+        | tr " " "\n" \
+        | grep -E "^flightctl-.*\.service$" \
+        | grep -v '^flightctl-delta-worker\.service$' \
+        | sort)
     echo "Services under flightctl.target: $ALL_SERVICES" >&2
     while true; do
         all_active=true

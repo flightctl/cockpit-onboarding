@@ -36,7 +36,7 @@ from wizard_navigation import (
     wait_next_enabled,
 )
 
-TEST_IMAGE = os.environ.get("TEST_OS", "fedora-43")
+TEST_IMAGE = os.environ.get("TEST_OS", "fedora-44")
 AGENT_CONFIG = "/etc/flightctl/config.yaml"
 LABELS_CONFIG = "/etc/flightctl/conf.d/50-cockpit-labels.yaml"
 APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
@@ -61,7 +61,7 @@ class TestEnrollmentE2EBase(OnboardingMachineCase):
             'restrict': False,
         },
         'services': {
-            'image': os.path.join(TEST_DIR, 'images', 'fedora-43-services'),
+            'image': os.path.join(TEST_DIR, 'images', 'fedora-44-services'),
             'restrict': False,
             'memory_mb': 4096,
         },
