@@ -62,7 +62,11 @@ else
     dnf install -y dnf-plugins-core
     dnf config-manager --add-repo "${FLIGHTCTL_REPO_URL}"
 fi
-dnf install -y flightctl-services flightctl-cli dnsmasq
+if [ "$FLIGHTCTL_CHANNEL" = stable ]; then
+    dnf install -y --exclude='flightctl-*-*rc*' flightctl-services flightctl-cli dnsmasq
+else
+    dnf install -y flightctl-services flightctl-cli dnsmasq
+fi
 
 # ── Firewall: allow HTTPS gateway port and DNS ───────────────────────────
 if systemctl is-active -q firewalld.service; then
