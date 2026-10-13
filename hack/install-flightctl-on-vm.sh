@@ -55,6 +55,7 @@ run_ssh() {
 echo "=== Installing Flight Control ${FLIGHTCTL_CHANNEL} packages on ${VM_IP} ==="
 
 run_ssh \
+    FLIGHTCTL_CHANNEL="${FLIGHTCTL_CHANNEL}" \
     FLIGHTCTL_REPO_URL="${FLIGHTCTL_REPO_URL}" \
     bash -s <<'REMOTE'
 set -euo pipefail
@@ -66,7 +67,12 @@ sudo dnf install -y dnf-plugins-core
 sudo rm -f /etc/yum.repos.d/flightctl*.repo
 sudo dnf config-manager addrepo --from-repofile="${FLIGHTCTL_REPO_URL}"
 
-if ! sudo dnf install -y "${PACKAGES[@]}"; then
+DNF_ARGS=()
+if [[ "$FLIGHTCTL_CHANNEL" == stable ]]; then
+    DNF_ARGS+=(--exclude='flightctl-*-*rc*')
+fi
+
+if ! sudo dnf install -y "${DNF_ARGS[@]}" "${PACKAGES[@]}"; then
     echo "ERROR: Failed to install flightctl packages from ${FLIGHTCTL_REPO_URL}" >&2
     exit 1
 fi

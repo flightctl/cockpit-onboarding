@@ -73,7 +73,11 @@ else
     dnf install -y dnf-plugins-core
     dnf config-manager --add-repo "${FLIGHTCTL_REPO_URL}"
 fi
-dnf install -y flightctl-agent flightctl-cli
+if [ "$FLIGHTCTL_CHANNEL" = stable ]; then
+    dnf install -y --exclude='flightctl-*-*rc*' flightctl-agent flightctl-cli
+else
+    dnf install -y flightctl-agent flightctl-cli
+fi
 
 # ── Base cockpit setup (same as vm.install) ──────────────────────────
 mkdir -p /etc/cockpit
